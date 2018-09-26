@@ -32,12 +32,6 @@ Output is written into the folder `out`. You can visualize the content with para
 
 ![](movie.gif)
 
-## Open Issues
-
-* currently, there is as small difference between the reference solution and the partitioned solution. This difference vanishes over time. You can visualize this issue, by looking at countour plots of the reference solution (blue contours) and of the partitioned solution (white/red contours) in paraview:
-
-![](difference.png)
-
 ## References
 
 [1] Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Minutes-The FEniCS Tutorial Volume I." (2016).  

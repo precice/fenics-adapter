@@ -1,5 +1,3 @@
-This is our project for coupling FEniCS via preCICE to a heat transport solver (either OpenFOAM or SU2).
-
 # Setup
 
 ## OpenFOAM
@@ -36,7 +34,7 @@ To make sure that fenics is working properly, you should run at least one of the
 
 Copy the Folder `Fluid` and all its contents from https://github.com/precice/openfoam-adapter/tree/master/tutorials/CHT/flow-over-plate/buoyantPimpleFoam-laplacianFoam to this folder.
 
-## Running the coupled simulation
+# Running
 
 To start the fluid solver (OpenFOAM), run the following commands in a shell opened in this folder:
 
