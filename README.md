@@ -1,6 +1,8 @@
 # fenics-adapter
 **experimental** preCICE-adapter for the open source computing platform FEniCS
 
+**currently only supports 2D simulations in FEniCS**
+
 ## Installation
 
 Run ``python setup.py install`` from your shell.
