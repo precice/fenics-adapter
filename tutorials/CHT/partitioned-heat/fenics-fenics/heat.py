@@ -76,7 +76,7 @@ def fluxes_from_temperature_full_domain(F, V):
     fluxes_vector = assemble(F)  # assemble weak form -> evaluate integral
     v = TestFunction(V)
     fluxes = Function(V)  # create function for flux
-    area = assemble(v * ds).array()
+    area = assemble(v * ds).get_local()
     fluxes.vector()[area != 0] = fluxes_vector[area != 0] / area[area != 0]  # put weight from assemble on function, scale function by spatial resolution
     return fluxes
 
@@ -120,9 +120,8 @@ elif problem is ProblemType.NEUMANN:
     read_data_name = "Flux"
     write_data_name = "Temperature"
 
-T = 1.0  # final time
-num_steps = 10  # number of time steps
-dt = T / num_steps  # time step size
+T = 1  # final time
+dt = .1  # time step size
 alpha = 3  # parameter alpha
 beta = 1.3  # parameter beta
 y_bottom, y_top = 0, 1
@@ -162,6 +161,7 @@ coupling.initialize_data()
 bcs = [DirichletBC(V, u_D, remaining_boundary)]
 # Define initial value
 u_n = interpolate(u_D, V)
+u_n.rename("Temperature", "")
 
 # Define variational problem
 u = TrialFunction(V)
@@ -183,15 +183,27 @@ u_np1 = Function(V)
 F_known_u = u_np1 * v * dx + dt * dot(grad(u_np1), grad(v)) * dx - (u_n + dt * f) * v * dx
 u_np1.rename("Temperature", "")
 t = 0
-u_D.t = t + coupling.precice_tau
-assert (dt == coupling.precice_tau)
+
+# reference solution at t=0
+u_e = interpolate(u_D, V)
+u_e.rename("reference", " ")
 
 file_out = File("out/%s.pvd" % solver_name)
 ref_out = File("out/ref%s.pvd" % solver_name)
 
+# output solution and reference solution at t=0, n=0
+n = 0
+print('output u^%d and u_ref^%d' % (n, n))
+file_out << u_n
+ref_out << u_e
+
+# set t_1 = t_0 + dt, this gives u_D^1
+u_D.t = t + coupling.precice_tau
+assert (dt == coupling.precice_tau)
+
 while coupling.is_coupling_ongoing():
 
-    # Compute solution
+    # Compute solution u^n+1, use bcs u_D^n+1, u^n and coupling bcs
     solve(a == L, u_np1, bcs)
 
     if problem is ProblemType.DIRICHLET:
@@ -210,15 +222,19 @@ while coupling.is_coupling_ongoing():
         u_e.rename("reference", " ")
         error = assemble(inner(u_e - u_np1, u_e - u_np1)/(u_e * u_e) * dx)
         assert (error < 10e-4)
-        print('t = %.2f: error = %.3g' % (t, error))
-        # Update previous solution
+        print('n = %d, t = %.2f: error = %.3g' % (n, t, error))
+        # output solution and reference solution at t_n+1
+        print('output u^%d and u_ref^%d' % (n+1, n+1))
         file_out << u_np1
         ref_out << u_e
-        # Update current time
+        # Update current time t_n+1 = t_n + dt
         t += coupling.precice_tau
         # Update dirichlet BC
         u_D.t = t + coupling.precice_tau
+        # use u^n+1 as initial condition for next timestep
         u_n.assign(u_np1)
+        # n -> n+1
+        n += 1
 
 # Hold plot
 coupling.finalize()
