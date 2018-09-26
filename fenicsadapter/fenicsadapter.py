@@ -52,51 +52,13 @@ class CustomExpression(Expression):
         value[0] = self.rbf_interpol(x)
 
 
-def extract_subdomain_vertices(mesh, subdomain):
-    n = 0
-    vertices_x = []
-    vertices_y = []
-
-    if not issubclass(type(subdomain), SubDomain):
-        raise Exception("no correct coupling interface defined!")
-
-    for v in dolfin.vertices(mesh):
-        if subdomain.inside(v.point(), True):
-            n += 1
-            vertices_x.append(v.x(0))
-            vertices_y.append(v.x(1))
-
-    return np.stack([vertices_x, vertices_y]), n
-
-
-def extract_subdomain_coordinates(mesh, subdomain):
-    vertices, _ = extract_subdomain_vertices(mesh, subdomain)
-    vertices_x = vertices[0, :]
-    vertices_y = vertices[1, :]
-
-    return vertices_x, vertices_y
-
-
-def convert_fenics_to_precice(data, mesh, subdomain):
-    x_all, y_all = extract_subdomain_coordinates(mesh, subdomain)
-    if type(data) is dolfin.Function:
-        return np.array([data(x, y) for x, y in zip(x_all, y_all)])
-    else:
-        raise Exception("Cannot handle data type %s" % type(data))
-
-
 class Coupling(object):
     def __init__(self, config_file_name, solver_name):
-        print("enter")
         self.solverName = solver_name  # name of the solver, like defined in the config
 
         self.interface = PySolverInterface.PySolverInterface(solver_name, 0, 1)
         self.interface.configure(config_file_name)
-        print("conf done")
         self.dimensions = self.interface.getDimensions()
-
-        if self.dimensions != 2:
-            raise Exception("only 2D simulations supported by the FEniCS adapter!")
 
         self.coupling_subdomain = None  # FEniCS subdomain defining the coupling interface
         self.mesh_fenics = None  # FEniCS mesh where the coupled simulation takes place
@@ -121,21 +83,52 @@ class Coupling(object):
 
         print("Done setting up coupling for participant with name %s." % solver_name)
 
+    def convert_fenics_to_precice(self, data, mesh, subdomain):
+        if type(data) is dolfin.Function:
+            x_all, y_all = self.extract_coupling_boundary_coordinates()
+            return np.array([data(x, y) for x, y in zip(x_all, y_all)])
+        else:
+            raise Exception("Cannot handle data type %s" % type(data))
+
+    def extract_coupling_boundary_vertices(self):
+        n = 0
+        vertices_x = []
+        vertices_y = []
+        if self.dimensions == 3:
+            vertices_z = []
+
+        if not issubclass(type(self.coupling_subdomain), SubDomain):
+            raise Exception("no correct coupling interface defined!")
+
+        for v in dolfin.vertices(self.mesh_fenics):
+            if self.coupling_subdomain.inside(v.point(), True):
+                n += 1
+                vertices_x.append(v.x(0))
+                vertices_y.append(v.x(1))
+                if self.dimensions == 3:
+                    # todo this has to be fixed for "proper" 3D coupling. Currently this is a workaround for the coupling of 2D fenics with pseudo 3D openfoam
+                    vertices_z.append(0)
+
+        if self.dimensions == 2:
+            return np.stack([vertices_x, vertices_y]), n
+        elif self.dimensions == 3:
+            return np.stack([vertices_x, vertices_y, vertices_z]), n
+
     def set_coupling_mesh(self, mesh, subdomain, coupling_mesh_name):
         self.coupling_subdomain = subdomain
         self.mesh_fenics = mesh
-        self.coupling_mesh_vertices, self.n_vertices = extract_subdomain_vertices(self.mesh_fenics, subdomain)
+        self.coupling_mesh_vertices, self.n_vertices = self.extract_coupling_boundary_vertices()
         self.mesh_id = self.interface.getMeshID(coupling_mesh_name)
         self.vertex_ids = np.zeros(self.n_vertices)
         self.interface.setMeshVertices(self.mesh_id, self.n_vertices, self.coupling_mesh_vertices.flatten('F'), self.vertex_ids)
 
     def set_write_field(self, write_data_name, write_function_init):
         self.write_data_id = self.interface.getDataID(write_data_name, self.mesh_id)
-        self.write_data = convert_fenics_to_precice(write_function_init, self.mesh_fenics, self.coupling_subdomain)
+        self.write_data = self.convert_fenics_to_precice(write_function_init, self.mesh_fenics, self.coupling_subdomain)
 
     def set_read_field(self, read_data_name, read_function_init):
         self.read_data_id = self.interface.getDataID(read_data_name, self.mesh_id)
-        self.read_data = convert_fenics_to_precice(read_function_init, self.mesh_fenics, self.coupling_subdomain)
+        self.read_data = self.convert_fenics_to_precice(read_function_init, self.mesh_fenics, self.coupling_subdomain)
 
     def create_coupling_boundary_condition(self):
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
@@ -155,7 +148,7 @@ class Coupling(object):
 
     def exchange_data(self, write_function, dt):
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-        self.write_data = convert_fenics_to_precice(write_function, self.mesh_fenics, self.coupling_subdomain)
+        self.write_data = self.convert_fenics_to_precice(write_function, self.mesh_fenics, self.coupling_subdomain)
         self.interface.writeBlockScalarData(self.write_data_id, self.n_vertices, self.vertex_ids, self.write_data)
         self.interface.advance(dt)
         self.interface.readBlockScalarData(self.read_data_id, self.n_vertices, self.vertex_ids, self.read_data)
@@ -189,7 +182,17 @@ class Coupling(object):
             return True
 
     def extract_coupling_boundary_coordinates(self):
-        return extract_subdomain_coordinates(self.mesh_fenics, self.coupling_subdomain)
+        vertices, _ = self.extract_coupling_boundary_vertices()
+        vertices_x = vertices[0, :]
+        vertices_y = vertices[1, :]
+        if self.dimensions == 3:
+            vertices_z = vertices[2, :]
+
+        if self.dimensions == 2:
+            return vertices_x, vertices_y
+        elif self.dimensions == 3:
+            # todo this has to be fixed for "proper" 3D coupling. Currently this is a workaround for the coupling of 2D fenics with pseudo 3D openfoam
+            return vertices_x, vertices_y
 
     def finalize(self):
         self.interface.finalize()
