@@ -1,0 +1,1 @@
+from .fenicsadapter import Coupling
