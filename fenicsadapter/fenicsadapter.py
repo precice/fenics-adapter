@@ -7,6 +7,7 @@ import numpy as np
 try:
     import PySolverInterface
 except ImportError:
+    import os
     # check if PRECICE_ROOT is defined
     if not os.getenv('PRECICE_ROOT'):
        raise Exception("ERROR: PRECICE_ROOT not defined!")
