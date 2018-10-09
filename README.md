@@ -5,6 +5,17 @@
 
 ## Installation
 
+### Dependencies
+
+Make sure to install 
+
+* preCICE (https://github.com/precice/precice/wiki)
+* the python language bindings for preCICE (https://github.com/precice/precice/blob/develop/src/precice/bindings/python/README.md)
+* fenics (https://fenicsproject.org/)
+* and scipy (`pip install scipy` or `pip3 install scipy`)
+
+### Build and install the adapter
+
 Run ``python setup.py install`` from your shell.
 
 ## Use the adapter
