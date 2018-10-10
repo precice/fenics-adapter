@@ -1,6 +1,6 @@
 # Setup
 
-The setup for this tutorial is based on the the flow-over-plate tutorial in the [precice/openfoam-adapter](https://github.com/precice/openfoam-adapter). Please refer to the openfoam-adapter for details and references.
+The setup for this tutorial is based on the the flow-over-plate tutorial in the [precice/openfoam-adapter](https://github.com/precice/openfoam-adapter). Please refer to [this wiki page](https://github.com/precice/openfoam-adapter/wiki/Tutorial-for-CHT:-Flow-over-a-heated-plate) of the openfoam-adapter for details and references regarding the experimental setup.
 
 ## OpenFOAM
 
