@@ -1,7 +1,11 @@
 # fenics-adapter
 **experimental** preCICE-adapter for the open source computing platform FEniCS
 
+_**Note:** This adapter is currently purely expermental and limited in functionality. If you are interested in using it or you want to contribute, feel free to contact us via the [preCICE mailing list](https://mailman.informatik.uni-stuttgart.de/mailman/listinfo/precice)._
+
 **currently only supports 2D simulations in FEniCS**
+
+This adapter was developed by [Benjamin Rüth](https://www5.in.tum.de/wiki/index.php/Benjamin_R%C3%BCth,_M.Sc._(hons)) during his research stay at Lund University in the group for [Numerical Analysis](http://www.maths.lu.se/english/research/research-divisions/numerical-analysis/) in close collaboration with [Peter Meisrimel](https://www.lunduniversity.lu.se/lucat/user/09d80f0367a060bcf2a22d7c22e5e504).
 
 ## Installation
 
