@@ -1,5 +1,7 @@
 # Setup
 
+The setup for this tutorial is based on the the flow-over-plate tutorial in the [precice/openfoam-adapter](https://github.com/precice/openfoam-adapter). Please refer to the openfoam-adapter for details and references.
+
 ## OpenFOAM
 
 See [Download v5.0 | Ubuntu](https://openfoam.org/download/5-0-ubuntu/). Don't forget to also update your `~/.bashrc`! See [Download v5.0 | Ubuntu -> User Configuration](https://openfoam.org/download/5-0-ubuntu/).
@@ -58,4 +60,3 @@ To create VTK output for the Fluid solver, go to the directory `fenics-adapter/t
 This is how your setup in paraview should look like, to obtain this output:
 
 ![Paraview](paraviewtree.png)
-
