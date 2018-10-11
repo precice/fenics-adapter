@@ -22,6 +22,12 @@ Make sure to install
 
 Run ``python setup.py install`` from your shell.
 
+### Test the adapter
+
+As a first test, try to import the adapter via `python -c "import fenicsadapter"`.
+
+You can also run the tests in `fenics-adapter/tests` from this folder. Example: `$python tests/testCustomExpression.py`.
+
 ## Use the adapter
 
 Add ``from fenicsadapter import Coupling`` in your FEniCS code. Please refer to the examples in the `tutorials` folder for usage examples.

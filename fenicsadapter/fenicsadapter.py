@@ -3,7 +3,7 @@ from dolfin import Expression, SubDomain
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
-
+"""
 try:
     import PySolverInterface
 except ImportError:
@@ -16,37 +16,37 @@ except ImportError:
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
     import PySolverInterface
-
+"""
 
 class CustomExpression(Expression):
     def __init__(self, vals, coords_x, coords_y=None, coords_z=None, *args, **kwargs):
         self.update_boundary_data(vals, coords_x, coords_y, coords_z)
 
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
-        self.coords_x = coords_x
+        self._coords_x = coords_x
         if coords_y is None:
-            coords_y = np.zeros(coords_x.shape)
-        self.coords_y = coords_y
+            coords_y = np.zeros(self._coords_x.shape)
+        self._coords_y = coords_y
         if coords_z is None:
-            coords_z = np.zeros(coords_x.shape)
-        self.coords_z = coords_z
+            coords_z = np.zeros(self._coords_x.shape)
+        self._coords_z = coords_z
 
-        self.vals = vals.flatten()
-        assert (self.vals.shape == self.coords_x.shape)
+        self._vals = vals.flatten()
+        assert (self._vals.shape == self._coords_x.shape)
 
     def rbf_interpol(self, x):
         if x.__len__() == 1:
-            f = Rbf(self.coords_x, self.vals.flatten())
+            f = Rbf(self._coords_x, self._vals.flatten())
             return f(x)
         if x.__len__() == 2:
-            f = Rbf(self.coords_x, self.coords_y, self.vals.flatten())
+            f = Rbf(self._coords_x, self._coords_y, self._vals.flatten())
             return f(x[0], x[1])
         if x.__len__() == 3:
-            f = Rbf(self.coords_x, self.coords_y, self.coords_z, self.vals.flatten())
+            f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
             return f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
-        f = interp1d(self.coords_x, self.vals)
+        f = interp1d(self._coords_x, self._vals)
         return f(x.x())
 
     def eval(self, value, x):
