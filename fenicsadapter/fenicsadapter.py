@@ -1,8 +1,9 @@
 import dolfin
-from dolfin import Expression, SubDomain
+from dolfin import UserExpression, SubDomain
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
+
 try:
     import PySolverInterface
 except ImportError:
@@ -17,11 +18,11 @@ except ImportError:
     sys.path.insert(0, precice_python_adapter_root)
     import PySolverInterface
 
-
-class CustomExpression(Expression):
-    def __init__(self, vals, coords_x, coords_y=None, coords_z=None, *args, **kwargs):
+    
+class CustomExpression(UserExpression):  
+    def set_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self.update_boundary_data(vals, coords_x, coords_y, coords_z)
-
+        
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self._coords_x = coords_x
         if coords_y is None:
@@ -135,9 +136,10 @@ class Coupling(object):
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
 
         try:  # works with dolfin 1.6.0
-            self._coupling_bc_expression = CustomExpression(self._read_data, x_vert, y_vert)
+            self._coupling_bc_expression = CustomExpression()
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            self._coupling_bc_expression = CustomExpression(self._read_data, x_vert, y_vert, degree=0)
+            self._coupling_bc_expression = CustomExpression(degree=0)
+        self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
     def create_coupling_dirichlet_boundary_condition(self, function_space):
         self.create_coupling_boundary_condition()
