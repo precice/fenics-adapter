@@ -1,1 +1,1 @@
-from .fenicsadapter import Coupling
+from .fenicsadapter import Coupling, CustomExpression
