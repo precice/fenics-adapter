@@ -148,8 +148,8 @@ u_np1 = Function(V)
 F_known_u = u_np1 * v / dt * dx + alpha * dot(grad(u_np1), grad(v)) * dx - u_n * v / dt * dx
 u_np1.rename("T", "")
 t = 0
-u_D.t = t + coupling.precice_tau
-assert (dt == coupling.precice_tau)
+u_D.t = t + coupling._precice_tau
+assert (dt == coupling._precice_tau)
 
 file_out = File("Solid/VTK/%s.pvd" % solver_name)
 
@@ -169,9 +169,9 @@ while coupling.is_coupling_ongoing():
         if abs(t % dt_out) < 10e-5 or abs(t % dt_out) < 10e-5:  # just a very complicated way to only produce output if t is a multiple of dt_out
             file_out << u_np1
         # Update current time
-        t += coupling.precice_tau
+        t += coupling._precice_tau
         # Update dirichlet BC
-        u_D.t = t + coupling.precice_tau
+        u_D.t = t + coupling._precice_tau
         u_n.assign(u_np1)
 
 file_out << u_np1

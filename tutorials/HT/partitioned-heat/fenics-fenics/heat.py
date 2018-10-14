@@ -198,8 +198,8 @@ file_out << u_n
 ref_out << u_e
 
 # set t_1 = t_0 + dt, this gives u_D^1
-u_D.t = t + coupling.precice_tau
-assert (dt == coupling.precice_tau)
+u_D.t = t + coupling._precice_tau
+assert (dt == coupling._precice_tau)
 
 while coupling.is_coupling_ongoing():
 
@@ -228,9 +228,9 @@ while coupling.is_coupling_ongoing():
         file_out << u_np1
         ref_out << u_e
         # Update current time t_n+1 = t_n + dt
-        t += coupling.precice_tau
+        t += coupling._precice_tau
         # Update dirichlet BC
-        u_D.t = t + coupling.precice_tau
+        u_D.t = t + coupling._precice_tau
         # use u^n+1 as initial condition for next timestep
         u_n.assign(u_np1)
         # n -> n+1
