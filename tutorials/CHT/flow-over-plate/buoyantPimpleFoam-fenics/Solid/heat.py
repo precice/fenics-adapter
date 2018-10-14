@@ -78,8 +78,13 @@ def fluxes_from_temperature_full_domain(F, V, k):
     fluxes_vector = assemble(F)  # assemble weak form -> evaluate integral
     v = TestFunction(V)
     fluxes = Function(V)  # create function for flux
-    area = assemble(v * ds).array()
-    fluxes.vector()[area != 0] = - k * fluxes_vector[area != 0] / area[area != 0]  # put weight from assemble on function, scale function by spatial resolution
+    area = assemble(v * ds).get_local()
+    for i in range(area.shape[0]): 
+        if area[i] != 0:  # put weight from assemble on function
+            fluxes.vector()[i] = - k * fluxes_vector[i] / area[i]  # scale by surface area
+        else:
+            assert(abs(fluxes_vector[i]) < 10**-10)  # for non surface parts, we expect zero flux   
+            fluxes.vector()[i] = - k * fluxes_vector[i]  
     return fluxes
 
 

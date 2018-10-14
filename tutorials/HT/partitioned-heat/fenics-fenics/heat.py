@@ -74,7 +74,12 @@ def fluxes_from_temperature_full_domain(F, V):
     v = TestFunction(V)
     fluxes = Function(V)  # create function for flux
     area = assemble(v * ds).get_local()
-    fluxes.vector()[area != 0] = fluxes_vector[area != 0] / area[area != 0]  # put weight from assemble on function, scale function by spatial resolution
+    for i in range(area.shape[0]): 
+        if area[i] != 0:  # put weight from assemble on function
+            fluxes.vector()[i] = fluxes_vector[i] / area[i]  # scale by surface area
+        else:
+            assert(abs(fluxes_vector[i]) < 10**-10)  # for non surface parts, we expect zero flux   
+            fluxes.vector()[i] = fluxes_vector[i]  
     return fluxes
 
 
