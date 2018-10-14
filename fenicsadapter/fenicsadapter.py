@@ -3,11 +3,11 @@ from dolfin import Expression, SubDomain
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
-"""
 try:
     import PySolverInterface
 except ImportError:
     import os
+    import sys
     # check if PRECICE_ROOT is defined
     if not os.getenv('PRECICE_ROOT'):
        raise Exception("ERROR: PRECICE_ROOT not defined!")
@@ -16,7 +16,7 @@ except ImportError:
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
     import PySolverInterface
-"""
+
 
 class CustomExpression(Expression):
     def __init__(self, vals, coords_x, coords_y=None, coords_z=None, *args, **kwargs):
