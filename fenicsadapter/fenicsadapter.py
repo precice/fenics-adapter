@@ -54,13 +54,13 @@ class CustomExpression(UserExpression):
         value[0] = self.rbf_interpol(x)
 
 
-class Coupling(object):
-    def __init__(self, config_file_name, solver_name):
-        self._solverName = solver_name  # name of the solver, like defined in the config
+class Adapter(object):
+    def __init__(self):
+        self._solver_name = None  # name of the solver, will be configured later
 
-        self._interface = PySolverInterface.PySolverInterface(solver_name, 0, 1)
-        self._interface.configure(config_file_name)
-        self._dimensions = self._interface.getDimensions()
+        self._interface = None  # coupling interface, will be initialized later
+
+        self._dimensions = None
 
         self._coupling_subdomain = None  # FEniCS subdomain defining the coupling interface
         self._mesh_fenics = None  # FEniCS mesh where the coupled simulation takes place
@@ -68,22 +68,32 @@ class Coupling(object):
 
         ## coupling mesh related quantities will be defined later
         self._coupling_mesh_vertices = None  # mesh vertices in a format that can be understood by preCICE
+        self._mesh_name = None  # name of mesh as defined in preCICE config
         self._mesh_id = None  # ID of the coupling mesh created from mesh name
         self._vertex_ids = None  # ID of vertices, will be filled by preCICE
         self._n_vertices = None  # number of vertices
 
         ## write data related quantities will be defined later (write data is written by this solver to preCICE)
+        self._write_data_name = None  # name of write data as defined in preCICE config
         self._write_data_id = None  # ID of the data on the coupling mesh created from data name
         self._write_data = None  # actual data
 
         ## read data related quantities will be defined later (read data is read by this solver from preCICE)
+        self._read_data_name = None  # name of read data as defined in preCICE config
         self._read_data_id = None  # ID of the data on the coupling mesh created from data name
         self._read_data = None  # actual data
 
         ## numerics
         self._precice_tau = None
 
-        print("Done setting up coupling for participant with name %s." % solver_name)
+    def configure(self, participant, precice_config_file, mesh, write_data, read_data):
+        self._solver_name = participant
+        self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1)
+        self._interface.configure(precice_config_file)
+        self._dimensions = self._interface.getDimensions()
+        self._mesh_name = mesh
+        self._write_data_name = write_data
+        self._read_data_name = read_data
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         if type(data) is dolfin.Function:
@@ -116,20 +126,20 @@ class Coupling(object):
         elif self._dimensions == 3:
             return np.stack([vertices_x, vertices_y, vertices_z]), n
 
-    def set_coupling_mesh(self, mesh, subdomain, coupling_mesh_name):
+    def set_coupling_mesh(self, mesh, subdomain):
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self.extract_coupling_boundary_vertices()
-        self._mesh_id = self._interface.getMeshID(coupling_mesh_name)
+        self._mesh_id = self._interface.getMeshID(self._mesh_name)
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.setMeshVertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
-    def set_write_field(self, write_data_name, write_function_init):
-        self._write_data_id = self._interface.getDataID(write_data_name, self._mesh_id)
+    def set_write_field(self, write_function_init):
+        self._write_data_id = self._interface.getDataID(self._write_data_name, self._mesh_id)
         self._write_data = self.convert_fenics_to_precice(write_function_init, self._mesh_fenics, self._coupling_subdomain)
 
-    def set_read_field(self, read_data_name, read_function_init):
-        self._read_data_id = self._interface.getDataID(read_data_name, self._mesh_id)
+    def set_read_field(self, read_function_init):
+        self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)
         self._read_data = self.convert_fenics_to_precice(read_function_init, self._mesh_fenics, self._coupling_subdomain)
 
     def create_coupling_boundary_condition(self):
@@ -149,15 +159,23 @@ class Coupling(object):
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def exchange_data(self, write_function, dt):
+    def advance(self, write_function, dt):
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
         self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
         self._interface.advance(dt)
         self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
+            return False
+        else:
+            return True
 
-    def initialize_data(self):
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field):
+        self.set_coupling_mesh(mesh, coupling_subdomain)
+        self.set_read_field(read_field)
+        self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteInitialData()):
@@ -176,13 +194,6 @@ class Coupling(object):
             return True
         else:
             return False
-
-    def check_convergence(self):
-        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
-            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
-            return False
-        else:
-            return True
 
     def extract_coupling_boundary_coordinates(self):
         vertices, _ = self.extract_coupling_boundary_vertices()
