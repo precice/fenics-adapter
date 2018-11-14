@@ -30,7 +30,7 @@ You can also run the tests in `fenics-adapter/tests` from this folder. Example: 
 
 ## Use the adapter
 
-Add ``from fenicsadapter import Coupling`` in your FEniCS code. Please refer to the examples in the `tutorials` folder for usage examples.
+Add ``from fenicsadapter import Coupling`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples.
 
 ## Packaging
 
