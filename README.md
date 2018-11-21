@@ -14,23 +14,24 @@ This adapter was developed by [Benjamin Rüth](https://www5.in.tum.de/wiki/index
 Make sure to install 
 
 * preCICE (https://github.com/precice/precice/wiki)
+* python3 (this adapter supports **only python3**)
 * the python language bindings for preCICE (https://github.com/precice/precice/blob/develop/src/precice/bindings/python/README.md)
 * fenics (https://fenicsproject.org/)
-* and scipy (`pip install scipy` or `pip3 install scipy`)
+* and scipy (`pip3 install scipy`)
 
 ### Build and install the adapter
 
-Run ``python setup.py install`` from your shell.
+Run ``python3 setup.py install`` from your shell.
 
 ### Test the adapter
 
-As a first test, try to import the adapter via `python -c "import fenicsadapter"`.
+As a first test, try to import the adapter via `python3 -c "import fenicsadapter"`.
 
-You can also run the tests in `fenics-adapter/tests` from this folder. Example: `$python tests/testCustomExpression.py`.
+You can also run the tests in `fenics-adapter/tests` from this folder. Example: `$python3 tests/testCustomExpression.py`.
 
 ## Use the adapter
 
-Add ``from fenicsadapter import Coupling`` in your FEniCS code. Please refer to the examples in the `tutorials` folder for usage examples.
+Add ``from fenicsadapter import Coupling`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples.
 
 ## Packaging
 
