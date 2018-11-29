@@ -45,11 +45,11 @@ class CustomExpression(UserExpression):
             return f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
-        f = interp1d(self._coords_x, self._vals)
-        return f(x.x())
+        f = interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate")
+        return f(x[1])
 
     def eval(self, value, x):
-        value[0] = self.rbf_interpol(x)
+        value[0] = self.lin_interpol(x)
 
 
 class Adapter:
