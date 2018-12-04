@@ -1,3 +1,5 @@
+**This branch of the fenics-adapter repository represents the version of the code used for producing the results presented at the GAMM CSE 2018. See the corresponding presentation [here](https://mediatum.ub.tum.de/1467486).**
+
 # fenics-adapter
 **experimental** preCICE-adapter for the open source computing platform FEniCS
 
