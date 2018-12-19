@@ -167,6 +167,8 @@ class Adapter(object):
         self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
         if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+            # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
+            # do nothing
             self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
             return False
         else:
@@ -190,6 +192,9 @@ class Adapter(object):
     def is_coupling_ongoing(self):
         if self._interface.isCouplingOngoing():
             if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+                # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
+                # do nothing
+                # @todo: checkpointing is a bit strange at this place, either name function differently (is_coupling_ongoing_and_checkpoint) or create a new pair of functions (write_checkpoint/read_checkpoint)
                 self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
             return True
         else:
