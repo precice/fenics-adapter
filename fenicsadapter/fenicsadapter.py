@@ -47,11 +47,11 @@ class CustomExpression(UserExpression):
             return f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
-        f = interp1d(self._coords_x, self._vals)
-        return f(x.x())
+        f = interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate")
+        return f(x[1])
 
     def eval(self, value, x):
-        value[0] = self.rbf_interpol(x)
+        value[0] = self.lin_interpol(x)
 
 
 class Adapter(object):
@@ -74,17 +74,29 @@ class Adapter(object):
         self._n_vertices = None  # number of vertices
 
         ## write data related quantities will be defined later (write data is written by this solver to preCICE)
-        self._write_data_name = None  # name of write data as defined in preCICE config
-        self._write_data_id = None  # ID of the data on the coupling mesh created from data name
-        self._write_data = None  # actual data
+        self._write_data_name = None  # name of write data as defined in preCICE config  # todo here we need a list for WR, no list w/o WR
+        self._write_data_id = None  # ID of the data on the coupling mesh created from data name  # todo here we need a list for WR, no list w/o WR
+        self._write_data = None  # actual data  # todo here we need a list for WR, no list w/o WR
 
         ## read data related quantities will be defined later (read data is read by this solver from preCICE)
-        self._read_data_name = None  # name of read data as defined in preCICE config
-        self._read_data_id = None  # ID of the data on the coupling mesh created from data name
-        self._read_data = None  # actual data
+        self._read_data_name = None  # name of read data as defined in preCICE config  # todo here we need a list for WR, no list w/o WR
+        self._read_data_id = None  # ID of the data on the coupling mesh created from data name  # todo here we need a list for WR, no list w/o WR
+        self._read_data = None  # actual data  # todo here we need a list for WR, no list w/o WR
 
         ## numerics
         self._precice_tau = None
+
+        ## multirate time stepping
+        self._N_this = 1  # number of timesteps in this window, by default: no WR
+        self._N_other = 1  # number of timesteps in other window
+        self._window_size = self._precice_tau
+        self._substep_counter = 0  # keeps track of number of substeps performed in window
+        self._window_time = 0  # keeps track of window time
+
+        ## checkpointing todo implement this properly!
+        self._u_cp = None  # checkpoint for temperature inside domain
+        self._t_cp = None  # time of the checkpoint
+        self._n_cp = None  # timestep of the checkpoint
 
     def configure(self, participant, precice_config_file, mesh, write_data, read_data):
         self._solver_name = participant
@@ -92,8 +104,12 @@ class Adapter(object):
         self._interface.configure(precice_config_file)
         self._dimensions = self._interface.getDimensions()
         self._mesh_name = mesh
-        self._write_data_name = write_data
-        self._read_data_name = read_data
+        self._write_data_name = write_data  # todo here we need a list for WR, no list w/o WR
+        self._read_data_name = read_data  # todo here we need a list for WR, no list w/o WR
+
+    def configure_multirate(self, N_this, N_other):
+        self._N_this = N_this
+        self._N_other = N_other
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         if type(data) is dolfin.Function:
@@ -159,20 +175,60 @@ class Adapter(object):
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def advance(self, write_function, dt):
-        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-        self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
-        self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-        self._interface.advance(dt)
-        self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
-        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
-            # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
-            # do nothing
-            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
-            return False
-        else:
+    def _window_is_completed(self):
+        if self._window_size < self._window_time:
+            assert (self._substep_counter == self._N_this)
+            assert (self._window_time == self._precice_tau)
             return True
+        else:
+            assert (self._substep_counter < self._N_this)
+            return False
+
+    def _perform_substep(self, dt):
+        # increase counters and window time
+        self._window_time += dt
+        self._substep_counter += 1
+        assert(dt / self._window_time == self._substep_counter)  # we only support non-adaptive time stepping. Therefore i*dt == window time!
+        assert(self._substep_counter <= self._N_this)
+
+        # perform temporal interpolation on interface mesh
+        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
+        interpolated_data = self._do_interpolation(self._read_data,
+                                                   self._window_time)  # todo interpolate from other's time grid to this' time grid
+
+        # store interface write data
+        self._write_data[self._substep_counter] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
+        # update interface read data
+        self._coupling_bc_expression.update_boundary_data(interpolated_data, x_vert, y_vert)
+
+    def advance(self, write_function, u_np1, t, n, dt):
+
+        self._perform_substep(dt)
+        
+        if self._window_is_completed():  # window completed
+            # communication
+            for i in range(self._N_this):
+                self._interface.writeBlockScalarData(self._write_data_id[i], self._n_vertices, self._vertex_ids, self._write_data[i])
+            self._interface.advance(self._precice_tau)
+            for i in range(self._N_other):
+                self._interface.readBlockScalarData(self._read_data_id[i], self._n_vertices, self._vertex_ids, self._read_data[i])
+
+            # checkpointing
+            if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+                u_np1.assign(self._u_cp)
+                t = self._t_cp
+                n = self._n_cp
+                self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
+
+            if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+                self._u_cp.assign(u_np1)
+                assert(t == self._t_cp + self._window_size)
+                self._t_cp = t
+                assert (n == self._n_cp + self._N_this)
+                self._n_cp = n
+                self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+
+        return t, n, u_np1
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field):
         self.set_coupling_mesh(mesh, coupling_subdomain)
@@ -192,9 +248,6 @@ class Adapter(object):
     def is_coupling_ongoing(self):
         if self._interface.isCouplingOngoing():
             if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
-                # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
-                # do nothing
-                # @todo: checkpointing is a bit strange at this place, either name function differently (is_coupling_ongoing_and_checkpoint) or create a new pair of functions (write_checkpoint/read_checkpoint)
                 self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
             return True
         else:
