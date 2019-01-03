@@ -1,5 +1,5 @@
 import dolfin
-from dolfin import UserExpression, SubDomain
+from dolfin import UserExpression, SubDomain, Function
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -86,6 +86,11 @@ class Adapter(object):
         ## numerics
         self._precice_tau = None
 
+        ## checkpointing
+        self._u_cp = None  # checkpoint for temperature inside domain
+        self._t_cp = None  # time of the checkpoint
+        self._n_cp = None  # timestep of the checkpoint
+
     def configure(self, participant, precice_config_file, mesh, write_data, read_data):
         self._solver_name = participant
         self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1)
@@ -159,46 +164,79 @@ class Adapter(object):
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def advance(self, write_function, dt):
+    def advance(self, write_function, u_np1, t_np1, np1, dt):
+        print("ADVANCE!")
+        # sample write data at interface
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
+
+        # communication
         self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
         self._interface.advance(dt)
         self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
-        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
-            # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
-            # do nothing
-            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
-            return False
-        else:
-            return True
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field):
+        # update boundary condition with read data
+        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+
+        # checkpointing
+        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+            print("ADVANCE:READ!")
+            u_np1 = self._u_cp.copy()
+            t_np1 = self._t_cp
+            np1 = self._n_cp
+            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
+        else:
+            print("ADVANCE:NO READ!")
+
+        print("WRITE IS REQUIRED?")
+        print(self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()))
+
+        if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+            print("ADVANCE:WRITE!")
+            self._u_cp = u_np1.copy(deepcopy=True)
+            print(t_np1)
+            print(self._t_cp + dt)
+            assert (np.isclose(t_np1, self._t_cp + dt))
+            self._t_cp = t_np1
+            assert (np.isclose(np1, self._n_cp + 1))
+            self._n_cp = np1
+            self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+        else:
+            print("ADVANCE:NO WRITE!")
+
+        return u_np1, t_np1, np1
+
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t_n=0, n=0):
+        print("INITIALIZE!")
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self.set_read_field(read_field)
         self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
+        # todo initialize checkpointing!
+
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteInitialData()):
-            self._interface.writeBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            print("INITIALIZE:WRITE INITIAL DATA!")
+            self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
         if self._interface.isReadDataAvailable():
-            self._interface.readBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            print("INITIALIZE:READ INITIAL DATA!")
+            self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+
+        if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+            print("INITIALIZE:WRITE CHECKPOINT!")
+            self._u_cp = u_n.copy(deepcopy=True)
+            self._t_cp = t_n
+            self._n_cp = n
+            self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+        else:
+            print("ADVANCE:NO WRITE!")
 
     def is_coupling_ongoing(self):
-        if self._interface.isCouplingOngoing():
-            if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
-                # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
-                # do nothing
-                # @todo: checkpointing is a bit strange at this place, either name function differently (is_coupling_ongoing_and_checkpoint) or create a new pair of functions (write_checkpoint/read_checkpoint)
-                self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
-            return True
-        else:
-            return False
+        return self._interface.isCouplingOngoing()
 
     def extract_coupling_boundary_coordinates(self):
         vertices, _ = self.extract_coupling_boundary_vertices()
