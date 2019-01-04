@@ -27,7 +27,7 @@ Run ``python3 setup.py install`` from your shell.
 
 As a first test, try to import the adapter via `python3 -c "import fenicsadapter"`.
 
-You can also run the tests in `fenics-adapter/tests` from this folder. Example: `$python3 tests/testCustomExpression.py`.
+You can run the other tests via `python3 setup.py test`.
 
 ## Use the adapter
 

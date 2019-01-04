@@ -13,4 +13,5 @@ setup(name='fenics-adapter',
       author_email='benjamin.rueth@tum.de',
       license='LGPL-3.0',
       packages=['fenicsadapter'],
+      test_suite='tests',
       zip_safe=False)
