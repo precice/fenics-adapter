@@ -11,6 +11,19 @@ fake_PySolverInterface = MagicMock()
 
 @patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
 class MyTest(TestCase):
+
+    dt = 1
+
+    n = 0
+    t_n = 0
+    u_n_mocked = MagicMock()
+    u_n_mocked.copy.return_value = u_n_mocked
+
+    np1 = 1
+    u_np1_mocked = MagicMock()
+    u_np1_mocked.copy.return_value = u_np1_mocked
+    t_np1 = t_n + dt
+
     def setUp(self):
         fake_PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
         fake_PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
@@ -21,7 +34,7 @@ class MyTest(TestCase):
         import PySolverInterface
 
         readIterationCheckpointOut = False
-        desiredOutputOfAdvance = not readIterationCheckpointOut
+        desiredOutputOfAdvance = (self.u_np1_mocked, self.t_np1, self.np1)
 
         def mock_feedback(input):
             if input == PySolverInterface.PyActionReadIterationCheckpoint():
@@ -42,15 +55,18 @@ class MyTest(TestCase):
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
 
-        self.assertEqual(precice.advance(None,0), desiredOutputOfAdvance)
-        return 0
+        precice._t_cp = self.t_n
+        precice._u_cp = self.u_n_mocked
+        precice._n_cp = self.n
+
+        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.t_np1, self.np1, self.dt), desiredOutputOfAdvance)
 
     @patch('PySolverInterface.PySolverInterface')
     def test_advance_rollback(self,fake_PySolverInterface_PySolverInterface):
         import PySolverInterface
 
         readIterationCheckpointOut = True
-        desiredOutputOfAdvance = not readIterationCheckpointOut
+        desiredOutputOfAdvance = (self.u_n_mocked, self.t_n, self.n)
 
         def mock_feedback(input):
             if input == PySolverInterface.PyActionReadIterationCheckpoint():
@@ -71,7 +87,12 @@ class MyTest(TestCase):
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
 
-        self.assertEqual(precice.advance(None,0), desiredOutputOfAdvance)
+        precice._t_cp = self.t_n
+        precice._u_cp = self.u_n_mocked
+        precice._n_cp = self.n
+
+        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.t_np1, self.np1, self.dt),
+                         desiredOutputOfAdvance)
 
     @patch('PySolverInterface.PySolverInterface')
     def test_isCouplingOngoing(self,fake_PySolverInterface_PySolverInterface):
