@@ -180,29 +180,18 @@ class Adapter(object):
 
         # checkpointing
         if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
-            print("ADVANCE:READ!")
-            u_np1 = self._u_cp.copy()
+            u_np1 = self._u_cp.copy(deepcopy=True)
             t_np1 = self._t_cp
             np1 = self._n_cp
             self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
-        else:
-            print("ADVANCE:NO READ!")
-
-        print("WRITE IS REQUIRED?")
-        print(self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()))
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
-            print("ADVANCE:WRITE!")
             self._u_cp = u_np1.copy(deepcopy=True)
-            print(t_np1)
-            print(self._t_cp + dt)
             assert (np.isclose(t_np1, self._t_cp + dt))
             self._t_cp = t_np1
             assert (np.isclose(np1, self._n_cp + 1))
             self._n_cp = np1
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
-        else:
-            print("ADVANCE:NO WRITE!")
 
         return u_np1, t_np1, np1
 
