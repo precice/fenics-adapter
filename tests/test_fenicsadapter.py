@@ -3,6 +3,7 @@
 
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
+import warnings
 
 fake_dolfin = MagicMock()
 fake_PySolverInterface = MagicMock()
@@ -10,16 +11,14 @@ fake_PySolverInterface = MagicMock()
 
 @patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
 class MyTest(TestCase):
+    def setUp(self):
+        fake_PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
+        fake_PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
+        warnings.simplefilter('ignore', category=ImportWarning)
+
     @patch('PySolverInterface.PySolverInterface')
     def test_advance_success(self, fake_PySolverInterface_PySolverInterface):
-        import dolfin
         import PySolverInterface
-
-        assert(dolfin == fake_dolfin)
-        assert(PySolverInterface == fake_PySolverInterface)
-        import fenicsadapter
-        PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
-        PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
 
         readIterationCheckpointOut = False
         desiredOutputOfAdvance = not readIterationCheckpointOut
@@ -35,7 +34,7 @@ class MyTest(TestCase):
         fake_PySolverInterface_PySolverInterface.return_value.readBlockScalarData = MagicMock()
         fake_PySolverInterface_PySolverInterface.return_value.advance = MagicMock()
 
-        import fenicsadapter as fenicsadapter
+        import fenicsadapter
         precice = fenicsadapter.Adapter()
         precice.configure(None, None, None, None, None)
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
@@ -48,14 +47,7 @@ class MyTest(TestCase):
 
     @patch('PySolverInterface.PySolverInterface')
     def test_advance_rollback(self,fake_PySolverInterface_PySolverInterface):
-        import dolfin
         import PySolverInterface
-
-        assert(dolfin == fake_dolfin)
-        assert(PySolverInterface == fake_PySolverInterface)
-        import fenicsadapter
-        PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
-        PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
 
         readIterationCheckpointOut = True
         desiredOutputOfAdvance = not readIterationCheckpointOut
@@ -71,7 +63,7 @@ class MyTest(TestCase):
         fake_PySolverInterface_PySolverInterface.return_value.readBlockScalarData = MagicMock()
         fake_PySolverInterface_PySolverInterface.return_value.advance = MagicMock()
 
-        import fenicsadapter as fenicsadapter
+        import fenicsadapter
         precice = fenicsadapter.Adapter()
         precice.configure(None, None, None, None, None)
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
