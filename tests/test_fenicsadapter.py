@@ -72,3 +72,15 @@ class MyTest(TestCase):
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
 
         self.assertEqual(precice.advance(None,0), desiredOutputOfAdvance)
+
+    @patch('PySolverInterface.PySolverInterface')
+    def test_isCouplingOngoing(self,fake_PySolverInterface_PySolverInterface):
+        import fenicsadapter
+        precice = fenicsadapter.Adapter()
+        precice.configure(None, None, None, None, None)
+
+        fake_PySolverInterface_PySolverInterface.return_value.isCouplingOngoing = MagicMock(return_value=True)
+        self.assertEqual(precice.is_coupling_ongoing(), True)
+
+        fake_PySolverInterface_PySolverInterface.return_value.isCouplingOngoing = MagicMock(return_value=False)
+        self.assertEqual(precice.is_coupling_ongoing(), False)
