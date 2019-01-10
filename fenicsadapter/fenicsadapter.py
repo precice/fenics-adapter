@@ -178,6 +178,8 @@ class Adapter(object):
         # update boundary condition with read data
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
+        success = False
+
         # checkpointing
         if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
             u_np1 = self._u_cp.copy(deepcopy=True)
@@ -192,8 +194,10 @@ class Adapter(object):
             assert (np.isclose(np1, self._n_cp + 1))
             self._n_cp = np1
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+            success = True
+            print("ADVANCE!:SUCCESS")
 
-        return u_np1, t_np1, np1
+        return u_np1, t_np1, np1, success
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t_n=0, n=0):
         print("INITIALIZE!")
@@ -222,7 +226,7 @@ class Adapter(object):
             self._n_cp = n
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
         else:
-            print("ADVANCE:NO WRITE!")
+            print("INITIALIZE:NO WRITE!")
 
     def is_coupling_ongoing(self):
         return self._interface.isCouplingOngoing()
