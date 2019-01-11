@@ -165,7 +165,6 @@ class Adapter(object):
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
-        print("ADVANCE!")
         # sample write data at interface
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
@@ -198,38 +197,29 @@ class Adapter(object):
             n = self._n_cp
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
             success = True
-            print("ADVANCE!:SUCCESS")
 
         return t, n, success
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t_n=0, n=0):
-        print("INITIALIZE!")
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self.set_read_field(read_field)
         self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
-        # todo initialize checkpointing!
-
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteInitialData()):
-            print("INITIALIZE:WRITE INITIAL DATA!")
             self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
         if self._interface.isReadDataAvailable():
-            print("INITIALIZE:READ INITIAL DATA!")
             self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
-            print("INITIALIZE:WRITE CHECKPOINT!")
             self._u_cp = u_n.copy(deepcopy=True)
-            self._t_cp = t_n
+            self._t_cp = t
             self._n_cp = n
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
-        else:
-            print("INITIALIZE:NO WRITE!")
 
     def is_coupling_ongoing(self):
         return self._interface.isCouplingOngoing()
