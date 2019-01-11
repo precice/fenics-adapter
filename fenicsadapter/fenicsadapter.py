@@ -165,6 +165,22 @@ class Adapter(object):
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
+        """
+        Calls preCICE advance function using PySolverInterface and manages checkpointing. 
+        The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
+        
+        This means:
+        * either, the checkpoint self._u_cp is assigned to u_n to repeat the iteration,
+        * or u_n+1 is assigned to u_n and the checkpoint is updated correspondingly.
+        
+        :param write_function: a FEniCS function being sent to the other participant as boundary condition at the coupling interface
+        :param u_np1: new value of FEniCS solution u_n+1 at time t_n+1 = t+dt
+        :param u_n: old value of FEniCS solution u_n at time t_n = t; updated via call-by-reference
+        :param t: current time t_n for timestep n
+        :param dt: timestep size dt = t_n+1 - t_n
+        :param n: current timestep
+        :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly. 
+        """
         # sample write data at interface
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
@@ -181,18 +197,23 @@ class Adapter(object):
 
         # checkpointing
         if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
-            u_n.assign(self._u_cp)
+            # continue FEniCS computation from checkpoint
+            # todo we might want to put reading the checkpoint into a function (duplicate code. compare to below)
+            u_n.assign(self._u_cp)  # set u_n to value of checkpoint
             t = self._t_cp
             n = self._n_cp
             self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+            # continue FEniCS computation with u_np1
+            # update checkpoint
             self._u_cp.assign(u_np1)
             assert (np.isclose(t + dt, self._t_cp + dt))
             self._t_cp = t + dt
             assert (np.isclose(n + 1, self._n_cp + 1))
             self._n_cp = n + 1
-            u_n.assign(self._u_cp)
+            # todo we might want to put reading the checkpoint into a function (duplicate code. compare to above)
+            u_n.assign(self._u_cp)  # set u_n to value of (updated)checkpoint
             t = self._t_cp
             n = self._n_cp
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
