@@ -164,7 +164,7 @@ class Adapter(object):
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def advance(self, write_function, u_np1, t_np1, np1, dt):
+    def advance(self, write_function, u_np1, u_n, t, dt, n):
         print("ADVANCE!")
         # sample write data at interface
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
@@ -182,22 +182,25 @@ class Adapter(object):
 
         # checkpointing
         if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
-            u_np1 = self._u_cp.copy(deepcopy=True)
-            t_np1 = self._t_cp
-            np1 = self._n_cp
+            u_n.assign(self._u_cp)
+            t = self._t_cp
+            n = self._n_cp
             self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
-            self._u_cp = u_np1.copy(deepcopy=True)
-            assert (np.isclose(t_np1, self._t_cp + dt))
-            self._t_cp = t_np1
-            assert (np.isclose(np1, self._n_cp + 1))
-            self._n_cp = np1
+            self._u_cp.assign(u_np1)
+            assert (np.isclose(t + dt, self._t_cp + dt))
+            self._t_cp = t + dt
+            assert (np.isclose(n + 1, self._n_cp + 1))
+            self._n_cp = n + 1
+            u_n.assign(self._u_cp)
+            t = self._t_cp
+            n = self._n_cp
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
             success = True
             print("ADVANCE!:SUCCESS")
 
-        return u_np1, t_np1, np1, success
+        return t, n, success
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t_n=0, n=0):
         print("INITIALIZE!")
