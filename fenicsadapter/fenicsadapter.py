@@ -74,22 +74,21 @@ class Adapter(object):
         self._n_vertices = None  # number of vertices
 
         ## write data related quantities will be defined later (write data is written by this solver to preCICE)
-        self._write_data_name = None  # name of write data as defined in preCICE config  # todo here we need a list for WR, no list w/o WR
-        self._write_data_id = None  # ID of the data on the coupling mesh created from data name  # todo here we need a list for WR, no list w/o WR
-        self._write_data = None  # actual data  # todo here we need a list for WR, no list w/o WR
+        self._write_data_name = []  # name of write data as defined in preCICE config
+        self._write_data_id = []  # ID of the data on the coupling mesh created from data name
+        self._write_data = []  # actual data
 
         ## read data related quantities will be defined later (read data is read by this solver from preCICE)
-        self._read_data_name = None  # name of read data as defined in preCICE config  # todo here we need a list for WR, no list w/o WR
-        self._read_data_id = None  # ID of the data on the coupling mesh created from data name  # todo here we need a list for WR, no list w/o WR
-        self._read_data = None  # actual data  # todo here we need a list for WR, no list w/o WR
+        self._read_data_name = []  # name of read data as defined in preCICE config
+        self._read_data_id = []  # ID of the data on the coupling mesh created from data name
+        self._read_data = []  # actual data
 
         ## numerics
         self._precice_tau = None
 
         ## multirate time stepping
-        self._N_this = 1  # number of timesteps in this window, by default: no WR
-        self._N_other = 1  # number of timesteps in other window
-        self._window_size = self._precice_tau
+        self._N_this = None  # number of timesteps in this window, by default: no WR
+        self._N_other = None  # number of timesteps in other window
         self._substep_counter = 0  # keeps track of number of substeps performed in window
         self._window_time = 0  # keeps track of window time
 
@@ -98,18 +97,28 @@ class Adapter(object):
         self._t_cp = None  # time of the checkpoint
         self._n_cp = None  # timestep of the checkpoint
 
-    def configure(self, participant, precice_config_file, mesh, write_data, read_data):
+    def _window_size(self):
+        return self._precice_tau
+
+    def _reset_window_counters(self):
+        self._substep_counter = 0
+        self._window_time = 0
+
+    def configure(self, participant, precice_config_file, mesh, write_data, read_data, N_this=1, N_other=1):
         self._solver_name = participant
         self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1)
         self._interface.configure(precice_config_file)
         self._dimensions = self._interface.getDimensions()
         self._mesh_name = mesh
-        self._write_data_name = write_data  # todo here we need a list for WR, no list w/o WR
-        self._read_data_name = read_data  # todo here we need a list for WR, no list w/o WR
 
-    def configure_multirate(self, N_this, N_other):
         self._N_this = N_this
         self._N_other = N_other
+
+        for i in range(N_this + 1):
+            self._write_data_name.append(write_data+str(i))
+
+        for i in range(N_other + 1):
+            self._read_data_name.append(read_data+str(i))
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         if type(data) is dolfin.Function:
@@ -151,12 +160,20 @@ class Adapter(object):
         self._interface.setMeshVertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
     def set_write_field(self, write_function_init):
-        self._write_data_id = self._interface.getDataID(self._write_data_name, self._mesh_id)
-        self._write_data = self.convert_fenics_to_precice(write_function_init, self._mesh_fenics, self._coupling_subdomain)
+        for i in range(self._N_this + 1):
+            self._write_data_id.append(self._interface.getDataID(self._write_data_name[i], self._mesh_id))
+            self._write_data.append(self.convert_fenics_to_precice(write_function_init, self._mesh_fenics, self._coupling_subdomain))
+        self._write_data[0] = None  # todo: nonsense code
+
+        assert(self._write_data.__len__() == self._N_this + 1)
 
     def set_read_field(self, read_function_init):
-        self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)
-        self._read_data = self.convert_fenics_to_precice(read_function_init, self._mesh_fenics, self._coupling_subdomain)
+        for i in range(self._N_other + 1):
+            self._read_data_id.append(self._interface.getDataID(self._read_data_name[i], self._mesh_id))
+            self._read_data.append(self.convert_fenics_to_precice(read_function_init, self._mesh_fenics, self._coupling_subdomain))
+        self._read_data[0] = None  # todo: nonsense code
+
+        assert (self._read_data.__len__() == self._N_other + 1)
 
     def create_coupling_boundary_condition(self):
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
@@ -165,7 +182,7 @@ class Adapter(object):
             self._coupling_bc_expression = CustomExpression()
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             self._coupling_bc_expression = CustomExpression(degree=0)
-        self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
+        self._coupling_bc_expression.set_boundary_data(self._read_data[-1], x_vert, y_vert)
 
     def create_coupling_dirichlet_boundary_condition(self, function_space):
         self.create_coupling_boundary_condition()
@@ -176,7 +193,11 @@ class Adapter(object):
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
     def _window_is_completed(self):
-        if self._window_size <= self._window_time:
+        print("## window status:")
+        print(self._window_size())
+        print(self._window_time)
+        print("##")
+        if self._window_size() <= self._window_time:
             assert (self._substep_counter == self._N_this)
             assert (self._window_time == self._precice_tau)
             return True
@@ -184,22 +205,37 @@ class Adapter(object):
             assert (self._substep_counter < self._N_this)
             return False
 
+    def _do_interpolation(self, data, window_time):
+        # this is currently a very limited dummy implementation
+
+        # todo support "real" multirate, then remove following assertion
+        assert(self._N_this == self._N_other)  # if self._N_this == self._N_other, we can assume that self._write_data = self._read_data and do not have to interpolate
+
+        # todo support sampling data at arbitrary times
+        assert(window_time * self._N_this % self._window_size() == 0)  # sampling time is exactly aligned with substep
+
+        id_sample_at = round(window_time / self._window_size() * self._N_this)
+
+        return data[id_sample_at]
+
     def _perform_substep(self, write_function, t, dt, n):
         # increase counters and window time
         self._window_time += dt
         self._substep_counter += 1
-        assert(dt / self._window_time == self._substep_counter)  # we only support non-adaptive time stepping. Therefore i*dt == window time!
+        assert(self._substep_counter > 0)
+        assert(self._window_time / dt == self._substep_counter)  # we only support non-adaptive time stepping. Therefore i*dt == window time!
         assert(self._substep_counter <= self._N_this)
 
         # perform temporal interpolation on interface mesh
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         interpolated_data = self._do_interpolation(self._read_data,
                                                    self._window_time)  # todo interpolate from other's time grid to this' time grid
-
         # store interface write data
-        self._write_data[self._substep_counter] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
+        self._write_data[-1] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)  # todo HARDCODED!
+        #self._write_data[self._substep_counter] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)  # todo should use this line
         # update interface read data
-        self._coupling_bc_expression.update_boundary_data(interpolated_data, x_vert, y_vert)
+        self._coupling_bc_expression.update_boundary_data(self._read_data[-1], x_vert, y_vert)  # todo HARDCODED!
+        #self._coupling_bc_expression.update_boundary_data(interpolated_data, x_vert, y_vert)  # todo should use this line
         
         t += dt
         n += 1
@@ -224,18 +260,35 @@ class Adapter(object):
         :param n: current timestep
         :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly. 
         """
+        print("###")
+        print("read data:")
+        print(self._read_data)
+        print("###")
 
-        t, n, success = self._perform_substep(write_function, t, dt, n)              
-        
+        t, n, success = self._perform_substep(write_function, t, dt, n)
+
+        assert(t == self._precice_tau)
+        assert(n == 1)
+
+        if not self._window_is_completed():  # just assign new value. Continue as normal.
+            u_n.assign(u_np1)
+            assert(False)  # if we have N_other == N_this == 1 we should never enter this branch
+
         if self._window_is_completed():  # window completed
+            print("window is complete!")
             # communication
-            for i in range(self._N_this):
+            for i in range(1, self._N_this + 1):  # todo should start at 0
                 self._interface.writeBlockScalarData(self._write_data_id[i], self._n_vertices, self._vertex_ids, self._write_data[i])
             self._interface.advance(self._precice_tau)
-            for i in range(self._N_other):
+            for i in range(1, self._N_other + 1):  # todo should start at 0
                 self._interface.readBlockScalarData(self._read_data_id[i], self._n_vertices, self._vertex_ids, self._read_data[i])
                 
             success = False
+
+            print("###")
+            print("write data:")
+            print(self._write_data)
+            print("###")
 
             # checkpointing
             if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
@@ -258,8 +311,28 @@ class Adapter(object):
                 u_n.assign(self._u_cp)  # set u_n to value of (updated)checkpoint
                 t = self._t_cp
                 n = self._n_cp
+
+                # todo the following part of code is really cryptic. we should really refactor it
+                """
+                What's the actual purpose: We never update self._write_data[0], but we have to keep it for 
+                interpolation. Therefore, after an iteration has ended successfully, we have to use the last sample of 
+                the successful iteration as the first sample for the next. Additionally, we need an initial guess for
+                the read data.
+                """
+                initial_guess_write = np.copy(self._write_data[-1])
+                for i in range(self._N_this + 1):
+                    self._write_data[i] = np.copy(initial_guess_write)
+                initial_guess_read = np.copy(self._read_data[-1])
+                for i in range(self._N_other + 1):
+                    self._read_data[i] = np.copy(initial_guess_read)
+                """
+                until here
+                """
+
                 self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
                 success = True
+
+            self._reset_window_counters()
 
         return t, n, success
 
@@ -270,13 +343,15 @@ class Adapter(object):
         self._precice_tau = self._interface.initialize()
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteInitialData()):
-            self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            for i in range(1, self._N_this + 1):  # todo should start at 0
+                self._interface.writeBlockScalarData(self._write_data_id[i], self._n_vertices, self._vertex_ids, self._write_data[i])
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
         if self._interface.isReadDataAvailable():
-            self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            for i in range(1, self._N_other + 1):  # todo should start at 0
+                self._interface.readBlockScalarData(self._read_data_id[i], self._n_vertices, self._vertex_ids, self._read_data[i])
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
             self._u_cp = u_n.copy(deepcopy=True)

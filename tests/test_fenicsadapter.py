@@ -56,7 +56,7 @@ class TestCheckpointing(TestCase):
         necessary to test checkpointing.
         :param precice: the fenicsadapter
         """
-        precice.configure(None, None, None, None, None)
+        precice.configure(None, None, None, "write", "read")
         # define functions that are called by advance, but not necessary for the test
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
         precice.convert_fenics_to_precice = MagicMock()
@@ -67,7 +67,6 @@ class TestCheckpointing(TestCase):
         precice._write_data_id = [None, None]
         precice._read_data = [None, None]
         precice._read_data_id = [None, None]
-        precice._window_size = self.dt
         precice._N_this = 1  # number of timesteps in this window, by default: no WR
         precice._N_other = 1  # number of timesteps in other window
         precice._substep_counter = 0
@@ -161,6 +160,31 @@ class TestCheckpointing(TestCase):
         # we expect that precice._u_cp.value has not been updated
         self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
 
+    @patch('PySolverInterface.PySolverInterface')
+    def test_perform_substep(self, fake_PySolverInterface_PySolverInterface):
+        self.mock_the_interface(fake_PySolverInterface_PySolverInterface, True)
+
+        import fenicsadapter
+        precice = fenicsadapter.Adapter()
+        self.mock_the_adapter(precice)
+
+        u0 = MagicMock(name="u0")
+        u1 = MagicMock(name="u1")
+        u1new = MagicMock(name="u1_new")
+        v0 = MagicMock(name="v0")
+        v1 = MagicMock(name="v1")
+
+        precice._write_data = [u0, u1]
+        precice._read_data = [v0, v1]
+        precice.convert_fenics_to_precice = MagicMock(return_value=u1new)
+
+        precice._perform_substep(u1new, self.t, self.dt, self.n)
+
+        self.assertEqual(precice._write_data[0], u0)
+        self.assertEqual(precice._write_data[1], u1new)
+        self.assertEqual(precice._read_data[0], v0)
+        self.assertEqual(precice._read_data[1], v1)
+
 
 @patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
 class TestIsCouplingOngoing(TestCase):
@@ -173,7 +197,7 @@ class TestIsCouplingOngoing(TestCase):
     def test_isCouplingOngoing(self, fake_PySolverInterface_PySolverInterface):
         import fenicsadapter
         precice = fenicsadapter.Adapter()
-        precice.configure(None, None, None, None, None)
+        precice.configure(None, None, None, "write", "read")
 
         fake_PySolverInterface_PySolverInterface.return_value.isCouplingOngoing = MagicMock(return_value=True)
         self.assertEqual(precice.is_coupling_ongoing(), True)
