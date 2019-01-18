@@ -187,7 +187,7 @@ class Adapter(object):
 
         # communication
         self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-        self._interface.advance(dt)
+        max_dt = self._interface.advance(dt)
         self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         # update boundary condition with read data
@@ -198,28 +198,25 @@ class Adapter(object):
         # checkpointing
         if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
             # continue FEniCS computation from checkpoint
-            # todo we might want to put reading the checkpoint into a function (duplicate code. compare to below)
             u_n.assign(self._u_cp)  # set u_n to value of checkpoint
             t = self._t_cp
             n = self._n_cp
             self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
+        else:
+            u_n.assign(u_np1)
+            t = new_t = t + dt  # todo the variables new_t, new_n could be saved, by just using t and n below, however I think it improved readability.
+            n = new_n = n + 1
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
             # continue FEniCS computation with u_np1
             # update checkpoint
             self._u_cp.assign(u_np1)
-            assert (np.isclose(t + dt, self._t_cp + dt))
-            self._t_cp = t + dt
-            assert (np.isclose(n + 1, self._n_cp + 1))
-            self._n_cp = n + 1
-            # todo we might want to put reading the checkpoint into a function (duplicate code. compare to above)
-            u_n.assign(self._u_cp)  # set u_n to value of (updated)checkpoint
-            t = self._t_cp
-            n = self._n_cp
+            self._t_cp = new_t
+            self._n_cp = new_n
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
             success = True
 
-        return t, n, success
+        return t, n, success, max_dt
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
         self.set_coupling_mesh(mesh, coupling_subdomain)
@@ -241,6 +238,8 @@ class Adapter(object):
             self._t_cp = t
             self._n_cp = n
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+
+        return self._precice_tau
 
     def is_coupling_ongoing(self):
         return self._interface.isCouplingOngoing()

@@ -97,7 +97,7 @@ class TestCheckpointing(TestCase):
         # functions below are called by advance and have to be defined, we are not interested in the output.
         interface.return_value.writeBlockScalarData = MagicMock()
         interface.return_value.readBlockScalarData = MagicMock()
-        interface.return_value.advance = MagicMock()
+        interface.return_value.advance = MagicMock(return_value=self.dt)
 
     @patch('PySolverInterface.PySolverInterface')
     def test_advance_success(self, fake_PySolverInterface_PySolverInterface):
@@ -116,7 +116,7 @@ class TestCheckpointing(TestCase):
         value_u_np1 = self.u_np1_mocked.value
 
         # time and iteration count should be increased by a successful call of advance
-        desired_output = (self.t + self.dt, self.n + 1, success)
+        desired_output = (self.t + self.dt, self.n + 1, success, self.dt)
         self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
                          desired_output)
 
@@ -141,7 +141,7 @@ class TestCheckpointing(TestCase):
         self.mock_the_adapter(precice)
 
         # time and iteration count should be rolled back by a not successful call of advance
-        desired_output = (self.t_cp_mocked, self.n_cp_mocked, success)
+        desired_output = (self.t_cp_mocked, self.n_cp_mocked, success, self.dt)
         self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
                          desired_output)
 
