@@ -3,6 +3,7 @@ from dolfin import UserExpression, SubDomain
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
+from .config import Config
 
 try:
     import PySolverInterface
@@ -18,11 +19,11 @@ except ImportError:
     sys.path.insert(0, precice_python_adapter_root)
     import PySolverInterface
 
-    
-class CustomExpression(UserExpression):  
+
+class CustomExpression(UserExpression):
     def set_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self.update_boundary_data(vals, coords_x, coords_y, coords_z)
-        
+
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self._coords_x = coords_x
         if coords_y is None:
@@ -56,11 +57,18 @@ class CustomExpression(UserExpression):
 
 class Adapter(object):
     def __init__(self):
-        self._solver_name = None  # name of the solver, will be configured later
+        """
+        instanciates object of class Config (from config.py). Defines all
+        configuration parameters.
 
-        self._interface = None  # coupling interface, will be initialized later
+        """
+        self._config = Config() # instanciate object of configuration class, implicitly reads from JSON config
 
-        self._dimensions = None
+        self._solver_name = self._config._solver_name # name of the solver (from JSON config file)
+
+        self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1) # coupling interface
+        self._interface.configure(self._config._config_file_name)
+        self._dimensions = self._interface.getDimensions()
 
         self._coupling_subdomain = None  # FEniCS subdomain defining the coupling interface
         self._mesh_fenics = None  # FEniCS mesh where the coupled simulation takes place
@@ -68,32 +76,23 @@ class Adapter(object):
 
         ## coupling mesh related quantities will be defined later
         self._coupling_mesh_vertices = None  # mesh vertices in a format that can be understood by preCICE
-        self._mesh_name = None  # name of mesh as defined in preCICE config
+        self._mesh_name = self._config._coupling_mesh_name  # name of mesh as defined in preCICE config (from JSON config file)
         self._mesh_id = None  # ID of the coupling mesh created from mesh name
         self._vertex_ids = None  # ID of vertices, will be filled by preCICE
         self._n_vertices = None  # number of vertices
 
         ## write data related quantities will be defined later (write data is written by this solver to preCICE)
-        self._write_data_name = None  # name of write data as defined in preCICE config
+        self._write_data_name = self._config._write_data_name # name of write data as defined in preCICE config (from JSON config file)
         self._write_data_id = None  # ID of the data on the coupling mesh created from data name
         self._write_data = None  # actual data
 
         ## read data related quantities will be defined later (read data is read by this solver from preCICE)
-        self._read_data_name = None  # name of read data as defined in preCICE config
+        self._read_data_name = self._config._read_data_name  # name of read data as defined in preCICE config (from JSON config file)
         self._read_data_id = None  # ID of the data on the coupling mesh created from data name
         self._read_data = None  # actual data
 
         ## numerics
         self._precice_tau = None
-
-    def configure(self, participant, precice_config_file, mesh, write_data, read_data):
-        self._solver_name = participant
-        self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1)
-        self._interface.configure(precice_config_file)
-        self._dimensions = self._interface.getDimensions()
-        self._mesh_name = mesh
-        self._write_data_name = write_data
-        self._read_data_name = read_data
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         if type(data) is dolfin.Function:
