@@ -21,7 +21,7 @@ Make sure to install
 
 ### Build and install the adapter
 
-Run ``python3 setup.py install`` from your shell.
+Run ``python3 setup.py install`` from your shell. Use ``sudo`` if necessary.
 
 ### Test the adapter
 
@@ -33,6 +33,7 @@ You can also run the tests in `fenics-adapter/tests` from this folder. Example: 
 
 Add ``from fenicsadapter import Coupling`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples.
 
+FEniCS configuration file`s name must be: ``precice-adapter-config.json`` and should be placed in the same directory as the solver in use.
 ## Packaging
 
 To create and install the `fenicsadapter` python package the following instructions were used: https://python-packaging.readthedocs.io/en/latest/index.html.

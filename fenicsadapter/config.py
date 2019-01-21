@@ -3,7 +3,7 @@
 import os, sys, json
 
 class Config(object):
-    """This class handles the configuration of the fenicsadapter based on JSON
+    """Handles reading of config. parameters of the fenicsadapter based on JSON
     configuration file. Initializer calls readJSON() method.
 
     :ivar _config_file_name: name of the configuration file
@@ -25,7 +25,7 @@ class Config(object):
 
 
     def readJSON(self):
-        """ This method reads JSON configuration file in "r" mode and saves the data to
+        """ Reads JSON configuration file in "r" mode and saves the data to
         the respective instance attributes. Config file name must be:
         precice-adapter-config.json
 
