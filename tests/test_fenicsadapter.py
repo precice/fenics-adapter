@@ -40,6 +40,7 @@ class TestCheckpointing(TestCase):
     u_cp_mocked = MockedArray()  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
+    dummy_config = "tests/precice-adapter-config.json"
     # todo if we support multirate, we should use the lines below for checkpointing
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
@@ -56,7 +57,6 @@ class TestCheckpointing(TestCase):
         necessary to test checkpointing.
         :param precice: the fenicsadapter
         """
-        precice.configure(None, None, None, None, None)
         # define functions that are called by advance, but not necessary for the test
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
         precice.convert_fenics_to_precice = MagicMock()
@@ -109,7 +109,7 @@ class TestCheckpointing(TestCase):
         self.mock_the_interface(fake_PySolverInterface_PySolverInterface, write_iteration_checkpoint_return=True)
 
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
+        precice = fenicsadapter.Adapter(self.dummy_config)
         self.mock_the_adapter(precice)
 
         value_u_np1 = self.u_np1_mocked.value
@@ -135,7 +135,7 @@ class TestCheckpointing(TestCase):
         self.mock_the_interface(fake_PySolverInterface_PySolverInterface, read_iteration_checkpoint_return=True)
 
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
+        precice = fenicsadapter.Adapter(self.dummy_config)
         self.mock_the_adapter(precice)
 
         precice_step_complete = False
@@ -159,7 +159,7 @@ class TestCheckpointing(TestCase):
         self.mock_the_interface(fake_PySolverInterface_PySolverInterface)
 
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
+        precice = fenicsadapter.Adapter(self.dummy_config)
         self.mock_the_adapter(precice)
 
         precice_step_complete = False
@@ -177,6 +177,9 @@ class TestCheckpointing(TestCase):
 
 @patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
 class TestIsCouplingOngoing(TestCase):
+
+    dummy_config = "tests/precice-adapter-config.json"
+
     def setUp(self):
         fake_PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
         fake_PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
@@ -185,8 +188,7 @@ class TestIsCouplingOngoing(TestCase):
     @patch('PySolverInterface.PySolverInterface')
     def test_isCouplingOngoing(self, fake_PySolverInterface_PySolverInterface):
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
-        precice.configure(None, None, None, None, None)
+        precice = fenicsadapter.Adapter(self.dummy_config)
 
         fake_PySolverInterface_PySolverInterface.return_value.isCouplingOngoing = MagicMock(return_value=True)
         self.assertEqual(precice.is_coupling_ongoing(), True)
