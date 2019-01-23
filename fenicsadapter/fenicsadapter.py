@@ -193,7 +193,7 @@ class Adapter(object):
         # update boundary condition with read data
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
-        success = False
+        precice_step_complete = False
 
         # checkpointing
         if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
@@ -214,9 +214,9 @@ class Adapter(object):
             self._t_cp = new_t
             self._n_cp = new_n
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
-            success = True
+            precice_step_complete = True
 
-        return t, n, success, max_dt
+        return t, n, precice_step_complete, max_dt
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
         self.set_coupling_mesh(mesh, coupling_subdomain)

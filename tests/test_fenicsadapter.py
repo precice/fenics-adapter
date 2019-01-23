@@ -67,14 +67,15 @@ class TestCheckpointing(TestCase):
         precice._u_cp = self.u_cp_mocked
         precice._n_cp = self.n_cp_mocked
 
-    def mock_the_interface(self, interface, success):
+    def mock_the_interface(self, interface, read_iteration_checkpoint_return=False, write_iteration_checkpoint_return=False):
         """
         We mock the PySolverInterface such that we can easily get the desired behavior when called by advance. If
         success is True, our mocked PySolverInterface behaves as if the current iteration was successful. If success is
         False, our mocked PySolverInterface behaves as if the current iteration was not successful and a checkpoint has
         to be loaded.
         :param interface: mocked PySolverInterface.PySolverInterface object where we add functionality needed for testing
-        :param success: specify whether the interface should
+        :param read_iteration_checkpoint_return: specify whether the interface should read the existing checkpoint
+        :param write_iteration_checkpoint_return: specify whether the interface should write a new checkpoint
         """
         import PySolverInterface
 
@@ -85,9 +86,9 @@ class TestCheckpointing(TestCase):
             :return:
             """
             if py_action == PySolverInterface.PyActionReadIterationCheckpoint():
-                return not success
+                return read_iteration_checkpoint_return
             elif py_action == PySolverInterface.PyActionWriteIterationCheckpoint():
-                return success
+                return write_iteration_checkpoint_return
 
         """
         return value of isActionRequired is crucial for behavior of advance w.r.t checkpointing. 
@@ -105,9 +106,7 @@ class TestCheckpointing(TestCase):
         Test correct checkpointing, if advance succeeded
         :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
         """
-        success = True
-
-        self.mock_the_interface(fake_PySolverInterface_PySolverInterface, success)
+        self.mock_the_interface(fake_PySolverInterface_PySolverInterface, write_iteration_checkpoint_return=True)
 
         import fenicsadapter
         precice = fenicsadapter.Adapter()
@@ -115,8 +114,9 @@ class TestCheckpointing(TestCase):
 
         value_u_np1 = self.u_np1_mocked.value
 
+        precice_step_complete = True
         # time and iteration count should be increased by a successful call of advance
-        desired_output = (self.t + self.dt, self.n + 1, success, self.dt)
+        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
         self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
                          desired_output)
 
@@ -132,21 +132,44 @@ class TestCheckpointing(TestCase):
         Test correct checkpointing, if advance did not succeed and we have to rollback
         :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
         """
-        success = False
-
-        self.mock_the_interface(fake_PySolverInterface_PySolverInterface, success)
+        self.mock_the_interface(fake_PySolverInterface_PySolverInterface, read_iteration_checkpoint_return=True)
 
         import fenicsadapter
         precice = fenicsadapter.Adapter()
         self.mock_the_adapter(precice)
 
+        precice_step_complete = False
         # time and iteration count should be rolled back by a not successful call of advance
-        desired_output = (self.t_cp_mocked, self.n_cp_mocked, success, self.dt)
+        desired_output = (self.t_cp_mocked, self.n_cp_mocked, precice_step_complete, self.dt)
         self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
                          desired_output)
 
         # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
+
+        # we expect that precice._u_cp.value has not been updated
+        self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
+
+    @patch('PySolverInterface.PySolverInterface')
+    def test_advance_continue(self, fake_PySolverInterface_PySolverInterface):
+        """
+        Test correct checkpointing, if advance did succeed, but we do not write a checkpoint (for example, if we do subcycling)
+        :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
+        """
+        self.mock_the_interface(fake_PySolverInterface_PySolverInterface)
+
+        import fenicsadapter
+        precice = fenicsadapter.Adapter()
+        self.mock_the_adapter(precice)
+
+        precice_step_complete = False
+        # time and iteration count should be rolled back by a not successful call of advance
+        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
+        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
+                         desired_output)
+
+        # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
+        self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
         # we expect that precice._u_cp.value has not been updated
         self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
