@@ -11,6 +11,8 @@ fake_PySolverInterface = MagicMock()
 
 @patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
 class MyTest(TestCase):
+    dummy_config = "tests/precice-adapter-config.json"
+
     def setUp(self):
         fake_PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
         fake_PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
@@ -35,8 +37,7 @@ class MyTest(TestCase):
         fake_PySolverInterface_PySolverInterface.return_value.advance = MagicMock()
 
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
-        precice.configure(None, None, None, None, None)
+        precice = fenicsadapter.Adapter(self.dummy_config)
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
         precice.convert_fenics_to_precice = MagicMock()
         precice._coupling_bc_expression = MagicMock()
@@ -64,8 +65,7 @@ class MyTest(TestCase):
         fake_PySolverInterface_PySolverInterface.return_value.advance = MagicMock()
 
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
-        precice.configure(None, None, None, None, None)
+        precice = fenicsadapter.Adapter(self.dummy_config)
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
         precice.convert_fenics_to_precice = MagicMock()
         precice._coupling_bc_expression = MagicMock()
@@ -76,8 +76,7 @@ class MyTest(TestCase):
     @patch('PySolverInterface.PySolverInterface')
     def test_isCouplingOngoing(self,fake_PySolverInterface_PySolverInterface):
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
-        precice.configure(None, None, None, None, None)
+        precice = fenicsadapter.Adapter(self.dummy_config)
 
         fake_PySolverInterface_PySolverInterface.return_value.isCouplingOngoing = MagicMock(return_value=True)
         self.assertEqual(precice.is_coupling_ongoing(), True)
