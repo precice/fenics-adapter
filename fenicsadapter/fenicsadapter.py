@@ -63,52 +63,20 @@ class CustomExpression(UserExpression):
         value[0] = self.rbf_interpol(x)
 
 
-class Adapter(object):
+class Adapter:
     """Initializes the Adapter. Initalizer creates object of class Config (from
     config.py module).
 
-    :ivar _config: object of class Config, which stores data from config file
-    :ivar _solver_name: name of the solver (from JSON config file)
-    :ivar _interface: coupling interface
-    :ivar _dimensions: number of dimensions
-    :ivar _coupling_subdomain: FEniCS subdomain defining the coupling interface
-    :ivar _mesh_fenics: FEniCS mesh where the coupled simulation takes place
-    :ivar _coupling_bc_expression: expression describing the coupling bc condition
-    :ivar _coupling_mesh_vertices: mesh vertices in a format that can be understood by preCICE
-    :ivar _mesh_name: name of mesh as defined in preCICE config (from JSON config file)
-    :ivar _mesh_id: ID of the coupling mesh created from mesh name
-    :ivar _vertex_ids: ID of vertices filled by preCICE
-    :ivar _n_vertices: number of vertices
-    :ivar _write_data_name: name of write data as defined in preCICE config (from JSON config file)
-    :ivar _write_data_id: ID of the data on the coupling mesh created from data name
-    :ivar _write_data: actual data to write
-    :ivar _read_data_name: name of read data as defined in preCICE config (from JSON config file)
-    :ivar _read_data_id: ID of the data on the coupling mesh created from data name
-    :ivar _read_data: actual data to read
-    :ivar _precice_tau: timestep
-
-    :func convert_fenics_to_precice(): converts FEniCS function, into an array of values
-    :func set_coupling_mesh(): sets the coupling mesh
-    :func extract_coupling_boundary_vertices(): extracts verticies which lay on the boundary
-    :func set_coupling_mesh: sets the coupling mesh
-    :func set_write_field: sets the write field
-    :func set_read_field: sets the read field
-    :func create_coupling_boundary_condition():
-    :func create_coupling_dirichlet_boundary_condition():
-    :func create_coupling_neumann_boundary_condition():
-    :func advance(): advances the simulation
-    :func initialize(): initializes remaining attributes
-    :func is_coupling_ongoing(): determines whether simulation should continue
-    :func extract_coupling_boundary_coordinates(): extracts the coordinates of boundary vertices
-    :func finalize(): finalizes the coupling interface.
+    :ivar _config: object of class Config, which stores data from the JSON config file
     """
-    def __init__(self):
-        self._config = Config()
+    def __init__(self, adapter_config_filename='precice-adapter-config.json'):
 
-        self._solver_name = self._config._solver_name
+        self._config = Config(adapter_config_filename)
+
+        self._solver_name = self._config.get_solver_name()
 
         self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1)
-        self._interface.configure(self._config._config_file_name)
+        self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.getDimensions()
 
         self._coupling_subdomain = None # initialized later
@@ -117,19 +85,19 @@ class Adapter(object):
 
         ## coupling mesh related quantities
         self._coupling_mesh_vertices = None # initialized later
-        self._mesh_name = self._config._coupling_mesh_name
-        self._mesh_id = None # initialized later
+        self._mesh_name = self._config.get_coupling_mesh_name()
+        self._mesh_id = self._interface.getMeshID(self._mesh_name)
         self._vertex_ids = None # initialized later
         self._n_vertices = None # initialized later
 
         ## write data related quantities (write data is written by this solver to preCICE)
-        self._write_data_name = self._config._write_data_name
-        self._write_data_id = None # initialized later
+        self._write_data_name = self._config.get_write_data_name()
+        self._write_data_id = self._interface.getDataID(self._write_data_name, self._mesh_id)
         self._write_data = None
 
         ## read data related quantities (read data is read by this solver from preCICE)
-        self._read_data_name = self._config._read_data_name
-        self._read_data_id = None # initialized later
+        self._read_data_name = self._config.get_read_data_name()
+        self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)
         self._read_data = None
 
         ## numerics
@@ -141,7 +109,7 @@ class Adapter(object):
 
         :param data: FEniCS boundary function
         :raise Exception: if type of data cannot be handled
-        :return: array of values at each point on the boundary
+        :return: array of FEniCS function values at each point on the boundary
         """
         if type(data) is dolfin.Function:
             x_all, y_all = self.extract_coupling_boundary_coordinates()
@@ -182,14 +150,10 @@ class Adapter(object):
     def set_coupling_mesh(self, mesh, subdomain):
         """Sets the coupling mesh. Called by initalize() function at the
         beginning of the simulation.
-
-        :param mesh:
-        :param subdomain:
         """
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self.extract_coupling_boundary_vertices()
-        self._mesh_id = self._interface.getMeshID(self._mesh_name)
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.setMeshVertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
@@ -199,7 +163,6 @@ class Adapter(object):
 
         :param write_function_init: function on the write field
         """
-        self._write_data_id = self._interface.getDataID(self._write_data_name, self._mesh_id)
         self._write_data = self.convert_fenics_to_precice(write_function_init, self._mesh_fenics, self._coupling_subdomain)
 
     def set_read_field(self, read_function_init):
@@ -208,14 +171,10 @@ class Adapter(object):
 
         :param read_function_init: function on the read field
         """
-        self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)
         self._read_data = self.convert_fenics_to_precice(read_function_init, self._mesh_fenics, self._coupling_subdomain)
 
     def create_coupling_boundary_condition(self):
-        """Creates the coupling boundary conditions using CustomExpression.
-
-        :raise TypeError, KeyError:
-        """
+        """Creates the coupling boundary conditions using CustomExpression."""
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
 
         try:  # works with dolfin 1.6.0
@@ -265,7 +224,6 @@ class Adapter(object):
     def initialize(self, coupling_subdomain, mesh, read_field, write_field):
         """Initializes remaining attributes. Called once, from the solver.
 
-        :param mesh:
         :param read_field: function applied on the read field
         :param write_field: function applied on the write field
         """
