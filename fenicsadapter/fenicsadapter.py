@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain
+from dolfin import UserExpression, SubDomain, Function
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -102,6 +102,11 @@ class Adapter:
 
         ## numerics
         self._precice_tau = None
+
+        ## checkpointing
+        self._u_cp = None  # checkpoint for temperature inside domain
+        self._t_cp = None  # time of the checkpoint
+        self._n_cp = None  # timestep of the checkpoint
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         """Converts FEniCS data of type dolfin.Function into
@@ -203,27 +208,61 @@ class Adapter:
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def advance(self, write_function, dt):
-        """Advances the simulation. Called from within the simulation loop in
-         the solver.
-
-        :return: False if reading of the checkpoint is requried, otherwise True
+    def advance(self, write_function, u_np1, u_n, t, dt, n):
+        """Calls preCICE advance function using PySolverInterface and manages checkpointing.
+        The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
+        
+        This means:
+        * either, the checkpoint self._u_cp is assigned to u_n to repeat the iteration,
+        * or u_n+1 is assigned to u_n and the checkpoint is updated correspondingly.
+        
+        :param write_function: a FEniCS function being sent to the other participant as boundary condition at the coupling interface
+        :param u_np1: new value of FEniCS solution u_n+1 at time t_n+1 = t+dt
+        :param u_n: old value of FEniCS solution u_n at time t_n = t; updated via call-by-reference
+        :param t: current time t_n for timestep n
+        :param dt: timestep size dt = t_n+1 - t_n
+        :param n: current timestep
+        :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly. 
         """
+
+        # sample write data at interface
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
-        self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-        self._interface.advance(dt)
-        self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
-        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
-            # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
-            # do nothing
-            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
-            return False
-        else:
-            return True
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field):
+        # communication
+        self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+        max_dt = self._interface.advance(dt)
+        self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+
+        # update boundary condition with read data
+        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+
+        precice_step_complete = False
+
+        # checkpointing
+        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+            # continue FEniCS computation from checkpoint
+            u_n.assign(self._u_cp)  # set u_n to value of checkpoint
+            t = self._t_cp
+            n = self._n_cp
+            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
+        else:
+            u_n.assign(u_np1)
+            t = new_t = t + dt  # todo the variables new_t, new_n could be saved, by just using t and n below, however I think it improved readability.
+            n = new_n = n + 1
+
+        if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+            # continue FEniCS computation with u_np1
+            # update checkpoint
+            self._u_cp.assign(u_np1)
+            self._t_cp = new_t
+            self._n_cp = new_n
+            self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+            precice_step_complete = True
+
+        return t, n, precice_step_complete, max_dt
+
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
         """Initializes remaining attributes. Called once, from the solver.
 
         :param read_field: function applied on the read field
@@ -235,13 +274,21 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         if self._interface.isActionRequired(PySolverInterface.PyActionWriteInitialData()):
-            self._interface.writeBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
             self._interface.fulfilledAction(PySolverInterface.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
         if self._interface.isReadDataAvailable():
-            self._interface.readBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+
+        if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+            self._u_cp = u_n.copy(deepcopy=True)
+            self._t_cp = t
+            self._n_cp = n
+            self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+
+        return self._precice_tau
 
     def is_coupling_ongoing(self):
         """Determines whether simulation should continue. Called from the
@@ -249,15 +296,7 @@ class Adapter:
 
         :return: True if the coupling is ongoing, False otherwise
         """
-        if self._interface.isCouplingOngoing():
-            if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
-                # We do not require proper checkpointing for the FEniCS examples we are currently dealing with.
-                # do nothing
-                # @todo: checkpointing is a bit strange at this place, either name function differently (is_coupling_ongoing_and_checkpoint) or create a new pair of functions (write_checkpoint/read_checkpoint)
-                self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
-            return True
-        else:
-            return False
+        return self._interface.isCouplingOngoing()
 
     def extract_coupling_boundary_coordinates(self):
         """Extracts the coordinates of vertices that lay on the boundary. 3D

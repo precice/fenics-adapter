@@ -9,8 +9,175 @@ fake_dolfin = MagicMock()
 fake_PySolverInterface = MagicMock()
 
 
+class MockedArray:
+    """
+    mock of dolfin.Function
+    """
+    def __init__(self):
+        self.value = MagicMock()
+
+    def assign(self, new_value):
+        """
+        mock of dolfin.Function.assign
+        :param new_value:
+        :return:
+        """
+        self.value = new_value.value
+
+
 @patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
-class MyTest(TestCase):
+class TestCheckpointing(TestCase):
+    """
+    Test suite to check whether checkpointing is done correctly, if the advance function is called. We use the mock
+    pattern, for mocking the desired state of precice.
+    """
+
+    dt = 1  # timestep size
+    n = 0  # current iteration count
+    t = 0  # current time
+    u_n_mocked = MockedArray()  # result at the beginning of the timestep
+    u_np1_mocked = MockedArray()  # newly computed result
+    u_cp_mocked = MockedArray()  # value of the checkpoint
+    t_cp_mocked = t  # time for the checkpoint
+    n_cp_mocked = n  # iteration count for the checkpoint
+    dummy_config = "tests/precice-adapter-config.json"
+    # todo if we support multirate, we should use the lines below for checkpointing
+    # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
+    # t_cp_mocked = MagicMock()  # time for the checkpoint
+    # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
+
+    def setUp(self):
+        fake_PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
+        fake_PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
+        warnings.simplefilter('ignore', category=ImportWarning)
+
+    def mock_the_adapter(self, precice):
+        """
+        We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
+        necessary to test checkpointing.
+        :param precice: the fenicsadapter
+        """
+        # define functions that are called by advance, but not necessary for the test
+        precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
+        precice.convert_fenics_to_precice = MagicMock()
+        precice._coupling_bc_expression = MagicMock()
+        precice._coupling_bc_expression.update_boundary_data = MagicMock()
+        # initialize checkpointing manually
+        precice._t_cp = self.t_cp_mocked
+        precice._u_cp = self.u_cp_mocked
+        precice._n_cp = self.n_cp_mocked
+
+    def mock_the_interface(self, interface, read_iteration_checkpoint_return=False, write_iteration_checkpoint_return=False):
+        """
+        We mock the PySolverInterface such that we can easily get the desired behavior when called by advance. If
+        success is True, our mocked PySolverInterface behaves as if the current iteration was successful. If success is
+        False, our mocked PySolverInterface behaves as if the current iteration was not successful and a checkpoint has
+        to be loaded.
+        :param interface: mocked PySolverInterface.PySolverInterface object where we add functionality needed for testing
+        :param read_iteration_checkpoint_return: specify whether the interface should read the existing checkpoint
+        :param write_iteration_checkpoint_return: specify whether the interface should write a new checkpoint
+        """
+        import PySolverInterface
+
+        def mocked_behavior(py_action):
+            """
+            Depending on py_action, this mocked function returns a bool.
+            :param py_action: PySolverInterface.PyActionReadIterationCheckpoint or PySolverInterface.PyActionWriteIterationCheckpoint
+            :return:
+            """
+            if py_action == PySolverInterface.PyActionReadIterationCheckpoint():
+                return read_iteration_checkpoint_return
+            elif py_action == PySolverInterface.PyActionWriteIterationCheckpoint():
+                return write_iteration_checkpoint_return
+
+        """
+        return value of isActionRequired is crucial for behavior of advance w.r.t checkpointing. 
+        We mock it to directly get the behavior of advance that we want to test
+        """
+        interface.return_value.isActionRequired = MagicMock(side_effect=mocked_behavior)
+        # functions below are called by advance and have to be defined, we are not interested in the output.
+        interface.return_value.writeBlockScalarData = MagicMock()
+        interface.return_value.readBlockScalarData = MagicMock()
+        interface.return_value.advance = MagicMock(return_value=self.dt)
+
+    @patch('PySolverInterface.PySolverInterface')
+    def test_advance_success(self, fake_PySolverInterface_PySolverInterface):
+        """
+        Test correct checkpointing, if advance succeeded
+        :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
+        """
+        self.mock_the_interface(fake_PySolverInterface_PySolverInterface, write_iteration_checkpoint_return=True)
+
+        import fenicsadapter
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        self.mock_the_adapter(precice)
+
+        value_u_np1 = self.u_np1_mocked.value
+
+        precice_step_complete = True
+        # time and iteration count should be increased by a successful call of advance
+        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
+        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
+                         desired_output)
+
+        # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
+        self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
+
+        # we expect that precice._u_cp.value has been updated to value_u_np1
+        self.assertEqual(precice._u_cp.value, value_u_np1)
+
+    @patch('PySolverInterface.PySolverInterface')
+    def test_advance_rollback(self, fake_PySolverInterface_PySolverInterface):
+        """
+        Test correct checkpointing, if advance did not succeed and we have to rollback
+        :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
+        """
+        self.mock_the_interface(fake_PySolverInterface_PySolverInterface, read_iteration_checkpoint_return=True)
+
+        import fenicsadapter
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        self.mock_the_adapter(precice)
+
+        precice_step_complete = False
+        # time and iteration count should be rolled back by a not successful call of advance
+        desired_output = (self.t_cp_mocked, self.n_cp_mocked, precice_step_complete, self.dt)
+        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
+                         desired_output)
+
+        # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
+        self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
+
+        # we expect that precice._u_cp.value has not been updated
+        self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
+
+    @patch('PySolverInterface.PySolverInterface')
+    def test_advance_continue(self, fake_PySolverInterface_PySolverInterface):
+        """
+        Test correct checkpointing, if advance did succeed, but we do not write a checkpoint (for example, if we do subcycling)
+        :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
+        """
+        self.mock_the_interface(fake_PySolverInterface_PySolverInterface)
+
+        import fenicsadapter
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        self.mock_the_adapter(precice)
+
+        precice_step_complete = False
+        # time and iteration count should be rolled back by a not successful call of advance
+        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
+        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
+                         desired_output)
+
+        # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
+        self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
+
+        # we expect that precice._u_cp.value has not been updated
+        self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
+
+
+@patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
+class TestIsCouplingOngoing(TestCase):
+
     dummy_config = "tests/precice-adapter-config.json"
 
     def setUp(self):
@@ -19,62 +186,7 @@ class MyTest(TestCase):
         warnings.simplefilter('ignore', category=ImportWarning)
 
     @patch('PySolverInterface.PySolverInterface')
-    def test_advance_success(self, fake_PySolverInterface_PySolverInterface):
-        import PySolverInterface
-
-        readIterationCheckpointOut = False
-        desiredOutputOfAdvance = not readIterationCheckpointOut
-
-        def mock_feedback(input):
-            if input == PySolverInterface.PyActionReadIterationCheckpoint():
-                return readIterationCheckpointOut
-            elif input == PySolverInterface.PyActionWriteIterationCheckpoint():
-                return (not readIterationCheckpointOut)
-
-        fake_PySolverInterface_PySolverInterface.return_value.isActionRequired = MagicMock(side_effect=mock_feedback)
-        fake_PySolverInterface_PySolverInterface.return_value.writeBlockScalarData = MagicMock()
-        fake_PySolverInterface_PySolverInterface.return_value.readBlockScalarData = MagicMock()
-        fake_PySolverInterface_PySolverInterface.return_value.advance = MagicMock()
-
-        import fenicsadapter
-        precice = fenicsadapter.Adapter(self.dummy_config)
-        precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice.convert_fenics_to_precice = MagicMock()
-        precice._coupling_bc_expression = MagicMock()
-        precice._coupling_bc_expression.update_boundary_data = MagicMock()
-
-        self.assertEqual(precice.advance(None,0), desiredOutputOfAdvance)
-        return 0
-
-    @patch('PySolverInterface.PySolverInterface')
-    def test_advance_rollback(self,fake_PySolverInterface_PySolverInterface):
-        import PySolverInterface
-
-        readIterationCheckpointOut = True
-        desiredOutputOfAdvance = not readIterationCheckpointOut
-
-        def mock_feedback(input):
-            if input == PySolverInterface.PyActionReadIterationCheckpoint():
-                return readIterationCheckpointOut
-            elif input == PySolverInterface.PyActionWriteIterationCheckpoint():
-                return (not readIterationCheckpointOut)
-
-        fake_PySolverInterface_PySolverInterface.return_value.isActionRequired = MagicMock(side_effect=mock_feedback)
-        fake_PySolverInterface_PySolverInterface.return_value.writeBlockScalarData = MagicMock()
-        fake_PySolverInterface_PySolverInterface.return_value.readBlockScalarData = MagicMock()
-        fake_PySolverInterface_PySolverInterface.return_value.advance = MagicMock()
-
-        import fenicsadapter
-        precice = fenicsadapter.Adapter(self.dummy_config)
-        precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice.convert_fenics_to_precice = MagicMock()
-        precice._coupling_bc_expression = MagicMock()
-        precice._coupling_bc_expression.update_boundary_data = MagicMock()
-
-        self.assertEqual(precice.advance(None,0), desiredOutputOfAdvance)
-
-    @patch('PySolverInterface.PySolverInterface')
-    def test_isCouplingOngoing(self,fake_PySolverInterface_PySolverInterface):
+    def test_isCouplingOngoing(self, fake_PySolverInterface_PySolverInterface):
         import fenicsadapter
         precice = fenicsadapter.Adapter(self.dummy_config)
 
