@@ -21,7 +21,7 @@ Make sure to install
 
 ### Build and install the adapter
 
-Run ``python3 setup.py install`` from your shell.
+Run ``python3 setup.py install`` from your shell. Use ``sudo`` if necessary.
 
 ### Test the adapter
 
@@ -33,6 +33,7 @@ You can run the other tests via `python3 setup.py test`.
 
 Add ``from fenicsadapter import Coupling`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples.
 
+The adapter is configured via a `json` configuration file. For example configuration files and usage refer to the tutorials ([fenics-fenics](https://github.com/precice/tutorials/tree/master/HT/partitioned-heat/fenics-fenics)).
 ## Packaging
 
 To create and install the `fenicsadapter` python package the following instructions were used: https://python-packaging.readthedocs.io/en/latest/index.html.
