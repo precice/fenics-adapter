@@ -41,6 +41,7 @@ class TestCheckpointing(TestCase):
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
     dummy_config = "tests/precice-adapter-config.json"
+    dummy_config_WR = "tests/precice-adapter-config-WR.json"
     # todo if we support multirate, we should use the lines below for checkpointing
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
@@ -66,6 +67,7 @@ class TestCheckpointing(TestCase):
         precice._t_cp = self.t_cp_mocked
         precice._u_cp = self.u_cp_mocked
         precice._n_cp = self.n_cp_mocked
+        precice._precice_tau = 1
 
     def mock_the_interface(self, interface, read_iteration_checkpoint_return=False, write_iteration_checkpoint_return=False):
         """
@@ -155,7 +157,7 @@ class TestCheckpointing(TestCase):
         self.mock_the_interface(fake_PySolverInterface_PySolverInterface, True)
 
         import fenicsadapter
-        precice = fenicsadapter.Adapter()
+        precice = fenicsadapter.Adapter(self.dummy_config_WR)
         self.mock_the_adapter(precice)
 
         u0 = MagicMock(name="u0")
