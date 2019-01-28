@@ -10,19 +10,7 @@ from scipy.interpolate import interp1d
 import numpy as np
 from .config import Config
 
-try:
-    import PySolverInterface
-except ImportError:
-    import os
-    import sys
-    # check if PRECICE_ROOT is defined
-    if not os.getenv('PRECICE_ROOT'):
-       raise Exception("ERROR: PRECICE_ROOT not defined!")
-
-    precice_root = os.getenv('PRECICE_ROOT')
-    precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
-    sys.path.insert(0, precice_python_adapter_root)
-    import PySolverInterface
+import fenicsadapter.waveform_bindings
 
 
 class CustomExpression(UserExpression):
@@ -75,7 +63,7 @@ class Adapter:
 
         self._solver_name = self._config.get_solver_name()
 
-        self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1)
+        self._interface = fenicsadapter.waveform_bindings.WaveformBindings(self._solver_name, 0, 1)
         self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.getDimensions()
 
@@ -350,18 +338,18 @@ class Adapter:
                 self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)  # TODO: this should go somewhere inside _perform_substep, however, if we do not use Waveform relaxation, we have to run the command after calling advance and readBlockScalarData
 
             # checkpointing
-            if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+            if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionReadIterationCheckpoint()):
                 # continue FEniCS computation from checkpoint
                 u_n.assign(self._u_cp)  # set u_n to value of checkpoint
                 t = self._t_cp
                 n = self._n_cp
-                self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
+                self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionReadIterationCheckpoint())
             else:
                 u_n.assign(u_np1)
                 t = new_t = t + dt  # todo the variables new_t, new_n could be saved, by just using t and n below, however I think it improved readability.
                 n = new_n = n + 1
 
-            if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+            if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint()):
                 # continue FEniCS computation with u_np1
                 # update checkpoint
                 self._u_cp.assign(u_np1)
@@ -384,7 +372,7 @@ class Adapter:
                     """
                     until here
                     """
-                self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+                self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint())
                 precice_step_complete = True
 
             if self._waveform_relaxation_is_used():
@@ -403,13 +391,13 @@ class Adapter:
         self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
-        if self._interface.isActionRequired(PySolverInterface.PyActionWriteInitialData()):
+        if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteInitialData()):
             if self._waveform_relaxation_is_used():
                 for i in range(1, self._N_this + 1):  # todo should start at 0
                     self._interface.writeBlockScalarData(self._write_data_id[i], self._n_vertices, self._vertex_ids, self._write_data[i])
             else:
                 self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-            self._interface.fulfilledAction(PySolverInterface.PyActionWriteInitialData())
+            self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
@@ -420,11 +408,11 @@ class Adapter:
             else:
                 self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
-        if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+        if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint()):
             self._u_cp = u_n.copy(deepcopy=True)
             self._t_cp = t
             self._n_cp = n
-            self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+            self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint())
 
         return self._precice_tau
 
