@@ -1,5 +1,6 @@
 # comments on test layout: https://docs.pytest.org/en/latest/goodpractices.html
-# run with python -m unittest tests.test_fenicsadapter
+# first install package python setup.py install
+# then run tests with python setup.py test -s tests.test_fenicsadapter
 
 from unittest.mock import MagicMock, patch, Mock
 from unittest import TestCase

@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 # from https://stackoverflow.com/a/9079062
 import sys  
@@ -12,6 +12,6 @@ setup(name='fenics-adapter',
       author="Benjamin Rueth",
       author_email='benjamin.rueth@tum.de',
       license='LGPL-3.0',
-      packages=['fenicsadapter'],
+      packages=find_packages(),
       test_suite='tests',
       zip_safe=False)
