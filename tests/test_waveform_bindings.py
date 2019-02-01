@@ -5,6 +5,7 @@
 from unittest.mock import MagicMock, patch, Mock
 from unittest import TestCase
 import warnings
+import numpy as np
 
 fake_dolfin = MagicMock()
 fake_PySolverInterface = MagicMock()
@@ -25,9 +26,19 @@ class TestWaveformBindings(TestCase):
 
     def mock_the_class(self):
         mocked_class = Mock
-        # functions below are called by advance and have to be defined, we are not interested in the output.
-        mocked_class.writeBlockScalarData = MagicMock()
-        mocked_class.readBlockScalarData = MagicMock()
+
+        def read_behavior(self, read_data_id, n_vertices, vertex_ids, read_data):
+            assert(type(read_data) == np.ndarray)
+            read_data += 1
+            pass
+
+        def write_behavior(self, write_data_id, n_vertices, vertex_ids, write_data):
+            assert(type(write_data) == np.ndarray)
+            write_data += 2
+            pass
+
+        mocked_class.writeBlockScalarData = MagicMock(side_effect=write_behavior)
+        mocked_class.readBlockScalarData = MagicMock(side_effect=read_behavior)
         mocked_class.advance = MagicMock(return_value=self.dt)
         return mocked_class
 
@@ -40,8 +51,25 @@ class TestWaveformBindings(TestCase):
 
     def test_read(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        bindings = WaveformBindings()
-        bindings.readBlockScalarData("dummy")
+        fake_PySolverInterfaceClass = self.mock_the_class()
+        import fenicsadapter
+        with patch('PySolverInterface.PySolverInterface') as fake_PySolverInterfaceClass:
+            bindings = WaveformBindings()
+            n = 5
+            read_data = np.zeros(n)
+            bindings.readBlockScalarData("dummy", None, None, None, read_data)
+            self.assertTrue(np.isclose(read_data, np.ones(n)).all())
+
+    def test_write(self):
+        from fenicsadapter.waveform_bindings import WaveformBindings
+        fake_PySolverInterfaceClass = self.mock_the_class()
+        import fenicsadapter
+        with patch('PySolverInterface.PySolverInterface') as fake_PySolverInterfaceClass:
+            bindings = WaveformBindings()
+            n = 5
+            write_data = np.zeros(n)
+            bindings.writeBlockScalarData("dummy", None, None, None, write_data)
+            self.assertTrue(np.isclose(write_data, 2*np.ones(n)).all())
 
     def test_perform_substep(self):
         fake_PySolverInterfaceClass = self.mock_the_class()
