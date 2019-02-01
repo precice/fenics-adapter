@@ -63,19 +63,13 @@ class Adapter:
 
         self._solver_name = self._config.get_solver_name()
 
-        self._interface = fenicsadapter.waveform_bindings.WaveformBindings(self._solver_name, 0, 1)
+        self._interface = fenicsadapter.waveform_bindings.WaveformBindings(self._solver_name, 0, 1, adapter_config_filename)
         self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.getDimensions()
 
         self._coupling_subdomain = None # initialized later
         self._mesh_fenics = None # initialized later
         self._coupling_bc_expression = None # initialized later
-
-        ## multirate time stepping
-        self._N_this = self._config._N_this  # number of timesteps in this window, by default: no WR
-        self._N_other = self._config._N_other  # number of timesteps in other window
-        self._substep_counter = 0  # keeps track of number of substeps performed in window
-        self._window_time = 0  # keeps track of window time
 
         ## coupling mesh related quantities
         self._coupling_mesh_vertices = None # initialized later
@@ -86,22 +80,11 @@ class Adapter:
 
         ## write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
-        if self._waveform_relaxation_is_used():
-            self._write_data_id = []
-            for i in range(self._N_this + 1):
-                self._write_data_id.append(self._interface.getDataID(self._write_data_name[i], self._mesh_id))
-        else:
-            self._write_data_id = self._interface.getDataID(self._write_data_name, self._mesh_id)
         self._write_data = None
 
         ## read data related quantities (read data is read by this solver from preCICE)
         self._read_data_name = self._config.get_read_data_name()
-        if self._waveform_relaxation_is_used():
-            self._read_data_id = []
-            for i in range(self._N_other + 1):
-                self._read_data_id.append(self._interface.getDataID(self._read_data_name[i], self._mesh_id))
-        else:
-            self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)
+        self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)  # TODO mapping of name to ID has to be done inside waveform bindings!
         self._read_data = None
 
         ## numerics
@@ -111,23 +94,6 @@ class Adapter:
         self._u_cp = None  # checkpoint for temperature inside domain
         self._t_cp = None  # time of the checkpoint
         self._n_cp = None  # timestep of the checkpoint
-
-    def _window_size(self):
-        return self._precice_tau
-
-    def _reset_window_counters(self):
-        self._substep_counter = 0
-        self._window_time = 0
-
-    def _waveform_relaxation_is_used(self):
-        if self._N_this and self._N_this > 0 and self._N_other and self._N_other > 0:  # N_this and N_other are set, we want to use Waveform relaxation
-            return True
-        elif self._N_this:
-            assert (self._N_this > 0)  # if key is defined, it has to be greater 0
-        elif self._N_other:
-            assert (self._N_other > 0)  # if key is defined, it has to be greater 0
-        else:
-            return False
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         """Converts FEniCS data of type dolfin.Function into
@@ -189,13 +155,7 @@ class Adapter:
 
         :param write_function_init: function on the write field
         """
-        if self._waveform_relaxation_is_used():
-            for i in range(self._N_this + 1):
-                self._write_data.append(self.convert_fenics_to_precice(write_function_init, self._mesh_fenics, self._coupling_subdomain))
-            self._write_data[0] = None  # todo: nonsense code
-            assert (self._write_data.__len__() == self._N_this + 1)
-        else:
-            self._write_data = self.convert_fenics_to_precice(write_function_init, self._mesh_fenics, self._coupling_subdomain)
+        self._write_data = self.convert_fenics_to_precice(write_function_init, self._mesh_fenics, self._coupling_subdomain)
 
     def set_read_field(self, read_function_init):
         """Sets the read field. Called by initalize() function at the
@@ -203,13 +163,7 @@ class Adapter:
 
         :param read_function_init: function on the read field
         """
-        if self._waveform_relaxation_is_used():
-            for i in range(self._N_other + 1):
-                self._read_data.append(self.convert_fenics_to_precice(read_function_init, self._mesh_fenics, self._coupling_subdomain))
-            self._read_data[0] = None  # todo: nonsense code
-            assert (self._read_data.__len__() == self._N_other + 1)
-        else:
-            self._read_data = self.convert_fenics_to_precice(read_function_init, self._mesh_fenics, self._coupling_subdomain)
+        self._read_data = self.convert_fenics_to_precice(read_function_init, self._mesh_fenics, self._coupling_subdomain)
 
     def create_coupling_boundary_condition(self):
         """Creates the coupling boundary conditions using CustomExpression."""
@@ -220,10 +174,7 @@ class Adapter:
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             self._coupling_bc_expression = CustomExpression(degree=0)
 
-        if self._waveform_relaxation_is_used():
-            self._coupling_bc_expression.set_boundary_data(self._read_data[-1], x_vert, y_vert)
-        else:
-            self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
+        self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
     def create_coupling_dirichlet_boundary_condition(self, function_space):
         """Creates the coupling Dirichlet boundary conditions using
@@ -245,19 +196,6 @@ class Adapter:
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def _window_is_completed(self):
-        print("## window status:")
-        print(self._window_size())
-        print(self._window_time)
-        print("##")
-        if self._window_size() <= self._window_time:
-            assert (self._substep_counter == self._N_this)
-            assert (self._window_time == self._precice_tau)
-            return True
-        else:
-            assert (self._substep_counter < self._N_this)
-            return False
-
     def _do_interpolation(self, data, window_time):
         # this is currently a very limited dummy implementation
 
@@ -270,32 +208,6 @@ class Adapter:
         id_sample_at = round(window_time / self._window_size() * self._N_this)
 
         return data[id_sample_at]
-
-    def _perform_substep(self, write_function, t, dt, n):
-        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-        # increase counters and window time
-        self._window_time += dt
-        self._substep_counter += 1
-        assert(self._substep_counter > 0)
-        assert(self._window_time / dt == self._substep_counter)  # we only support non-adaptive time stepping. Therefore i*dt == window time!
-        assert(self._substep_counter <= self._N_this)
-
-        # perform temporal interpolation on interface mesh
-        interpolated_data = self._do_interpolation(self._read_data,
-                                                   self._window_time)  # todo interpolate from other's time grid to this' time grid
-        # store interface write data
-        self._write_data[-1] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)  # todo HARDCODED!
-        #self._write_data[self._substep_counter] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)  # todo should use this line
-
-        # update interface read data
-        self._coupling_bc_expression.update_boundary_data(self._read_data[-1], x_vert, y_vert)  # todo HARDCODED!
-        #self._coupling_bc_expression.update_boundary_data(interpolated_data, x_vert, y_vert)  # todo should use this line
-
-        t += dt
-        n += 1
-        success = True
-        
-        return t, n, success
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using PySolverInterface and manages checkpointing.
@@ -314,69 +226,36 @@ class Adapter:
         :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly. 
         """
 
-        if self._waveform_relaxation_is_used():
-            t, n, success = self._perform_substep(write_function, t, dt, n)
+        precice_step_complete = False
 
-        if not self._waveform_relaxation_is_used() or self._window_is_completed():  # window completed
-            precice_step_complete = False
+        # communication
+        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
+        self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
+        self._interface.writeBlockScalarData(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data)
+        max_dt = self._interface.advance(dt)
+        self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data)
+        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)  # TODO: this should go somewhere inside _perform_substep, however, if we do not use Waveform relaxation, we have to run the command after calling advance and readBlockScalarData
 
-            # communication
-            if self._waveform_relaxation_is_used():
-                for i in range(1, self._N_this + 1):  # todo should start at 0
-                    self._interface.writeBlockScalarData(self._write_data_id[i], self._n_vertices, self._vertex_ids, self._write_data[i])
-            else:
-                x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-                self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
-                self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-            max_dt = self._interface.advance(dt)
-            if self._waveform_relaxation_is_used():
-                for i in range(1, self._N_other + 1):  # todo should start at 0
-                    self._interface.readBlockScalarData(self._read_data_id[i], self._n_vertices, self._vertex_ids, self._read_data[i])
-                assert(False)  # TODO possible reason for bug here? Should we update the coupling bc at this point?
-            else:
-                self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
-                self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)  # TODO: this should go somewhere inside _perform_substep, however, if we do not use Waveform relaxation, we have to run the command after calling advance and readBlockScalarData
+        # checkpointing
+        if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionReadIterationCheckpoint()):
+            # continue FEniCS computation from checkpoint
+            u_n.assign(self._u_cp)  # set u_n to value of checkpoint
+            t = self._t_cp
+            n = self._n_cp
+            self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionReadIterationCheckpoint())
+        else:
+            u_n.assign(u_np1)
+            t = new_t = t + dt  # todo the variables new_t, new_n could be spared, by just using t and n below, however I think it improved readability.
+            n = new_n = n + 1
 
-            # checkpointing
-            if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionReadIterationCheckpoint()):
-                # continue FEniCS computation from checkpoint
-                u_n.assign(self._u_cp)  # set u_n to value of checkpoint
-                t = self._t_cp
-                n = self._n_cp
-                self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionReadIterationCheckpoint())
-            else:
-                u_n.assign(u_np1)
-                t = new_t = t + dt  # todo the variables new_t, new_n could be saved, by just using t and n below, however I think it improved readability.
-                n = new_n = n + 1
-
-            if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint()):
-                # continue FEniCS computation with u_np1
-                # update checkpoint
-                self._u_cp.assign(u_np1)
-                self._t_cp = new_t
-                self._n_cp = new_n
-                if self._waveform_relaxation_is_used():
-                    # todo the following part of code is really cryptic. we should really refactor it
-                    """
-                    What's the actual purpose: We never update self._write_data[0], but we have to keep it for 
-                    interpolation. Therefore, after an iteration has ended successfully, we have to use the last sample of 
-                    the successful iteration as the first sample for the next. Additionally, we need an initial guess for
-                    the read data.
-                    """
-                    initial_guess_write = np.copy(self._write_data[-1])
-                    for i in range(self._N_this + 1):
-                        self._write_data[i] = np.copy(initial_guess_write)
-                    initial_guess_read = np.copy(self._read_data[-1])
-                    for i in range(self._N_other + 1):
-                        self._read_data[i] = np.copy(initial_guess_read)
-                    """
-                    until here
-                    """
-                self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint())
-                precice_step_complete = True
-
-            if self._waveform_relaxation_is_used():
-                self._reset_window_counters()
+        if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint()):
+            # continue FEniCS computation with u_np1
+            # update checkpoint
+            self._u_cp.assign(u_np1)
+            self._t_cp = new_t
+            self._n_cp = new_n
+            self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint())
+            precice_step_complete = True
 
         return t, n, precice_step_complete, max_dt
 
@@ -392,21 +271,13 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteInitialData()):
-            if self._waveform_relaxation_is_used():
-                for i in range(1, self._N_this + 1):  # todo should start at 0
-                    self._interface.writeBlockScalarData(self._write_data_id[i], self._n_vertices, self._vertex_ids, self._write_data[i])
-            else:
-                self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
             self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
         if self._interface.isReadDataAvailable():
-            if self._waveform_relaxation_is_used():
-                for i in range(1, self._N_other + 1):  # todo should start at 0
-                    self._interface.readBlockScalarData(self._read_data_id[i], self._n_vertices, self._vertex_ids, self._read_data[i])
-            else:
-                self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint()):
             self._u_cp = u_n.copy(deepcopy=True)

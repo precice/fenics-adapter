@@ -153,30 +153,6 @@ class TestCheckpointing(TestCase):
             # we expect that precice._u_cp.value has not been updated
             self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
 
-    def test_perform_substep(self):
-        fake_PySolverInterfaceClass = self.mock_the_class()
-        import fenicsadapter
-        with patch('PySolverInterface.PySolverInterface') as fake_PySolverInterfaceClass:
-            precice = fenicsadapter.Adapter(self.dummy_config_WR)
-            self.mock_the_adapter(precice, fake_PySolverInterfaceClass)
-
-            u0 = MagicMock(name="u0")
-            u1 = MagicMock(name="u1")
-            u1new = MagicMock(name="u1_new")
-            v0 = MagicMock(name="v0")
-            v1 = MagicMock(name="v1")
-
-            precice._write_data = [u0, u1]
-            precice._read_data = [v0, v1]
-            precice.convert_fenics_to_precice = MagicMock(return_value=u1new)
-
-            precice._perform_substep(u1new, self.t, self.dt, self.n)
-
-            self.assertEqual(precice._write_data[0], u0)
-            self.assertEqual(precice._write_data[1], u1new)
-            self.assertEqual(precice._read_data[0], v0)
-            self.assertEqual(precice._read_data[1], v1)
-
     def test_advance_continue(self):
         """
         Test correct checkpointing, if advance did succeed, but we do not write a checkpoint (for example, if we do subcycling)
