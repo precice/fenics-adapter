@@ -257,13 +257,13 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteInitialData()):
-            self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            self._interface.writeBlockScalarData(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data)
             self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
         if self._interface.isReadDataAvailable():
-            self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint()):
             self._u_cp = u_n.copy(deepcopy=True)

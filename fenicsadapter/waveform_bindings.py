@@ -33,7 +33,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
 
         super().__init__()
 
-    def __new__(cls, name, rank, procs):
+    def __new__(cls, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
         print("NEW CALLED!")
         return super().__new__(cls, name, rank, procs)
 
@@ -53,9 +53,9 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         super().readBlockScalarData(read_data_id, n_vertices, vertex_ids, read_data)
         # TODO here, we either access preCICE or put the data into a buffer
 
-    def advance(self):
+    def advance(self, dt):
         # TODO here, we either call preCICE.advance() or update FEniCS boundary conditions from the WR interpolation
-        return super().advance()
+        return super().advance(dt)
 
     def _window_is_completed(self):
         print("## window status:")
