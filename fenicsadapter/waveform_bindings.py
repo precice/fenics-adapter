@@ -20,7 +20,6 @@ from .config import Config
 
 class WaveformBindings(PySolverInterface.PySolverInterface):
     def __init__(self, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
-        print("CALL INIT")
         self._sample_counter_this = 0
         self._sample_counter_other = 0
 
@@ -35,14 +34,12 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._write_data_buffer = dict()
         self._read_data_buffer = dict()
 
-        super().__init__()
+        super().__init__(name, rank, procs)
 
     def __new__(cls, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
         return super().__new__(cls, name, rank, procs)
 
     def writeBlockScalarData(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
-        self._print_window_status()
-        print(time)
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         self._write_data_buffer[time] = write_data
@@ -52,8 +49,6 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         super().writeBlockScalarData(write_data_id, n_vertices, vertex_ids, write_data)
 
     def readBlockScalarData(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
-        self._print_window_status()
-        print(time)
         assert(self._config.get_read_data_name() == read_data_name)
         assert(self._is_inside_current_window(time))
         # read_data_name = read_data_name+self._sample_counter_other
@@ -120,24 +115,15 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._read_data_buffer = dict()
 
     def _perform_substep(self, write_function, t, dt, n):
-        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         # increase counters and window time
         self._window_time += dt
-        self._substep_counter += 1
-        assert(self._substep_counter > 0)
-        assert(self._window_time / dt == self._substep_counter)  # we only support non-adaptive time stepping. Therefore i*dt == window time!
-        assert(self._substep_counter <= self._N_this)
 
         # perform temporal interpolation on interface mesh
-        interpolated_data = self._do_interpolation(self._read_data,
-                                                   self._window_time)  # todo interpolate from other's time grid to this' time grid
+        # TODO
         # store interface write data
-        self._write_data[-1] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)  # todo HARDCODED!
-        #self._write_data[self._substep_counter] = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)  # todo should use this line
-
+        # TODO
         # update interface read data
-        self._coupling_bc_expression.update_boundary_data(self._read_data[-1], x_vert, y_vert)  # todo HARDCODED!
-        #self._coupling_bc_expression.update_boundary_data(interpolated_data, x_vert, y_vert)  # todo should use this line
+        # TODO
 
         t += dt
         n += 1
