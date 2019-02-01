@@ -3,7 +3,7 @@ import numpy as np
 
 
 class PySolverInterface:
-    def __init__(self, name, rank, procs):
+    def __init__(self):
         pass
 
     def __new__(cls, name, rank, procs):
