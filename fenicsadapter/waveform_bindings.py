@@ -118,3 +118,16 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
 
     def initializeData(self):
         return super().initializeData()
+
+    def _do_interpolation(self, data, window_time):
+        # this is currently a very limited dummy implementation
+
+        # todo support "real" multirate, then remove following assertion
+        assert(self._N_this == self._N_other)  # if self._N_this == self._N_other, we can assume that self._write_data = self._read_data and do not have to interpolate
+
+        # todo support sampling data at arbitrary times
+        assert(window_time * self._N_this % self._window_size() == 0)  # sampling time is exactly aligned with substep
+
+        id_sample_at = round(window_time / self._window_size() * self._N_this)
+
+        return data[id_sample_at]

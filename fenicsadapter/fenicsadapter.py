@@ -44,11 +44,11 @@ class CustomExpression(UserExpression):
             return f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
-        f = interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate")
-        return f(x[1])
+        f = interp1d(self._coords_x, self._vals)
+        return f(x.x())
 
     def eval(self, value, x):
-        value[0] = self.lin_interpol(x)
+        value[0] = self.rbf_interpol(x)
 
 
 class Adapter:
@@ -84,7 +84,6 @@ class Adapter:
 
         ## read data related quantities (read data is read by this solver from preCICE)
         self._read_data_name = self._config.get_read_data_name()
-        self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)  # TODO mapping of name to ID has to be done inside waveform bindings!
         self._read_data = None
 
         ## numerics
@@ -196,19 +195,6 @@ class Adapter:
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def _do_interpolation(self, data, window_time):
-        # this is currently a very limited dummy implementation
-
-        # todo support "real" multirate, then remove following assertion
-        assert(self._N_this == self._N_other)  # if self._N_this == self._N_other, we can assume that self._write_data = self._read_data and do not have to interpolate
-
-        # todo support sampling data at arbitrary times
-        assert(window_time * self._N_this % self._window_size() == 0)  # sampling time is exactly aligned with substep
-
-        id_sample_at = round(window_time / self._window_size() * self._N_this)
-
-        return data[id_sample_at]
-
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using PySolverInterface and manages checkpointing.
         The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
@@ -226,8 +212,6 @@ class Adapter:
         :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly. 
         """
 
-        precice_step_complete = False
-
         # communication
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
@@ -236,6 +220,8 @@ class Adapter:
         self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data)
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)  # TODO: this should go somewhere inside _perform_substep, however, if we do not use Waveform relaxation, we have to run the command after calling advance and readBlockScalarData
 
+        precice_step_complete = False
+        
         # checkpointing
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionReadIterationCheckpoint()):
             # continue FEniCS computation from checkpoint
