@@ -215,9 +215,9 @@ class Adapter:
         # communication
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
-        self._interface.writeBlockScalarData(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data)
+        self._interface.writeBlockScalarData(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t+dt)
         max_dt = self._interface.advance(dt)
-        self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data)
+        self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+dt)
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)  # TODO: this should go somewhere inside _perform_substep, however, if we do not use Waveform relaxation, we have to run the command after calling advance and readBlockScalarData
 
         precice_step_complete = False
@@ -257,13 +257,13 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteInitialData()):
-            self._interface.writeBlockScalarData(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data)
+            self._interface.writeBlockScalarData(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)
             self._interface.fulfilledAction(fenicsadapter.waveform_bindings.PyActionWriteInitialData())
 
         self._interface.initializeData()
 
         if self._interface.isReadDataAvailable():
-            self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data)
+            self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t)
 
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteIterationCheckpoint()):
             self._u_cp = u_n.copy(deepcopy=True)

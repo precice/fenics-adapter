@@ -1,3 +1,5 @@
+import numpy as np
+
 try:
     import PySolverInterface
     from PySolverInterface import PyActionReadIterationCheckpoint, PyActionWriteInitialData, PyActionWriteIterationCheckpoint
@@ -18,74 +20,103 @@ from .config import Config
 
 class WaveformBindings(PySolverInterface.PySolverInterface):
     def __init__(self, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
-        print("INIT CALLED!")
-
         self._sample_counter_this = 0
         self._sample_counter_other = 0
 
         self._config = Config(adapter_config_filename)
+        self._precice_tau = None
 
         ## multirate time stepping
         self._N_this = self._config._N_this  # number of timesteps in this window, by default: no WR
         self._N_other = self._config._N_other  # number of timesteps in other window
-        self._substep_counter = 0  # keeps track of number of substeps performed in window
-        self._window_time = 0  # keeps track of window time
+        self._current_window_start = 0  # defines start of window
+        self._window_time = self._current_window_start  # keeps track of window time
+        self._write_data_buffer = dict()
+        self._read_data_buffer = dict()
 
         super().__init__()
 
     def __new__(cls, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
-        print("NEW CALLED!")
         return super().__new__(cls, name, rank, procs)
 
-    def writeBlockScalarData(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data):
+    def writeBlockScalarData(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
+        self._print_window_status()
+        print(time)
         assert(self._config.get_write_data_name() == write_data_name)
-        self._sample_counter_this += 1
+        assert(self._is_inside_current_window(time))
+        self._write_data_buffer[time] = write_data
         # write_data_name = write_data_name+self._sample_counter_this
         write_data_id = super().getDataID(write_data_name, mesh_id)
-        super().writeBlockScalarData(write_data_id, n_vertices, vertex_ids, write_data)
         # TODO here, we either access preCICE or put the data into a buffer
+        super().writeBlockScalarData(write_data_id, n_vertices, vertex_ids, write_data)
 
-    def readBlockScalarData(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data):
+    def readBlockScalarData(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
+        self._print_window_status()
+        print(time)
         assert(self._config.get_read_data_name() == read_data_name)
-        self._sample_counter_other += 1
+        assert(self._is_inside_current_window(time))
         # read_data_name = read_data_name+self._sample_counter_other
         read_data_id = super().getDataID(read_data_name, mesh_id)
-        super().readBlockScalarData(read_data_id, n_vertices, vertex_ids, read_data)
         # TODO here, we either access preCICE or put the data into a buffer
+        super().readBlockScalarData(read_data_id, n_vertices, vertex_ids, read_data)
+        self._read_data_buffer[time] = read_data
 
     def advance(self, dt):
-        # TODO here, we either call preCICE.advance() or update FEniCS boundary conditions from the WR interpolation
-        return super().advance(dt)
+        self._window_time += dt
+        if self._window_is_completed():
+            print("WINDOW COMPLETE!")
 
-    def _window_is_completed(self):
+            max_dt = super().advance(self._window_time)  # = time given by preCICE
+
+            # checkpointing
+            if self.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+                print("REPEAT WINDOW!")
+                # repeat window
+            else:
+                print("GO TO NEXT WINDOW!")
+                # go to next window
+                self._current_window_start += self._window_time
+
+            self._reset_window()
+        else:
+            print("WINDOW INCOMPLETE!")
+            max_dt = self._remaining_window_time()  # = window time remaining
+            assert(max_dt > 0)
+
+        return max_dt
+
+    def _print_window_status(self):
         print("## window status:")
+        print(self._current_window_start)
         print(self._window_size())
         print(self._window_time)
         print("##")
+
+    def _window_is_completed(self):
         if self._window_size() <= self._window_time:
-            assert (self._substep_counter == self._N_this)
             assert (self._window_time == self._precice_tau)
             return True
         else:
-            assert (self._substep_counter < self._N_this)
             return False
 
-    def _window_size(self):  # TODO: Remove this block and put it into WR Bindings
+    def _remaining_window_time(self):
+        return self._window_size() - self._window_time
+
+    def _current_window_end(self):
+        return self._current_window_start + self._window_size()
+
+    def _is_inside_current_window(self, global_time):
+        local_time = global_time - self._current_window_start
+        tol = self._window_size() * 10**-5
+        return 0-tol <= local_time <= self._window_size()+tol
+
+    def _window_size(self):
         return self._precice_tau
 
-    def _reset_window_counters(self):  # TODO: Remove this block and put it into WR Bindings
-        self._substep_counter = 0
+    def _reset_window(self):
         self._window_time = 0
-
-    def _waveform_relaxation_is_used(self):  # TODO: Remove this block and put it into WR Bindings
-        if self._N_this and self._N_this > 0 and self._N_other and self._N_other > 0:  # N_this and N_other are set, we want to use Waveform relaxation
-            return True
-        elif self._N_this:
-            assert (self._N_this > 0)  # if key is defined, it has to be greater 0
-        elif self._N_other:
-            assert (self._N_other > 0)  # if key is defined, it has to be greater 0
-        else:
-            return False
+        self._write_data_buffer = dict()
+        self._read_data_buffer = dict()
 
     def _perform_substep(self, write_function, t, dt, n):
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
@@ -114,7 +145,8 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         return t, n, success
 
     def initialize(self):
-        return super().initialize()
+        self._precice_tau = super().initialize()
+        return np.max([self._precice_tau, self._remaining_window_time()])
 
     def initializeData(self):
         return super().initializeData()

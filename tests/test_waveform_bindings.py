@@ -27,12 +27,12 @@ class TestWaveformBindings(TestCase):
     def mock_the_class(self):
         mocked_class = Mock
 
-        def read_behavior(self, read_data_id, n_vertices, vertex_ids, read_data):
+        def read_behavior(self, read_data_id, n_vertices, vertex_ids, read_data, t):
             assert(type(read_data) == np.ndarray)
             read_data += 1
             pass
 
-        def write_behavior(self, write_data_id, n_vertices, vertex_ids, write_data):
+        def write_behavior(self, write_data_id, n_vertices, vertex_ids, write_data, t):
             assert(type(write_data) == np.ndarray)
             write_data += 2
             pass
@@ -57,7 +57,7 @@ class TestWaveformBindings(TestCase):
             bindings = WaveformBindings()
             n = 5
             read_data = np.zeros(n)
-            bindings.readBlockScalarData("dummy", None, None, None, read_data)
+            bindings.readBlockScalarData("dummy", None, None, None, read_data, 0)
             self.assertTrue(np.isclose(read_data, np.ones(n)).all())
 
     def test_write(self):
@@ -68,7 +68,7 @@ class TestWaveformBindings(TestCase):
             bindings = WaveformBindings()
             n = 5
             write_data = np.zeros(n)
-            bindings.writeBlockScalarData("dummy", None, None, None, write_data)
+            bindings.writeBlockScalarData("dummy", None, None, None, write_data, 0)
             self.assertTrue(np.isclose(write_data, 2*np.ones(n)).all())
 
     def test_perform_substep(self):
