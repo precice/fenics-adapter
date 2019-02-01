@@ -20,6 +20,7 @@ from .config import Config
 
 class WaveformBindings(PySolverInterface.PySolverInterface):
     def __init__(self, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
+        print("CALL INIT")
         self._sample_counter_this = 0
         self._sample_counter_other = 0
 
@@ -46,7 +47,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         assert(self._is_inside_current_window(time))
         self._write_data_buffer[time] = write_data
         # write_data_name = write_data_name+self._sample_counter_this
-        write_data_id = super().getDataID(write_data_name, mesh_id)
+        write_data_id = self.getDataID(write_data_name, mesh_id)
         # TODO here, we either access preCICE or put the data into a buffer
         super().writeBlockScalarData(write_data_id, n_vertices, vertex_ids, write_data)
 
@@ -56,7 +57,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         assert(self._config.get_read_data_name() == read_data_name)
         assert(self._is_inside_current_window(time))
         # read_data_name = read_data_name+self._sample_counter_other
-        read_data_id = super().getDataID(read_data_name, mesh_id)
+        read_data_id = self.getDataID(read_data_name, mesh_id)
         # TODO here, we either access preCICE or put the data into a buffer
         super().readBlockScalarData(read_data_id, n_vertices, vertex_ids, read_data)
         self._read_data_buffer[time] = read_data

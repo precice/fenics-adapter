@@ -70,13 +70,7 @@ class Config:
         return self._coupling_mesh_name
 
     def get_read_data_name(self):
-        if self._N_other and self._N_other > 0:
-            return [self._read_data_name + str(i) for i in range(self._N_other + 1)]
-        else:
-            return self._read_data_name
+        return self._read_data_name
 
     def get_write_data_name(self):
-        if self._N_this and self._N_this > 0:
-            return [self._write_data_name + str(i) for i in range(self._N_this + 1)]
-        else:
-            return self._write_data_name
+        return self._write_data_name

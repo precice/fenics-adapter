@@ -2,16 +2,14 @@
 # first install package python setup.py install
 # then run tests with python setup.py test -s tests.test_waveform_bindings
 
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, patch
 from unittest import TestCase
 import warnings
 import numpy as np
 
 fake_dolfin = MagicMock()
-fake_PySolverInterface = MagicMock()
 
-
-@patch.dict('sys.modules', **{'PySolverInterface': fake_PySolverInterface, 'dolfin': fake_dolfin})
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin})
 class TestWaveformBindings(TestCase):
 
     dt = 1
@@ -20,12 +18,10 @@ class TestWaveformBindings(TestCase):
     dummy_config_WR = "tests/precice-adapter-config-WR.json"
 
     def setUp(self):
-        fake_PySolverInterface.PyActionReadIterationCheckpoint = MagicMock(return_value=1)
-        fake_PySolverInterface.PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
         warnings.simplefilter('ignore', category=ImportWarning)
 
     def mock_the_class(self):
-        mocked_class = Mock
+        mocked_class = MagicMock
 
         def read_behavior(self, read_data_id, n_vertices, vertex_ids, read_data, t):
             assert(type(read_data) == np.ndarray)
@@ -40,6 +36,8 @@ class TestWaveformBindings(TestCase):
         mocked_class.writeBlockScalarData = MagicMock(side_effect=write_behavior)
         mocked_class.readBlockScalarData = MagicMock(side_effect=read_behavior)
         mocked_class.advance = MagicMock(return_value=self.dt)
+        mocked_class.initialize = MagicMock(return_value=self.dt)
+        mocked_class.getDataID = MagicMock(return_value=0)
         return mocked_class
 
     def test_import(self):
@@ -47,36 +45,37 @@ class TestWaveformBindings(TestCase):
 
     def test_init(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        WaveformBindings()
+        with patch("PySolverInterface.PySolverInterface") as MagicMock:
+            WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
 
     def test_read(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
         fake_PySolverInterfaceClass = self.mock_the_class()
-        import fenicsadapter
         with patch('PySolverInterface.PySolverInterface') as fake_PySolverInterfaceClass:
-            bindings = WaveformBindings()
+            bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
+            bindings._precice_tau = self.dt
             n = 5
             read_data = np.zeros(n)
-            bindings.readBlockScalarData("dummy", None, None, None, read_data, 0)
+            bindings.readBlockScalarData("Dummy-Read", 0, None, None, read_data, 0)
             self.assertTrue(np.isclose(read_data, np.ones(n)).all())
 
     def test_write(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
         fake_PySolverInterfaceClass = self.mock_the_class()
-        import fenicsadapter
         with patch('PySolverInterface.PySolverInterface') as fake_PySolverInterfaceClass:
-            bindings = WaveformBindings()
+            bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
+            bindings._precice_tau = self.dt
+            print(bindings._config.get_write_data_name())
             n = 5
             write_data = np.zeros(n)
-            bindings.writeBlockScalarData("dummy", None, None, None, write_data, 0)
+            bindings.writeBlockScalarData("Dummy-Write", 0, None, None, write_data, 0)
             self.assertTrue(np.isclose(write_data, 2*np.ones(n)).all())
 
     def test_perform_substep(self):
+        from fenicsadapter.waveform_bindings import WaveformBindings
         fake_PySolverInterfaceClass = self.mock_the_class()
-        import fenicsadapter
         with patch('PySolverInterface.PySolverInterface') as fake_PySolverInterfaceClass:
-            from fenicsadapter.waveform_bindings import WaveformBindings
-            bindings = WaveformBindings()
+            bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
 
             u0 = MagicMock(name="u0")
             u1 = MagicMock(name="u1")
