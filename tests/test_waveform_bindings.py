@@ -54,6 +54,23 @@ class TestWaveformBindings(TestCase):
         bindings.writeBlockScalarData("Dummy-Write", 0, None, None, write_data, 0)
         self.assertTrue(np.isclose(write_data, 2*np.ones(n)).all())
 
+    def test_do_some_steps(self):
+        from fenicsadapter.waveform_bindings import WaveformBindings
+        bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
+        bindings._precice_tau = self.dt
+        bindings.readCheckpointReturn = False
+        bindings.writeCheckpointReturn = False
+        self.assertEqual(bindings._current_window_start, 0.0)
+        bindings.advance(.5)
+        self.assertEqual(bindings._current_window_start, 0.0)
+        bindings.advance(.5)
+        self.assertEqual(bindings._current_window_start, 1.0)
+        bindings.readCheckpointReturn = True
+        bindings.advance(.5)
+        self.assertEqual(bindings._current_window_start, 1.0)
+        bindings.advance(.5)
+        self.assertEqual(bindings._current_window_start, 1.0)
+
     def test_perform_substep(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
         bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)

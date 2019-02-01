@@ -1,8 +1,16 @@
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 import numpy as np
+
+PyActionReadIterationCheckpoint = MagicMock(return_value=1)
+PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
+PyActionWriteInitialData = MagicMock()
 
 
 class PySolverInterface:
+
+    readCheckpointReturn = False
+    writeCheckpointReturn = False
+
     def __init__(self):
         pass
 
@@ -22,10 +30,11 @@ class PySolverInterface:
     def getDataID(self, foo, bar):
         return None
 
-    def advance(self):
-        return self.dt
+    def advance(self, foo):
+        return 1.0
 
-PyActionReadIterationCheckpoint = MagicMock(return_value=1)
-PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
-PyActionWriteInitialData = MagicMock()
-
+    def isActionRequired(self, py_action):
+        if py_action == PyActionReadIterationCheckpoint():
+            return self.readCheckpointReturn
+        elif py_action == PyActionWriteIterationCheckpoint():
+            return self.writeCheckpointReturn
