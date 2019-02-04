@@ -34,7 +34,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._write_data_buffer = dict()
         self._read_data_buffer = dict()
 
-        super().__init__()
+        super().__init__(name, rank, procs)
 
     def __new__(cls, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
         return super().__new__(cls, name, rank, procs)

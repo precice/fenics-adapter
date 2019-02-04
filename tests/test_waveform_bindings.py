@@ -38,6 +38,14 @@ class TestWaveformBindings(TestCase):
 
     def test_read(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
+        from PySolverInterface import PySolverInterface
+
+        def readBehavior(read_data_id, n_vertices, vertex_ids, read_data):
+            assert (type(read_data) == np.ndarray)
+            read_data += 1
+
+        PySolverInterface.getDataID = MagicMock()
+        PySolverInterface.readBlockScalarData = MagicMock(side_effect=readBehavior)
         bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
         bindings._precice_tau = self.dt
         n = 5
@@ -47,6 +55,14 @@ class TestWaveformBindings(TestCase):
 
     def test_write(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
+        from PySolverInterface import PySolverInterface
+
+        def writeBehavior(read_data_id, n_vertices, vertex_ids, read_data):
+            assert (type(read_data) == np.ndarray)
+            read_data += 2
+
+        PySolverInterface.getDataID = MagicMock()
+        PySolverInterface.writeBlockScalarData = MagicMock(side_effect=writeBehavior)
         bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
         bindings._precice_tau = self.dt
         n = 5
@@ -56,16 +72,25 @@ class TestWaveformBindings(TestCase):
 
     def test_do_some_steps(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
+        from PySolverInterface import PySolverInterface, PyActionReadIterationCheckpoint, \
+            PyActionWriteIterationCheckpoint
+
+        PySolverInterface.advance = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
         bindings._precice_tau = self.dt
-        bindings.readCheckpointReturn = False
-        bindings.writeCheckpointReturn = False
+        PySolverInterface.isActionRequired = MagicMock(return_value=False)
         self.assertEqual(bindings._current_window_start, 0.0)
         bindings.advance(.5)
         self.assertEqual(bindings._current_window_start, 0.0)
         bindings.advance(.5)
         self.assertEqual(bindings._current_window_start, 1.0)
-        bindings.readCheckpointReturn = True
+
+        def isActionRequiredBehavior(py_action):
+            if py_action == PyActionReadIterationCheckpoint():
+                return True
+            elif py_action == PyActionWriteIterationCheckpoint():
+                return False
+        PySolverInterface.isActionRequired = MagicMock(side_effect=isActionRequiredBehavior)
         bindings.advance(.5)
         self.assertEqual(bindings._current_window_start, 1.0)
         bindings.advance(.5)
