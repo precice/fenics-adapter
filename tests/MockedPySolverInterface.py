@@ -8,7 +8,7 @@ PyActionWriteInitialData = MagicMock()
 
 class PySolverInterface:
 
-    def __init__(self, a, b, c):
+    def __init__(self):
         pass
 
     def __new__(cls, name, rank, procs):
