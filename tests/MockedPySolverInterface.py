@@ -8,33 +8,35 @@ PyActionWriteInitialData = MagicMock()
 
 class PySolverInterface:
 
-    readCheckpointReturn = False
-    writeCheckpointReturn = False
-
-    def __init__(self):
+    def __init__(self, a, b, c):
         pass
 
     def __new__(cls, name, rank, procs):
         return super().__new__(cls)
 
     def readBlockScalarData(self, read_data_id, n_vertices, vertex_ids, read_data):
-        assert(type(read_data) == np.ndarray)
-        read_data += 1
-        pass
+        raise Exception("not implemented")
 
     def writeBlockScalarData(self, write_data_id, n_vertices, vertex_ids, write_data):
-        assert(type(write_data) == np.ndarray)
-        write_data += 2
-        pass
+        raise Exception("not implemented")
 
     def getDataID(self, foo, bar):
-        return None
+        raise Exception("not implemented")
+
+    def getMeshID(self, foo):
+        raise Exception("not implemented")
 
     def advance(self, foo):
-        return 1.0
+        raise Exception("not implemented")
 
     def isActionRequired(self, py_action):
-        if py_action == PyActionReadIterationCheckpoint():
-            return self.readCheckpointReturn
-        elif py_action == PyActionWriteIterationCheckpoint():
-            return self.writeCheckpointReturn
+        raise Exception("not implemented")
+
+    def isCouplingOngoing(self):
+        raise Exception("not implemented")
+
+    def configure(self, foo):
+        raise Exception("not implemented")
+
+    def getDimensions(self):
+        raise Exception("not implemented")
