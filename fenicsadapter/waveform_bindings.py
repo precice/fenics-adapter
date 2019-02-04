@@ -19,7 +19,7 @@ from .config import Config
 
 
 class WaveformBindings(PySolverInterface.PySolverInterface):
-    def __init__(self, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
+    def configure_waveform_relaxation(self, adapter_config_filename='precice-adapter-config-WR.json'):
         self._sample_counter_this = 0
         self._sample_counter_other = 0
 
@@ -33,11 +33,6 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._window_time = self._current_window_start  # keeps track of window time
         self._write_data_buffer = dict()
         self._read_data_buffer = dict()
-
-        super().__init__()
-
-    def __new__(cls, name, rank, procs, adapter_config_filename='precice-adapter-config-WR.json'):
-        return super().__new__(cls, name, rank, procs)
 
     def writeBlockScalarData(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)

@@ -34,7 +34,7 @@ class TestWaveformBindings(TestCase):
 
     def test_init(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
+        WaveformBindings("Dummy", 0, 1)
 
     def test_read(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
@@ -46,7 +46,8 @@ class TestWaveformBindings(TestCase):
 
         PySolverInterface.getDataID = MagicMock()
         PySolverInterface.readBlockScalarData = MagicMock(side_effect=readBehavior)
-        bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
+        bindings = WaveformBindings("Dummy", 0, 1)
+        bindings.configure_waveform_relaxation(self.dummy_config_WR)
         bindings._precice_tau = self.dt
         n = 5
         read_data = np.zeros(n)
@@ -63,7 +64,8 @@ class TestWaveformBindings(TestCase):
 
         PySolverInterface.getDataID = MagicMock()
         PySolverInterface.writeBlockScalarData = MagicMock(side_effect=writeBehavior)
-        bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
+        bindings = WaveformBindings("Dummy", 0, 1)
+        bindings.configure_waveform_relaxation(self.dummy_config_WR)
         bindings._precice_tau = self.dt
         n = 5
         write_data = np.zeros(n)
@@ -76,7 +78,8 @@ class TestWaveformBindings(TestCase):
             PyActionWriteIterationCheckpoint
 
         PySolverInterface.advance = MagicMock()
-        bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
+        bindings = WaveformBindings("Dummy", 0, 1)
+        bindings.configure_waveform_relaxation(self.dummy_config_WR)
         bindings._precice_tau = self.dt
         PySolverInterface.isActionRequired = MagicMock(return_value=False)
         self.assertEqual(bindings._current_window_start, 0.0)
@@ -98,8 +101,8 @@ class TestWaveformBindings(TestCase):
 
     def test_perform_substep(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        bindings = WaveformBindings("Dummy", 0, 1, self.dummy_config_WR)
-
+        bindings = WaveformBindings("Dummy", 0, 1)
+        bindings.configure_waveform_relaxation(self.dummy_config_WR)
         u0 = MagicMock(name="u0")
         u1 = MagicMock(name="u1")
         u1new = MagicMock(name="u1_new")
