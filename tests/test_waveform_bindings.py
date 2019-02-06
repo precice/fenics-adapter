@@ -51,7 +51,11 @@ class TestWaveformBindings(TestCase):
         bindings._precice_tau = self.dt
         n = 5
         read_data = np.zeros(n)
-        bindings.readBlockScalarData("Dummy-Read", 0, None, None, read_data, 0)
+        dummy_mesh_id = MagicMock()
+        dummy_n_vertices = MagicMock()
+        dummy_vertex_ids = MagicMock()
+        bindings.initialize_waveforms(dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", n)
+        bindings.readBlockScalarData("Dummy-Read", dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, read_data, 0)
         self.assertTrue(np.isclose(read_data, np.ones(n)).all())
 
     def test_write(self):
@@ -69,7 +73,11 @@ class TestWaveformBindings(TestCase):
         bindings._precice_tau = self.dt
         n = 5
         write_data = np.zeros(n)
-        bindings.writeBlockScalarData("Dummy-Write", 0, None, None, write_data, 0)
+        dummy_mesh_id = MagicMock()
+        dummy_n_vertices = MagicMock()
+        dummy_vertex_ids = MagicMock()
+        bindings.initialize_waveforms(dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", n)
+        bindings.writeBlockScalarData("Dummy-Write", dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, write_data, 0)
         self.assertTrue(np.isclose(write_data, 2*np.ones(n)).all())
 
     def test_do_some_steps(self):
@@ -80,6 +88,11 @@ class TestWaveformBindings(TestCase):
         PySolverInterface.advance = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
         bindings.configure_waveform_relaxation(self.dummy_config_WR)
+        n = 5
+        dummy_mesh_id = MagicMock()
+        dummy_n_vertices = MagicMock()
+        dummy_vertex_ids = MagicMock()
+        bindings.initialize_waveforms(dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", n)
         bindings._precice_tau = self.dt
         PySolverInterface.isActionRequired = MagicMock(return_value=False)
         self.assertEqual(bindings._current_window_start, 0.0)

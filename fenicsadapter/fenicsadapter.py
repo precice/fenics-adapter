@@ -68,29 +68,29 @@ class Adapter:
         self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.getDimensions()
 
-        self._coupling_subdomain = None # initialized later
-        self._mesh_fenics = None # initialized later
-        self._coupling_bc_expression = None # initialized later
+        self._coupling_subdomain = None  # initialized later
+        self._mesh_fenics = None  # initialized later
+        self._coupling_bc_expression = None  # initialized later
 
-        ## coupling mesh related quantities
-        self._coupling_mesh_vertices = None # initialized later
+        # coupling mesh related quantities
+        self._coupling_mesh_vertices = None  # initialized later
         self._mesh_name = self._config.get_coupling_mesh_name()
         self._mesh_id = self._interface.getMeshID(self._mesh_name)
-        self._vertex_ids = None # initialized later
-        self._n_vertices = None # initialized later
+        self._vertex_ids = None  # initialized later
+        self._n_vertices = None  # initialized later
 
-        ## write data related quantities (write data is written by this solver to preCICE)
+        # write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
         self._write_data = None
 
-        ## read data related quantities (read data is read by this solver from preCICE)
+        # read data related quantities (read data is read by this solver from preCICE)
         self._read_data_name = self._config.get_read_data_name()
         self._read_data = None
 
-        ## numerics
+        # numerics
         self._precice_tau = None
 
-        ## checkpointing
+        # checkpointing
         self._u_cp = None  # checkpoint for temperature inside domain
         self._t_cp = None  # time of the checkpoint
         self._n_cp = None  # timestep of the checkpoint
@@ -256,6 +256,10 @@ class Adapter:
         self.set_read_field(read_field)
         self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
+        n_data = self._write_data.shape[0]  # TODO this is not nice currently...
+
+        self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name,
+                                             self._read_data_name, n_data)
 
         if self._interface.isActionRequired(fenicsadapter.waveform_bindings.PyActionWriteInitialData()):
             self._interface.writeBlockScalarData(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)
