@@ -54,31 +54,31 @@ class TestWaveformBindings(TestCase):
         dummy_mesh_id = MagicMock()
         dummy_n_vertices = MagicMock()
         dummy_vertex_ids = MagicMock()
+        to_be_read = np.random.rand(n)
         bindings.initialize_waveforms(dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", n)
+        bindings._read_data_buffer = to_be_read
         bindings.readBlockScalarData("Dummy-Read", dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, read_data, 0)
-        self.assertTrue(np.isclose(read_data, np.ones(n)).all())
+        self.assertTrue(np.isclose(read_data, to_be_read).all())
 
     def test_write(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
         from PySolverInterface import PySolverInterface
 
-        def writeBehavior(read_data_id, n_vertices, vertex_ids, read_data):
-            assert (type(read_data) == np.ndarray)
-            read_data += 2
-
         PySolverInterface.getDataID = MagicMock()
-        PySolverInterface.writeBlockScalarData = MagicMock(side_effect=writeBehavior)
+        PySolverInterface.writeBlockScalarData = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
         bindings.configure_waveform_relaxation(self.dummy_config_WR)
         bindings._precice_tau = self.dt
         n = 5
-        write_data = np.zeros(n)
+        to_be_written = np.random.rand(n)
+        write_data = to_be_written
         dummy_mesh_id = MagicMock()
         dummy_n_vertices = MagicMock()
         dummy_vertex_ids = MagicMock()
         bindings.initialize_waveforms(dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", n)
+        bindings._write_data_buffer = MagicMock()
         bindings.writeBlockScalarData("Dummy-Write", dummy_mesh_id, dummy_n_vertices, dummy_vertex_ids, write_data, 0)
-        self.assertTrue(np.isclose(write_data, 2*np.ones(n)).all())
+        self.assertTrue(np.isclose(to_be_written, bindings._write_data_buffer).all())
 
     def test_do_some_steps(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
@@ -86,6 +86,9 @@ class TestWaveformBindings(TestCase):
             PyActionWriteIterationCheckpoint
 
         PySolverInterface.advance = MagicMock()
+        PySolverInterface.getDataID = MagicMock()
+        PySolverInterface.readBlockScalarData = MagicMock()
+        PySolverInterface.writeBlockScalarData = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
         bindings.configure_waveform_relaxation(self.dummy_config_WR)
         n = 5
