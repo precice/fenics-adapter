@@ -38,6 +38,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._n_vertices = n_vertices
         self._vertex_ids = vertex_ids
 
+        # number of samples in one window
         self._n_data = n_data
 
         # constant write data name prefix
@@ -49,13 +50,16 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._read_data_buffer = self._get_empty_buffer()  # TODO later, we want to have more than one sample in this buffer to be able to interpolate
 
     def _get_empty_buffer(self):
-        return np.zeros(self._n_data)
+        buffer=[]
+        for _ in range(self._n_data):
+            buffer.append(np.zeros(self._n_vertices))
+        return buffer
 
     def writeBlockScalarData(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
-        self._write_data_buffer = write_data[:]
+        self._write_data_buffer[0] = write_data[:]  # todo currently, our buffer only stores one sample. Later, we want to write the data depending on the given "time"
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
@@ -66,7 +70,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         assert(self._config.get_read_data_name() == read_data_name)
         assert(self._is_inside_current_window(time))
         # we get the data from the interpolant. New data will be obtained from the other participant via preCICE in advance
-        read_data[:] = self._read_data_buffer
+        read_data[:] = self._read_data_buffer[0]  # todo currently, our buffer only stores one sample. Later, we want to read the data depending on the given "time"
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)

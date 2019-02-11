@@ -48,11 +48,11 @@ class TestCheckpointing(TestCase):
     # t_cp_mocked = MagicMock()  # time for the checkpoint
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
     mesh_id = MagicMock()
-    n_vertices = MagicMock()
+    n_vertices = 10
     vertex_ids = MagicMock()
     write_data_name = "Dummy-Write"
     read_data_name = "Dummy-Read"
-    n_data = 10
+    n_data = 1
 
     def setUp(self):
         warnings.simplefilter('ignore', category=ImportWarning)
@@ -77,9 +77,9 @@ class TestCheckpointing(TestCase):
         precice._n_vertices = self.n_vertices
         precice._vertex_ids = self.vertex_ids
         precice._write_data_name = self.write_data_name
-        precice._write_data = np.zeros(self.n_data)
+        precice._write_data = np.zeros(self.n_vertices)
         precice._read_data_name = self.read_data_name
-        precice._read_data = np.zeros(self.n_data)
+        precice._read_data = np.zeros(self.n_vertices)
 
         from fenicsadapter.waveform_bindings import WaveformBindings
 
