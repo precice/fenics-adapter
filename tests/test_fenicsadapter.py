@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch, Mock
 from unittest import TestCase
 import warnings
 import tests.MockedPySolverInterface
+import numpy as np
 
 fake_dolfin = MagicMock()
 
@@ -46,6 +47,12 @@ class TestCheckpointing(TestCase):
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
+    mesh_id = MagicMock()
+    n_vertices = MagicMock()
+    vertex_ids = MagicMock()
+    write_data_name = "Dummy-Write"
+    read_data_name = "Dummy-Read"
+    n_data = 10
 
     def setUp(self):
         warnings.simplefilter('ignore', category=ImportWarning)
@@ -67,6 +74,17 @@ class TestCheckpointing(TestCase):
         precice._u_cp = self.u_cp_mocked
         precice._n_cp = self.n_cp_mocked
         precice._precice_tau = 1
+        precice._n_vertices = self.n_vertices
+        precice._vertex_ids = self.vertex_ids
+        precice._write_data_name = self.write_data_name
+        precice._write_data = np.zeros(self.n_data)
+        precice._read_data_name = self.read_data_name
+        precice._read_data = np.zeros(self.n_data)
+
+        from fenicsadapter.waveform_bindings import WaveformBindings
+
+        if type(precice._interface) is WaveformBindings:
+            precice._interface.initialize_waveforms(self.mesh_id , self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, self.n_data)
 
     def test_advance_success(self):
         """
@@ -85,7 +103,7 @@ class TestCheckpointing(TestCase):
         PySolverInterface.isActionRequired = MagicMock(side_effect=isActionRequiredBehavior)
         PySolverInterface.configure = MagicMock()
         PySolverInterface.getDimensions = MagicMock()
-        PySolverInterface.getMeshID = MagicMock()
+        PySolverInterface.getMeshID = MagicMock(return_value=self.mesh_id)
         PySolverInterface.getDataID = MagicMock()
         PySolverInterface.writeBlockScalarData = MagicMock()
         PySolverInterface.readBlockScalarData = MagicMock()
@@ -126,7 +144,7 @@ class TestCheckpointing(TestCase):
         PySolverInterface.isActionRequired = MagicMock(side_effect=isActionRequiredBehavior)
         PySolverInterface.configure = MagicMock()
         PySolverInterface.getDimensions = MagicMock()
-        PySolverInterface.getMeshID = MagicMock()
+        PySolverInterface.getMeshID = MagicMock(return_value=self.mesh_id)
         PySolverInterface.getDataID = MagicMock()
         PySolverInterface.writeBlockScalarData = MagicMock()
         PySolverInterface.readBlockScalarData = MagicMock()
@@ -166,7 +184,7 @@ class TestCheckpointing(TestCase):
         PySolverInterface.isActionRequired = MagicMock(side_effect=isActionRequiredBehavior)
         PySolverInterface.configure = MagicMock()
         PySolverInterface.getDimensions = MagicMock()
-        PySolverInterface.getMeshID = MagicMock()
+        PySolverInterface.getMeshID = MagicMock(return_value=self.mesh_id)
         PySolverInterface.getDataID = MagicMock()
         PySolverInterface.writeBlockScalarData = MagicMock()
         PySolverInterface.readBlockScalarData = MagicMock()

@@ -38,13 +38,18 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._n_vertices = n_vertices
         self._vertex_ids = vertex_ids
 
+        self._n_data = n_data
+
         # constant write data name prefix
         self._write_data_name = write_data_name
-        self._write_data_buffer = np.zeros(n_data)  # TODO later, we want to have more than one sample in this buffer to be able to interpolate
+        self._write_data_buffer = self._get_empty_buffer()  # TODO later, we want to have more than one sample in this buffer to be able to interpolate
 
         # constant read data name prefix
         self._read_data_name = read_data_name
-        self._read_data_buffer = np.zeros(n_data)  # TODO later, we want to have more than one sample in this buffer to be able to interpolate
+        self._read_data_buffer = self._get_empty_buffer()  # TODO later, we want to have more than one sample in this buffer to be able to interpolate
+
+    def _get_empty_buffer(self):
+        return np.zeros(self._n_data)
 
     def writeBlockScalarData(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)
@@ -125,8 +130,8 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
 
     def _reset_window(self):
         self._window_time = 0
-        self._write_data_buffer = dict()
-        self._read_data_buffer = dict()
+        self._write_data_buffer = self._get_empty_buffer()
+        self._read_data_buffer = self._get_empty_buffer()
 
     def _perform_substep(self, write_function, t, dt, n):
         # increase counters and window time
