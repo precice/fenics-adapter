@@ -173,3 +173,66 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         id_sample_at = round(window_time / self._window_size() * self._N_this)
 
         return data[id_sample_at]
+
+
+class OutOfWindowError(Exception):
+    """Raised when the time is not inside the window"""
+    pass
+
+class NotInTemporalGridError(Exception):
+    """Raised when the point in time is not in the temporal grid"""
+    pass
+
+
+class Waveform:
+    def __init__(self, temporal_grid, window_start, window_size):
+        """
+        :param temporal_grid: temporal grid in local coordinates in [0,1]
+        :param window_start: starting time of the window
+        :param window_size: size of window
+        """
+        assert (abs(temporal_grid[0] - 0) < 10**-10)
+        assert (abs(temporal_grid[-1] - 1) < 10**-10)
+        assert (window_size > 0)
+        self._temporal_grid = temporal_grid
+        self._samples_in_time = dict()
+        self._window_size = window_size
+        self._window_start = window_start
+        for t in self._temporal_grid:
+            self._samples_in_time[t] = None
+
+    def initialize(self, data):
+        self._n_datapoints = data.shape[0]
+        for t in self._temporal_grid:
+            self._samples_in_time[t] = data.copy()
+
+    def _sample(self, local_time):
+        from scipy.interpolate import interp1d
+
+        if not (0 <= local_time <= 1):
+            raise OutOfWindowError
+
+        return_value = np.zeros(self._n_datapoints)
+        for i in range(self._n_datapoints):
+            values_along_time = dict()
+            for t in self._temporal_grid:
+                values_along_time[t] = self._samples_in_time[t][i]
+            interpolant = interp1d(list(values_along_time.keys()), list(values_along_time.values()))
+            return_value[i] = interpolant(local_time)
+        return return_value
+
+    def sample(self, global_time):
+        local_time = self.global_to_local_time(global_time)
+        return self._sample(local_time)
+
+    def global_to_local_time(self, global_time):
+        return (global_time - self._window_start)/self._window_size
+
+    def global_temporal_grid(self):
+        return self._temporal_grid * self._window_size + self._window_start
+
+    def update(self, data, global_time):
+        if not (global_time in self.global_temporal_grid()):
+            raise NotInTemporalGridError
+        assert (data.shape[0] == self._n_datapoints)
+        self._samples_in_time[self.global_to_local_time(global_time)] = data
