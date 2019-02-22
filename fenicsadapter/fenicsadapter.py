@@ -11,7 +11,7 @@ import numpy as np
 from .config import Config
 
 try:
-    import PySolverInterface
+    import precice
 except ImportError:
     import os
     import sys
@@ -22,7 +22,7 @@ except ImportError:
     precice_root = os.getenv('PRECICE_ROOT')
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
-    import PySolverInterface
+    import precice
 
 
 class CustomExpression(UserExpression):
@@ -75,9 +75,9 @@ class Adapter:
 
         self._solver_name = self._config.get_solver_name()
 
-        self._interface = PySolverInterface.PySolverInterface(self._solver_name, 0, 1)
+        self._interface = precice.Interface(self._solver_name, 0, 1)
         self._interface.configure(self._config.get_config_file_name())
-        self._dimensions = self._interface.getDimensions()
+        self._dimensions = self._interface.get_dimensions()
 
         self._coupling_subdomain = None # initialized later
         self._mesh_fenics = None # initialized later
@@ -86,18 +86,18 @@ class Adapter:
         ## coupling mesh related quantities
         self._coupling_mesh_vertices = None # initialized later
         self._mesh_name = self._config.get_coupling_mesh_name()
-        self._mesh_id = self._interface.getMeshID(self._mesh_name)
+        self._mesh_id = self._interface.get_mesh_id(self._mesh_name)
         self._vertex_ids = None # initialized later
         self._n_vertices = None # initialized later
 
         ## write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
-        self._write_data_id = self._interface.getDataID(self._write_data_name, self._mesh_id)
+        self._write_data_id = self._interface.get_data_id(self._write_data_name, self._mesh_id)
         self._write_data = None
 
         ## read data related quantities (read data is read by this solver from preCICE)
         self._read_data_name = self._config.get_read_data_name()
-        self._read_data_id = self._interface.getDataID(self._read_data_name, self._mesh_id)
+        self._read_data_id = self._interface.get_data_id(self._read_data_name, self._mesh_id)
         self._read_data = None
 
         ## numerics
@@ -160,7 +160,7 @@ class Adapter:
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self.extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
-        self._interface.setMeshVertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+        self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
     def set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
@@ -209,20 +209,20 @@ class Adapter:
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
-        """Calls preCICE advance function using PySolverInterface and manages checkpointing.
+        """Calls preCICE advance function using precice and manages checkpointing.
         The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
-        
+
         This means:
         * either, the checkpoint self._u_cp is assigned to u_n to repeat the iteration,
         * or u_n+1 is assigned to u_n and the checkpoint is updated correspondingly.
-        
+
         :param write_function: a FEniCS function being sent to the other participant as boundary condition at the coupling interface
         :param u_np1: new value of FEniCS solution u_n+1 at time t_n+1 = t+dt
         :param u_n: old value of FEniCS solution u_n at time t_n = t; updated via call-by-reference
         :param t: current time t_n for timestep n
         :param dt: timestep size dt = t_n+1 - t_n
         :param n: current timestep
-        :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly. 
+        :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly.
         """
 
         # sample write data at interface
@@ -230,9 +230,9 @@ class Adapter:
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
 
         # communication
-        self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+        self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
         max_dt = self._interface.advance(dt)
-        self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+        self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         # update boundary condition with read data
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
@@ -240,24 +240,24 @@ class Adapter:
         precice_step_complete = False
 
         # checkpointing
-        if self._interface.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+        if self._interface.is_action_required(precice.action_read_iteration_checkpoint()):
             # continue FEniCS computation from checkpoint
             u_n.assign(self._u_cp)  # set u_n to value of checkpoint
             t = self._t_cp
             n = self._n_cp
-            self._interface.fulfilledAction(PySolverInterface.PyActionReadIterationCheckpoint())
+            self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
         else:
             u_n.assign(u_np1)
             t = new_t = t + dt  # todo the variables new_t, new_n could be saved, by just using t and n below, however I think it improved readability.
             n = new_n = n + 1
 
-        if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+        if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             # continue FEniCS computation with u_np1
             # update checkpoint
             self._u_cp.assign(u_np1)
             self._t_cp = new_t
             self._n_cp = new_n
-            self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+            self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
             precice_step_complete = True
 
         return t, n, precice_step_complete, max_dt
@@ -273,20 +273,20 @@ class Adapter:
         self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
-        if self._interface.isActionRequired(PySolverInterface.PyActionWriteInitialData()):
-            self._interface.writeBlockScalarData(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-            self._interface.fulfilledAction(PySolverInterface.PyActionWriteInitialData())
+        if self._interface.is_action_required(precice.action_write_initial_data()):
+            self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            self._interface.fulfilled_action(precice.action_write_initial_data())
 
-        self._interface.initializeData()
+        self._interface.initialize_data()
 
-        if self._interface.isReadDataAvailable():
-            self._interface.readBlockScalarData(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+        if self._interface.is_read_data_available():
+            self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
-        if self._interface.isActionRequired(PySolverInterface.PyActionWriteIterationCheckpoint()):
+        if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             self._u_cp = u_n.copy(deepcopy=True)
             self._t_cp = t
             self._n_cp = n
-            self._interface.fulfilledAction(PySolverInterface.PyActionWriteIterationCheckpoint())
+            self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
 
         return self._precice_tau
 
@@ -296,7 +296,7 @@ class Adapter:
 
         :return: True if the coupling is ongoing, False otherwise
         """
-        return self._interface.isCouplingOngoing()
+        return self._interface.is_coupling_ongoing()
 
     def extract_coupling_boundary_coordinates(self):
         """Extracts the coordinates of vertices that lay on the boundary. 3D
