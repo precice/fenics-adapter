@@ -274,13 +274,24 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
-            self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            if write_field.value_rank() == 0:
+                self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            elif write_field.value_rank() == 1:
+                self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            else:
+                raise Exception("Rank of function space is neither 0 nor 1")
             self._interface.fulfilled_action(precice.action_write_initial_data())
 
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
-            self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            if read_field.value_rank() == 0:
+                self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            elif read_field.value_rank() == 1:
+                self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+            else:
+                raise Exception("Rank of function space is neither 0 nor 1")
+
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             self._u_cp = u_n.copy(deepcopy=True)
