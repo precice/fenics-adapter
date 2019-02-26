@@ -41,15 +41,21 @@ class CustomExpression(UserExpression):
             coords_z = np.zeros(self._coords_x.shape)
         self._coords_z = coords_z
 
-        self._vals = vals.flatten()
-        assert (self._vals.shape == self._coords_x.shape)
+        #self._vals = vals.flatten() #original
+        self._vals = vals
+        print("------------> vals vals.flatten", vals, vals.flatten())
+        print("------------> coord x y ", coords_x[1], coords_y[1])
+        print("------------> _vals.shape", vals.shape)
+        print("------------> _coords_x.shape", self._coords_x.shape)
+
+        #assert (self._vals.shape == self._coords_x.shape)
 
     def rbf_interpol(self, x):
         if x.__len__() == 1:
             f = Rbf(self._coords_x, self._vals.flatten())
             return f(x)
         if x.__len__() == 2:
-            f = Rbf(self._coords_x, self._coords_y, self._vals.flatten())
+            f = Rbf(self._coords_x, self._coords_y, self._vals.flatten()) # original
             return f(x[0], x[1])
         if x.__len__() == 3:
             f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
@@ -181,11 +187,13 @@ class Adapter:
     def create_coupling_boundary_condition(self):
         """Creates the coupling boundary conditions using CustomExpression."""
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-
+        print("------------->x_vert, y vert: ", x_vert, y_vert)
+        print("-------------> self._read_data", self._read_data)
         try:  # works with dolfin 1.6.0
-            self._coupling_bc_expression = CustomExpression()
+            self._coupling_bc_expression = CustomExpression(element=self._function_space.ufl_element())
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            self._coupling_bc_expression = CustomExpression(degree=0)
+            self._coupling_bc_expression = CustomExpression(element=self._function_space.ufl_element(),degree=0)
+        print("---------> UserExpression return", self._coupling_bc_expression.value_rank())
         self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
     def create_coupling_dirichlet_boundary_condition(self, function_space):
@@ -194,6 +202,7 @@ class Adapter:
 
         :return: dolfin.DirichletBC()
         """
+        self._function_space = function_space
         self.create_coupling_boundary_condition()
         return dolfin.DirichletBC(function_space, self._coupling_bc_expression, self._coupling_subdomain)
 
@@ -205,6 +214,7 @@ class Adapter:
          Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The
          FEniCS Tutorial Volume I." (2016).)
         """
+        self._function_space = test_functions #TODO: temporary solution
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
