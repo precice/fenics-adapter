@@ -50,12 +50,21 @@ class CustomExpression(UserExpression):
 
         #assert (self._vals.shape == self._coords_x.shape)
 
-    def rbf_interpol(self, x):
+    #TODO: implement handling of vector-valued funtions for 1D and 3D
+    def rbf_interpol(self, x, dim_no=-1):
         if x.__len__() == 1:
             f = Rbf(self._coords_x, self._vals.flatten())
             return f(x)
         if x.__len__() == 2:
-            f = Rbf(self._coords_x, self._coords_y, self._vals.flatten()) # original
+            print("-----------------> RBF coords x", self._coords_x)
+            print("-----------------> RBF coords y", self._coords_y)
+            print("-----------------> RBF vals", self._vals)
+            print("-----------------> RBF vals flattem", self._vals.flatten())
+            #f = Rbf(self._coords_x, self._coords_y, self._vals.flatten()) # original
+            if self._vals.ndim == 1: #check if scalar or vector-valued
+                f = Rbf(self._coords_x, self._coords_y, self._vals.flatten())
+            else:
+                f = Rbf(self._coords_x, self._coords_y, self._vals[:,dim_no].flatten()) # extract dim_no element of each vector
             return f(x[0], x[1])
         if x.__len__() == 3:
             f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
@@ -65,8 +74,14 @@ class CustomExpression(UserExpression):
         f = interp1d(self._coords_x, self._vals)
         return f(x.x())
 
-    def eval(self, value, x):
-        value[0] = self.rbf_interpol(x)
+    def eval(self, value, x): # note that eval() is overloaded !
+        print("-------------> value value[0] for eval: ", value, value[0])
+        if self._vals.ndim == 1:
+            value[0] = self.rbf_interpol(x)
+        else:
+            for i in range(self._vals.ndim): # in case of more dimensions
+                value[i] = self.rbf_interpol(x,i)
+            #value[1] = self.rbf_interpol(x,1)
 
 
 class Adapter:
@@ -287,7 +302,8 @@ class Adapter:
             if write_field.value_rank() == 0:
                 self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
             elif write_field.value_rank() == 1:
-                self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+                #print("-----------> write_data, write_data_ravel", self._write_data, self._write_data.ravel())
+                self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data.ravel())
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
             self._interface.fulfilled_action(precice.action_write_initial_data())
@@ -298,7 +314,7 @@ class Adapter:
             if read_field.value_rank() == 0:
                 self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
             elif read_field.value_rank() == 1:
-                self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+                self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data.ravel())
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
 
