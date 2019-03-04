@@ -7,11 +7,11 @@ from unittest import TestCase
 import warnings
 import numpy as np
 import numpy.testing as npt
-import tests.MockedPySolverInterface
+import tests.MockedPrecice
 
 fake_dolfin = MagicMock()
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'PySolverInterface': tests.MockedPySolverInterface})
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestWaveformBindings(TestCase):
 
     dt = 1
@@ -36,19 +36,20 @@ class TestWaveformBindings(TestCase):
             self.assertEqual(type(e), TypeError)
 
     def test_init(self):
-        from fenicsadapter.waveform_bindings import WaveformBindings
-        WaveformBindings("Dummy", 0, 1)
+        with patch("precice.Interface") as tests.MockedPrecice.Interface:
+            from fenicsadapter.waveform_bindings import WaveformBindings
+            WaveformBindings("Dummy", 0, 1)
 
     def test_read(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        from PySolverInterface import PySolverInterface
+        from precice import Interface
 
-        def readBehavior(read_data_id, n_vertices, vertex_ids, read_data):
+        def read_behavior(read_data_id, n_vertices, vertex_ids, read_data):
             assert (type(read_data) == np.ndarray)
             read_data += 1
 
-        PySolverInterface.getDataID = MagicMock()
-        PySolverInterface.readBlockScalarData = MagicMock(side_effect=readBehavior)
+        Interface.get_data_id = MagicMock()
+        Interface.read_block_scalar_data= MagicMock(side_effect=read_behavior)
         bindings = WaveformBindings("Dummy", 0, 1)
         bindings.configure_waveform_relaxation(self.dummy_config_WR)
         bindings._precice_tau = self.dt
@@ -58,15 +59,15 @@ class TestWaveformBindings(TestCase):
         to_be_read = np.random.rand(self.n_vertices)
         bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", self.n_data)
         bindings._read_data_buffer[0] = to_be_read
-        bindings.readBlockScalarData("Dummy-Read", dummy_mesh_id, self.n_vertices, dummy_vertex_ids, read_data, 0)
+        bindings.read_block_scalar_data("Dummy-Read", dummy_mesh_id, self.n_vertices, dummy_vertex_ids, read_data, 0)
         self.assertTrue(np.isclose(read_data, to_be_read).all())
 
     def test_write(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        from PySolverInterface import PySolverInterface
+        from precice import Interface
 
-        PySolverInterface.getDataID = MagicMock()
-        PySolverInterface.writeBlockScalarData = MagicMock()
+        Interface.get_data_id = MagicMock()
+        Interface.write_block_scalar_data = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
         bindings.configure_waveform_relaxation(self.dummy_config_WR)
         bindings._precice_tau = self.dt
@@ -76,37 +77,36 @@ class TestWaveformBindings(TestCase):
         dummy_vertex_ids = MagicMock()
         bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", self.n_data)
         bindings._write_data_buffer[0] = MagicMock()
-        bindings.writeBlockScalarData("Dummy-Write", dummy_mesh_id, self.n_vertices, dummy_vertex_ids, write_data, 0)
+        bindings.write_block_scalar_data("Dummy-Write", dummy_mesh_id, self.n_vertices, dummy_vertex_ids, write_data, 0)
         self.assertTrue(np.isclose(to_be_written, bindings._write_data_buffer).all())
 
     def test_do_some_steps(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        from PySolverInterface import PySolverInterface, PyActionReadIterationCheckpoint, \
-            PyActionWriteIterationCheckpoint
+        from precice import Interface, action_read_iteration_checkpoint, action_write_iteration_checkpoint
 
-        PySolverInterface.advance = MagicMock()
-        PySolverInterface.getDataID = MagicMock()
-        PySolverInterface.readBlockScalarData = MagicMock()
-        PySolverInterface.writeBlockScalarData = MagicMock()
+        Interface.advance = MagicMock()
+        Interface.get_data_id = MagicMock()
+        Interface.read_block_scalar_data = MagicMock()
+        Interface.write_block_scalar_data = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
         bindings.configure_waveform_relaxation(self.dummy_config_WR)
         dummy_mesh_id = MagicMock()
         dummy_vertex_ids = MagicMock()
         bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", self.n_data)
         bindings._precice_tau = self.dt
-        PySolverInterface.isActionRequired = MagicMock(return_value=False)
+        Interface.is_action_required= MagicMock(return_value=False)
         self.assertEqual(bindings._current_window_start, 0.0)
         bindings.advance(.5)
         self.assertEqual(bindings._current_window_start, 0.0)
         bindings.advance(.5)
         self.assertEqual(bindings._current_window_start, 1.0)
 
-        def isActionRequiredBehavior(py_action):
-            if py_action == PyActionReadIterationCheckpoint():
+        def is_action_required_behavior(py_action):
+            if py_action == action_read_iteration_checkpoint():
                 return True
-            elif py_action == PyActionWriteIterationCheckpoint():
+            elif py_action == action_write_iteration_checkpoint():
                 return False
-        PySolverInterface.isActionRequired = MagicMock(side_effect=isActionRequiredBehavior)
+        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
         bindings.advance(.5)
         self.assertEqual(bindings._current_window_start, 1.0)
         bindings.advance(.5)
@@ -134,7 +134,7 @@ class TestWaveformBindings(TestCase):
         self.assertEqual(bindings._read_data[1], v1)
         """
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'PySolverInterface': tests.MockedPySolverInterface})
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestWaveform(TestCase):
     def setUp(self):
         warnings.simplefilter('ignore', category=ImportWarning)

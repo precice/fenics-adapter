@@ -1,8 +1,8 @@
 import numpy as np
 
 try:
-    import PySolverInterface
-    from PySolverInterface import PyActionReadIterationCheckpoint, PyActionWriteInitialData, PyActionWriteIterationCheckpoint
+    import precice
+    from precice import action_read_iteration_checkpoint, action_write_initial_data, action_write_iteration_checkpoint
 except ImportError:
     import os
     import sys
@@ -13,12 +13,12 @@ except ImportError:
     precice_root = os.getenv('PRECICE_ROOT')
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
-    import PySolverInterface
+    import precice
+    from precice import action_read_iteration_checkpoint, action_write_initial_data, action_write_iteration_checkpoint
 
 from .config import Config
 
-
-class WaveformBindings(PySolverInterface.PySolverInterface):
+class WaveformBindings(precice.Interface):
     def configure_waveform_relaxation(self, adapter_config_filename='precice-adapter-config-WR.json'):
         self._sample_counter_this = 0
         self._sample_counter_other = 0
@@ -55,7 +55,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
             buffer.append(np.zeros(self._n_vertices))
         return buffer
 
-    def writeBlockScalarData(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
+    def write_block_scalar_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
@@ -66,7 +66,7 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         assert (self._vertex_ids == vertex_ids)
         assert (self._write_data_name == write_data_name)
 
-    def readBlockScalarData(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
+    def read_block_scalar_data(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
         assert(self._config.get_read_data_name() == read_data_name)
         assert(self._is_inside_current_window(time))
         # we get the data from the interpolant. New data will be obtained from the other participant via preCICE in advance
@@ -81,14 +81,14 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._window_time += dt
         if self._window_is_completed():
             print("WINDOW COMPLETE!")
-            write_data_id = self.getDataID(self._write_data_name, self._mesh_id)
-            read_data_id = self.getDataID(self._read_data_name, self._mesh_id)
-            super().writeBlockScalarData(write_data_id, self._n_vertices, self._vertex_ids, self._write_data_buffer)
+            write_data_id = self.get_data_id(self._write_data_name, self._mesh_id)
+            read_data_id = self.get_data_id(self._read_data_name, self._mesh_id)
+            super().write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, self._write_data_buffer)
             max_dt = super().advance(self._window_time)  # = time given by preCICE
-            super().readBlockScalarData(read_data_id, self._n_vertices, self._vertex_ids, self._read_data_buffer)
+            super().write_block_scalar_data(read_data_id, self._n_vertices, self._vertex_ids, self._read_data_buffer)
 
             # checkpointing
-            if self.isActionRequired(PySolverInterface.PyActionReadIterationCheckpoint()):
+            if self.is_action_required(action_read_iteration_checkpoint()):
                 print("REPEAT WINDOW!")
                 # repeat window
             else:
@@ -158,8 +158,8 @@ class WaveformBindings(PySolverInterface.PySolverInterface):
         self._precice_tau = super().initialize()
         return np.max([self._precice_tau, self._remaining_window_time()])
 
-    def initializeData(self):
-        return super().initializeData()
+    def initialize_data(self):
+        return super().initialize_data()
 
     def _do_interpolation(self, data, window_time):
         # this is currently a very limited dummy implementation

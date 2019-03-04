@@ -1,39 +1,39 @@
 from unittest.mock import MagicMock
 import numpy as np
 
-PyActionReadIterationCheckpoint = MagicMock(return_value=1)
-PyActionWriteIterationCheckpoint = MagicMock(return_value=2)
-PyActionWriteInitialData = MagicMock()
+action_read_iteration_checkpoint = MagicMock(return_value=1)
+action_write_iteration_checkpoint = MagicMock(return_value=2)
+action_write_initial_data = MagicMock()
 
 
-class PySolverInterface:
+class Interface:
 
     def __init__(self, name, rank, procs):
         pass
 
-    def readBlockScalarData(self, read_data_id, n_vertices, vertex_ids, read_data):
+    def read_block_scalar_data(self, read_data_id, n_vertices, vertex_ids, read_data):
         raise Exception("not implemented")
 
-    def writeBlockScalarData(self, write_data_id, n_vertices, vertex_ids, write_data):
+    def write_block_scalar_data(self, write_data_id, n_vertices, vertex_ids, write_data):
         raise Exception("not implemented")
 
-    def getDataID(self, foo, bar):
+    def get_data_id(self, foo, bar):
         raise Exception("not implemented")
 
-    def getMeshID(self, foo):
+    def get_mesh_id(self, foo):
         raise Exception("not implemented")
 
     def advance(self, foo):
         raise Exception("not implemented")
 
-    def isActionRequired(self, py_action):
+    def is_action_required(self, py_action):
         raise Exception("not implemented")
 
-    def isCouplingOngoing(self):
+    def is_coupling_ongoing(self):
         raise Exception("not implemented")
 
     def configure(self, foo):
         raise Exception("not implemented")
 
-    def getDimensions(self):
+    def get_dimensions(self):
         raise Exception("not implemented")
