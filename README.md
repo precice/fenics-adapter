@@ -3,6 +3,9 @@
 <a style="text-decoration: none" href="https://travis-ci.org/precice/fenics-adapter" target="_blank">
     <img src="https://travis-ci.org/precice/fenics-adapter.svg?branch=master" alt="Build status">
 </a>
+<a style="text-decoration: none" href="https://github.com/precice/fenics-adapter/blob/master/LICENSE" target="_blank">
+    <img src="https://img.shields.io/github/license/precice/fenics-adapter.svg" alt="GNU LGPL license">
+</a>
 
 **experimental** preCICE-adapter for the open source computing platform FEniCS
 
