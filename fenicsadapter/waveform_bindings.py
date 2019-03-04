@@ -1,6 +1,6 @@
 try:
-    import PySolverInterface
-    from PySolverInterface import PyActionReadIterationCheckpoint, PyActionWriteInitialData, PyActionWriteIterationCheckpoint
+    import precice
+    from precice import action_read_iteration_checkpoint, action_write_initial_data, action_write_iteration_checkpoint
 except ImportError:
     import os
     import sys
@@ -11,16 +11,9 @@ except ImportError:
     precice_root = os.getenv('PRECICE_ROOT')
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
-    import PySolverInterface
+    import precice
+    from precice import action_read_iteration_checkpoint, action_write_initial_data, action_write_iteration_checkpoint
 
 
-class WaveformBindings(PySolverInterface.PySolverInterface):
-    def __init__(self, name, rank, procs):
-        print("INIT CALLED!")
-        super().__init__()
-
-
-    def __new__(cls, name, rank, procs):
-        print("NEW CALLED!")
-        return super().__new__(cls, name, rank, procs)
-
+class WaveformBindings(precice.Interface):
+    pass

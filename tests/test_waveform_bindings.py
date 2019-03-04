@@ -5,8 +5,11 @@
 from unittest.mock import MagicMock, patch, Mock
 from unittest import TestCase
 import warnings
+import tests.MockedPrecice
 
+fake_dolfin = MagicMock()
 
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestWaveformBindings(TestCase):
     def setUp(self):
         warnings.simplefilter('ignore', category=ImportWarning)
@@ -17,6 +20,6 @@ class TestWaveformBindings(TestCase):
 
     def test_init(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
-        with patch("PySolverInterface.PySolverInterface") as MagicMock:
+        with patch("precice.Interface") as tests.MockedPrecice.Interface:
             WaveformBindings("Dummy", 0, 1)
 
