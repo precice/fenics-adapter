@@ -12,6 +12,7 @@ from .config import Config
 
 import fenicsadapter.waveform_bindings
 
+
 class CustomExpression(UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
     provided by preCICE, using RBF interpolation.
