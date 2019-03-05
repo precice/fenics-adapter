@@ -9,7 +9,6 @@ action_write_initial_data = MagicMock()
 class Interface:
 
     def __init__(self, name, rank, procs):
-        print("MOCKED PRECICE")
         pass
 
     def read_block_scalar_data(self, read_data_id, n_vertices, vertex_ids, read_data):

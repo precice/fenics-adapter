@@ -15,20 +15,22 @@ fake_dolfin = MagicMock()
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestWaveform(TestCase):
     def setUp(self):
-        from fenicsadapter.waveform_bindings import Waveform
         warnings.simplefilter('ignore', category=ImportWarning)
         warnings.simplefilter('ignore', category=DeprecationWarning)
-        window_start = 2
-        window_size = 3
+        self.window_start = 2
+        self.window_size = 3
         self.local_time_grid = np.linspace(0, 1, 10)
-        self.global_time_grid = window_start + window_size * self.local_time_grid
+        self.global_time_grid = self.window_start + self.window_size * self.local_time_grid
         self.input_data = np.array([1, 2, 3])
-        self.waveform = Waveform(np.linspace(0, 1, 10), window_start, window_size)
 
     def test_initialize_data(self):
+        from fenicsadapter.waveform_bindings import Waveform
+        self.waveform = Waveform(self.local_time_grid, self.window_start, self.window_size)
         self.waveform.initialize(self.input_data)
 
     def test_update_data(self):
+        from fenicsadapter.waveform_bindings import Waveform
+        self.waveform = Waveform(self.local_time_grid, self.window_start, self.window_size)
         from fenicsadapter.waveform_bindings import NotOnTemporalGridError
 
         self.waveform.initialize(self.input_data)
@@ -50,6 +52,8 @@ class TestWaveform(TestCase):
         npt.assert_almost_equal(out, self.input_data*1.5)
 
     def test_sample_data(self):
+        from fenicsadapter.waveform_bindings import Waveform
+        self.waveform = Waveform(self.local_time_grid, self.window_start, self.window_size)
         from fenicsadapter.waveform_bindings import OutOfLocalWindowError, NoDataError
 
         with self.assertRaises(NoDataError):

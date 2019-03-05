@@ -176,12 +176,12 @@ class WaveformBindings(precice.Interface):
         return data[id_sample_at]
 
 
-class OutOfWindowError(Exception):
+class OutOfLocalWindowError(Exception):
     """Raised when the time is not inside the window; i.e. t not inside [t_start, t_end]"""
     pass
 
 
-class NotInTemporalGridError(Exception):
+class NotOnTemporalGridError(Exception):
     """Raised when the point in time is not on the temporal grid. """
     pass
 
@@ -221,7 +221,7 @@ class Waveform:
             raise NoDataError
 
         if not (0 <= local_time <= 1):
-            raise OutOfWindowError
+            raise OutOfLocalWindowError
 
         return_value = np.zeros(self._n_datapoints)
         for i in range(self._n_datapoints):
@@ -247,6 +247,6 @@ class Waveform:
 
     def update(self, data, global_time):
         if not self._time_is_on_grid(global_time):
-            raise NotInTemporalGridError
+            raise NotOnTemporalGridError
         assert (data.shape[0] == self._n_datapoints)
         self._samples_in_time[self.global_to_local_time(global_time)] = data
