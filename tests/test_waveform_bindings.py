@@ -11,6 +11,7 @@ import tests.MockedPrecice
 
 fake_dolfin = MagicMock()
 
+
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestWaveformBindings(TestCase):
 
@@ -134,6 +135,7 @@ class TestWaveformBindings(TestCase):
         self.assertEqual(bindings._read_data[1], v1)
         """
 
+
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestWaveform(TestCase):
     def setUp(self):
@@ -144,14 +146,14 @@ class TestWaveform(TestCase):
 
     def test_init(self):
         from fenicsadapter.waveform_bindings import Waveform
-        wf = Waveform(np.linspace(0,1,10),2,3)
+        wf = Waveform(np.linspace(0, 1, 10), 2, 3)
 
     def test_initialize_data(self):
         from fenicsadapter.waveform_bindings import Waveform, OutOfWindowError
         window_start = 2
         window_size = 3
-        wf = Waveform(np.linspace(0,1,10),window_start,window_size)
-        input_data = np.array([1,2,3])
+        wf = Waveform(np.linspace(0, 1, 10), window_start, window_size)
+        input_data = np.array([1, 2, 3])
         wf.initialize(input_data)
         for t in np.linspace(window_start, window_start + window_size):
             out = wf.sample(t)
@@ -166,10 +168,10 @@ class TestWaveform(TestCase):
         from fenicsadapter.waveform_bindings import Waveform, OutOfWindowError, NotInTemporalGridError
         window_start = 2
         window_size = 3
-        local_time_grid = np.linspace(0,1,10)
+        local_time_grid = np.linspace(0, 1, 10)
         global_time_grid = window_start + window_size * local_time_grid
         wf = Waveform(local_time_grid, window_start, window_size)
-        input_data = np.array([1,2,3])
+        input_data = np.array([1, 2, 3])
         wf.initialize(input_data)
         wf.update(input_data*2, global_time_grid[0])
 
