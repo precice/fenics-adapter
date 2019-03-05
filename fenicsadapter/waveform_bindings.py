@@ -18,6 +18,7 @@ except ImportError:
 
 from .config import Config
 
+
 class WaveformBindings(precice.Interface):
     def configure_waveform_relaxation(self, adapter_config_filename='precice-adapter-config-WR.json'):
         self._sample_counter_this = 0
@@ -176,11 +177,17 @@ class WaveformBindings(precice.Interface):
 
 
 class OutOfWindowError(Exception):
-    """Raised when the time is not inside the window"""
+    """Raised when the time is not inside the window; i.e. t not inside [t_start, t_end]"""
     pass
 
+
 class NotInTemporalGridError(Exception):
-    """Raised when the point in time is not in the temporal grid"""
+    """Raised when the point in time is not on the temporal grid. """
+    pass
+
+
+class NoDataError(Exception):
+    """Raised if not data exists in waveform"""
     pass
 
 
@@ -198,6 +205,7 @@ class Waveform:
         self._samples_in_time = dict()
         self._window_size = window_size
         self._window_start = window_start
+        self._n_datapoints = None
         for t in self._temporal_grid:
             self._samples_in_time[t] = None
 
@@ -208,6 +216,9 @@ class Waveform:
 
     def _sample(self, local_time):
         from scipy.interpolate import interp1d
+
+        if not self._n_datapoints:
+            raise NoDataError
 
         if not (0 <= local_time <= 1):
             raise OutOfWindowError
@@ -231,8 +242,11 @@ class Waveform:
     def global_temporal_grid(self):
         return self._temporal_grid * self._window_size + self._window_start
 
+    def _time_is_on_grid(self, time):
+        return time in self.global_temporal_grid()
+
     def update(self, data, global_time):
-        if not (global_time in self.global_temporal_grid()):
+        if not self._time_is_on_grid(global_time):
             raise NotInTemporalGridError
         assert (data.shape[0] == self._n_datapoints)
         self._samples_in_time[self.global_to_local_time(global_time)] = data
