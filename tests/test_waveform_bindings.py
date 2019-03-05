@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 from unittest import TestCase
 import warnings
 import numpy as np
-import numpy.testing as npt
 import tests.MockedPrecice
 
 fake_dolfin = MagicMock()
@@ -26,7 +25,7 @@ class TestWaveformBindings(TestCase):
         warnings.simplefilter('ignore', category=ImportWarning)
 
     def test_import(self):
-        from fenicsadapter.waveform_bindings import WaveformBindings
+        pass
 
     def test_init_fail(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
@@ -134,56 +133,3 @@ class TestWaveformBindings(TestCase):
         self.assertEqual(bindings._read_data[0], v0)
         self.assertEqual(bindings._read_data[1], v1)
         """
-
-
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
-class TestWaveform(TestCase):
-    def setUp(self):
-        warnings.simplefilter('ignore', category=ImportWarning)
-
-    def test_import(self):
-        from fenicsadapter.waveform_bindings import Waveform
-
-    def test_init(self):
-        from fenicsadapter.waveform_bindings import Waveform
-        wf = Waveform(np.linspace(0, 1, 10), 2, 3)
-
-    def test_initialize_data(self):
-        from fenicsadapter.waveform_bindings import Waveform, OutOfWindowError
-        window_start = 2
-        window_size = 3
-        wf = Waveform(np.linspace(0, 1, 10), window_start, window_size)
-        input_data = np.array([1, 2, 3])
-        wf.initialize(input_data)
-        for t in np.linspace(window_start, window_start + window_size):
-            out = wf.sample(t)
-            npt.assert_almost_equal(out, input_data)
-
-        with self.assertRaises(OutOfWindowError):
-            wf.sample(window_start + window_size + .1)
-        with self.assertRaises(OutOfWindowError):
-            wf.sample(window_start - .1)
-
-    def test_update_data(self):
-        from fenicsadapter.waveform_bindings import Waveform, OutOfWindowError, NotInTemporalGridError
-        window_start = 2
-        window_size = 3
-        local_time_grid = np.linspace(0, 1, 10)
-        global_time_grid = window_start + window_size * local_time_grid
-        wf = Waveform(local_time_grid, window_start, window_size)
-        input_data = np.array([1, 2, 3])
-        wf.initialize(input_data)
-        wf.update(input_data*2, global_time_grid[0])
-
-        with self.assertRaises(NotInTemporalGridError):
-            wf.update(input_data*2, local_time_grid[0])
-
-        out = wf.sample(global_time_grid[0])
-        npt.assert_almost_equal(out, input_data*2)
-
-        for t in global_time_grid[1:]:
-            out = wf.sample(t)
-            npt.assert_almost_equal(out, input_data)
-
-        out = wf.sample(.5 * (global_time_grid[0] + global_time_grid[1]))
-        npt.assert_almost_equal(out, input_data*1.5)

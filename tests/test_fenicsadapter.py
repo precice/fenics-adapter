@@ -206,6 +206,7 @@ class TestCheckpointing(TestCase):
         # we expect that precice._u_cp.value has not been updated
         self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
 
+
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestIsCouplingOngoing(TestCase):
     dummy_config = "tests/precice-adapter-config.json"
