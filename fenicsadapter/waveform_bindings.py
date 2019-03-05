@@ -33,34 +33,33 @@ class WaveformBindings(precice.Interface):
         self._current_window_start = 0  # defines start of window
         self._window_time = self._current_window_start  # keeps track of window time
 
-    def initialize_waveforms(self, mesh_id , n_vertices, vertex_ids, write_data_name, read_data_name, n_data):
+    def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name, n_substeps):
         # constant information of mesh
         self._mesh_id = mesh_id
         self._n_vertices = n_vertices
         self._vertex_ids = vertex_ids
 
         # number of samples in one window
-        self._n_data = n_data
+        self._n_substeps = n_substeps + 1
 
         # constant write data name prefix
         self._write_data_name = write_data_name
-        self._write_data_buffer = self._get_empty_buffer()  # TODO later, we want to have more than one sample in this buffer to be able to interpolate
+        self._write_data_buffer = self._get_empty_buffer()
 
         # constant read data name prefix
         self._read_data_name = read_data_name
-        self._read_data_buffer = self._get_empty_buffer()  # TODO later, we want to have more than one sample in this buffer to be able to interpolate
+        self._read_data_buffer = self._get_empty_buffer()
 
     def _get_empty_buffer(self):
-        buffer=[]
-        for _ in range(self._n_data):
-            buffer.append(np.zeros(self._n_vertices))
+        buffer = Waveform(self._current_window_start, self._precice_tau, self._n_substeps)
+        buffer.initialize(np.zeros(self._n_vertices))
         return buffer
 
     def write_block_scalar_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
-        self._write_data_buffer[0] = write_data[:]  # todo currently, our buffer only stores one sample. Later, we want to write the data depending on the given "time"
+        self._write_data_buffer.update(write_data[:], time)
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
@@ -71,7 +70,7 @@ class WaveformBindings(precice.Interface):
         assert(self._config.get_read_data_name() == read_data_name)
         assert(self._is_inside_current_window(time))
         # we get the data from the interpolant. New data will be obtained from the other participant via preCICE in advance
-        read_data[:] = self._read_data_buffer[0]  # todo currently, our buffer only stores one sample. Later, we want to read the data depending on the given "time"
+        read_data[:] = self._read_data_buffer.sample(time)[:]
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
@@ -81,7 +80,6 @@ class WaveformBindings(precice.Interface):
     def advance(self, dt):
         self._window_time += dt
         if self._window_is_completed():
-            print("WINDOW COMPLETE!")
             write_data_id = self.get_data_id(self._write_data_name, self._mesh_id)
             read_data_id = self.get_data_id(self._read_data_name, self._mesh_id)
             super().write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, self._write_data_buffer)
@@ -90,16 +88,14 @@ class WaveformBindings(precice.Interface):
 
             # checkpointing
             if self.is_action_required(action_read_iteration_checkpoint()):
-                print("REPEAT WINDOW!")
                 # repeat window
+                pass
             else:
-                print("GO TO NEXT WINDOW!")
                 # go to next window
                 self._current_window_start += self._window_time
 
             self._reset_window()
         else:
-            print("WINDOW INCOMPLETE!")
             max_dt = self._remaining_window_time()  # = window time remaining
             assert(max_dt > 0)
 
@@ -192,16 +188,15 @@ class NoDataError(Exception):
 
 
 class Waveform:
-    def __init__(self, temporal_grid, window_start, window_size):
+    def __init__(self, window_start, window_size, n_samples):
         """
-        :param temporal_grid: temporal grid in local coordinates in [0,1]
         :param window_start: starting time of the window
         :param window_size: size of window
+        :param n_samples: number of samples on window
         """
-        assert (abs(temporal_grid[0] - 0) < 10**-10)
-        assert (abs(temporal_grid[-1] - 1) < 10**-10)
+        assert (n_samples >= 2)
         assert (window_size > 0)
-        self._temporal_grid = temporal_grid
+        self._temporal_grid = np.linspace(0, 1, n_samples)
         self._samples_in_time = dict()
         self._window_size = window_size
         self._window_start = window_start

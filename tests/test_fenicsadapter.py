@@ -14,7 +14,7 @@ class MockedArray:
     """
     mock of dolfin.Function
     """
-    def __init__(self):
+    def __init__(self, size):
         self.value = MagicMock()
 
     def assign(self, new_value):
@@ -36,23 +36,22 @@ class TestCheckpointing(TestCase):
     dt = 1  # timestep size
     n = 0  # current iteration count
     t = 0  # current time
-    u_n_mocked = MockedArray()  # result at the beginning of the timestep
-    u_np1_mocked = MockedArray()  # newly computed result
-    u_cp_mocked = MockedArray()  # value of the checkpoint
+    n_vertices = 10
+    u_n_mocked = MockedArray(n_vertices)  # result at the beginning of the timestep
+    u_np1_mocked = MockedArray(n_vertices)  # newly computed result
+    u_cp_mocked = MockedArray(n_vertices)  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
-    dummy_config = "tests/precice-adapter-config.json"
-    dummy_config_WR = "tests/precice-adapter-config-WR.json"
+    dummy_config = "tests/precice-adapter-config-WR.json"
     # todo if we support multirate, we should use the lines below for checkpointing
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
     mesh_id = MagicMock()
-    n_vertices = 10
     vertex_ids = MagicMock()
     write_data_name = "Dummy-Write"
     read_data_name = "Dummy-Read"
-    n_data = 1
+    n_substeps = 5
     data_id = MagicMock()
 
     def setUp(self):
@@ -66,7 +65,7 @@ class TestCheckpointing(TestCase):
         """
         # define functions that are called by advance, but not necessary for the test
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice.convert_fenics_to_precice = MagicMock()
+        precice.convert_fenics_to_precice = MagicMock(return_value=np.zeros(self.n_vertices))
         precice._interface._precice_tau = self.dt
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
@@ -85,7 +84,7 @@ class TestCheckpointing(TestCase):
         from fenicsadapter.waveform_bindings import WaveformBindings
 
         if type(precice._interface) is WaveformBindings:
-            precice._interface.initialize_waveforms(self.mesh_id , self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, self.n_data)
+            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, self.n_substeps)
 
     def test_advance_success(self):
         """

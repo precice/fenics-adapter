@@ -19,27 +19,25 @@ class TestWaveform(TestCase):
         warnings.simplefilter('ignore', category=DeprecationWarning)
         self.window_start = 2
         self.window_size = 3
-        self.local_time_grid = np.linspace(0, 1, 10)
-        self.global_time_grid = self.window_start + self.window_size * self.local_time_grid
+        self.n_samples = 10
+        self.global_time_grid = self.window_start + self.window_size * np.linspace(0, 1, self.n_samples)
         self.input_data = np.array([1, 2, 3])
 
     def test_initialize_data(self):
         from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.local_time_grid, self.window_start, self.window_size)
+        self.waveform = Waveform(self.window_start, self.window_size, self.n_samples)
         self.waveform.initialize(self.input_data)
 
     def test_update_data(self):
         from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.local_time_grid, self.window_start, self.window_size)
+        self.waveform = Waveform(self.window_start, self.window_size, self.n_samples)
         from fenicsadapter.waveform_bindings import NotOnTemporalGridError
 
         self.waveform.initialize(self.input_data)
         self.waveform.update(self.input_data * 2, self.global_time_grid[0])
 
         with self.assertRaises(NotOnTemporalGridError):
-            # this is a usage error, update only accepts global time! In this case using local time gives us a point in
-            # time that is not on the grid
-            self.waveform.update(self.input_data * 2, self.local_time_grid[0])
+            self.waveform.update(self.input_data * 2, 0)
 
         out = self.waveform.sample(self.global_time_grid[0])
         npt.assert_almost_equal(out, self.input_data*2)
@@ -53,7 +51,7 @@ class TestWaveform(TestCase):
 
     def test_sample_data(self):
         from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.local_time_grid, self.window_start, self.window_size)
+        self.waveform = Waveform(self.window_start, self.window_size, self.n_samples)
         from fenicsadapter.waveform_bindings import OutOfLocalWindowError, NoDataError
 
         with self.assertRaises(NoDataError):
