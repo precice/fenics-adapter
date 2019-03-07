@@ -62,12 +62,16 @@ class CustomExpression(UserExpression):
                 f = Rbf(self._coords_x, self._coords_y, self._vals.flatten())
             elif self.isVectorValues():
                 f = Rbf(self._coords_x, self._coords_y, self._vals[:,dim_no].flatten()) # extract dim_no element of each vector
+            else: # TODO: this is already checked in isScalarValues()!
+                raise Exception("Dimension of the function is 0 or negative!")
             return f(x[0], x[1])
-        if x.__len__() == 3:
+        if x.__len__() == 3: # this case has not been tested yet
             if self.isScalarValues():
                 f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
-            if self.isVectorValues():
+            elif self.isVectorValues():
                 f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:,dim_no].flatten())
+            else: # TODO: this is already checked in isScalarValues()!
+                raise Exception("Dimension of the function is 0 or negative!")
             return f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
@@ -377,9 +381,10 @@ class Adapter:
         """ Determines if the function is scalar- or vector-valued based on
         rank evaluation.
         """
-        if function.value_rank() == 0:
+        # TODO: is is better to use FunctionType.SCALAR.value here ?
+        if function.value_rank() == 0: # scalar-valued functions have rank 0 is FEniCS
             return FunctionType.SCALAR
-        elif function.value_rank() == 1:
+        elif function.value_rank() == 1: # vector-valued functions have rank 1 in FEniCS
             return FunctionType.VECTOR
         else:
             raise Exception("Error determining function type")
