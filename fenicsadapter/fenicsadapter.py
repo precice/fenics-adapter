@@ -9,6 +9,7 @@ from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
 from .config import Config
+from enum import Enum
 
 try:
     import precice
@@ -24,6 +25,10 @@ except ImportError:
     sys.path.insert(0, precice_python_adapter_root)
     import precice
 
+class FunctionType(Enum):
+    """ Defines scalar- and vector-valued function """
+    SCALAR = 0 # scalar valued funtion
+    VECTOR = 1 # vector valued function
 
 class CustomExpression(UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
@@ -41,47 +46,63 @@ class CustomExpression(UserExpression):
             coords_z = np.zeros(self._coords_x.shape)
         self._coords_z = coords_z
 
-        #self._vals = vals.flatten() #original
         self._vals = vals
-        print("------------> vals vals.flatten", vals, vals.flatten())
-        print("------------> coord x y ", coords_x[1], coords_y[1])
-        print("------------> _vals.shape", vals.shape)
-        print("------------> _coords_x.shape", self._coords_x.shape)
 
-        #assert (self._vals.shape == self._coords_x.shape)
+        if self.isScalarValues():
+            assert (self._vals.shape == self._coords_x.shape)
+        elif self.isVectorValues():
+            assert (self._vals.shape[0] == self._coords_x.shape[0])
 
-    #TODO: implement handling of vector-valued funtions for 1D and 3D
-    def rbf_interpol(self, x, dim_no=-1):
-        if x.__len__() == 1:
+    def rbf_interpol(self, x, dim_no):
+        if x.__len__() == 1: # for 1D only R->R mapping is allowed by preCICE, no need to implement Vector case
             f = Rbf(self._coords_x, self._vals.flatten())
             return f(x)
         if x.__len__() == 2:
-            print("-----------------> RBF coords x", self._coords_x)
-            print("-----------------> RBF coords y", self._coords_y)
-            print("-----------------> RBF vals", self._vals)
-            print("-----------------> RBF vals flattem", self._vals.flatten())
-            #f = Rbf(self._coords_x, self._coords_y, self._vals.flatten()) # original
-            if self._vals.ndim == 1: #check if scalar or vector-valued
+            if self.isScalarValues(): #check if scalar or vector-valued
                 f = Rbf(self._coords_x, self._coords_y, self._vals.flatten())
-            else:
+            elif self.isVectorValues():
                 f = Rbf(self._coords_x, self._coords_y, self._vals[:,dim_no].flatten()) # extract dim_no element of each vector
             return f(x[0], x[1])
         if x.__len__() == 3:
-            f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
+            if self.isScalarValues():
+                f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
+            if self.isVectorValues():
+                f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:,dim_no].flatten())
             return f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
         f = interp1d(self._coords_x, self._vals)
         return f(x.x())
 
-    def eval(self, value, x): # note that eval() is overloaded !
-        print("-------------> value value[0] for eval: ", value, value[0])
+    def eval(self, value, x): # overloaded function
+        """
+        Overrides UserExpression.eval(). Called by Expression(x_coord). handles
+        scalar- and vector-valued functions evaluation.
+        """
+        for i in range(self._vals.ndim):
+            value[i] = self.rbf_interpol(x,i)
+
+    def isScalarValues(self):
+        """ Determines if function being interpolated is scalar-valued based on
+        dimension of provided vals vector
+        """
         if self._vals.ndim == 1:
-            value[0] = self.rbf_interpol(x)
+            return True
+        elif self._vals.ndim > 1:
+            return False
         else:
-            for i in range(self._vals.ndim): # in case of more dimensions
-                value[i] = self.rbf_interpol(x,i)
-            #value[1] = self.rbf_interpol(x,1)
+            raise Exception("Dimension of the function is 0 or negative!")
+
+    def isVectorValues(self):
+        """ Determines if function being interpolated is vector-valued based on
+        dimension of provided vals vector
+        """
+        if self._vals.ndim > 1:
+            return True
+        elif self._vals.ndim == 1:
+            return False
+        else:
+            raise Exception("Dimension of the function is 0 or negative!")
 
 
 class Adapter:
@@ -128,6 +149,9 @@ class Adapter:
         self._u_cp = None  # checkpoint for temperature inside domain
         self._t_cp = None  # time of the checkpoint
         self._n_cp = None  # timestep of the checkpoint
+
+        #function space
+        self._function_space = None
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         """Converts FEniCS data of type dolfin.Function into
@@ -202,13 +226,10 @@ class Adapter:
     def create_coupling_boundary_condition(self):
         """Creates the coupling boundary conditions using CustomExpression."""
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-        print("------------->x_vert, y vert: ", x_vert, y_vert)
-        print("-------------> self._read_data", self._read_data)
         try:  # works with dolfin 1.6.0
-            self._coupling_bc_expression = CustomExpression(element=self._function_space.ufl_element())
+            self._coupling_bc_expression = CustomExpression(element=self._function_space.ufl_element()) # elemnt information must be provided, else DOLFIN assumes scalar function
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             self._coupling_bc_expression = CustomExpression(element=self._function_space.ufl_element(),degree=0)
-        print("---------> UserExpression return", self._coupling_bc_expression.value_rank())
         self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
     def create_coupling_dirichlet_boundary_condition(self, function_space):
@@ -219,7 +240,7 @@ class Adapter:
         """
         self._function_space = function_space
         self.create_coupling_boundary_condition()
-        return dolfin.DirichletBC(function_space, self._coupling_bc_expression, self._coupling_subdomain)
+        return dolfin.DirichletBC(self._function_space, self._coupling_bc_expression, self._coupling_subdomain)
 
     def create_coupling_neumann_boundary_condition(self, test_functions):
         """Creates the coupling Neumann boundary conditions using
@@ -229,7 +250,7 @@ class Adapter:
          Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The
          FEniCS Tutorial Volume I." (2016).)
         """
-        self._function_space = test_functions #TODO: temporary solution
+        self._function_space = test_functions.function_space()
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
@@ -299,10 +320,9 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
-            if write_field.value_rank() == 0:
+            if  self.function_type(write_field) is FunctionType.SCALAR: #write_field.value_rank() == 0:
                 self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-            elif write_field.value_rank() == 1:
-                #print("-----------> write_data, write_data_ravel", self._write_data, self._write_data.ravel())
+            elif self.function_type(write_field) is FunctionType.VECTOR:
                 self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data.ravel())
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
@@ -311,9 +331,9 @@ class Adapter:
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
-            if read_field.value_rank() == 0:
+            if self.function_type(read_field) is FunctionType.SCALAR:
                 self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
-            elif read_field.value_rank() == 1:
+            elif self.function_type(read_field) is FunctionType.VECTOR:
                 self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data.ravel())
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
@@ -352,6 +372,17 @@ class Adapter:
         elif self._dimensions == 3:
             # todo this has to be fixed for "proper" 3D coupling. Currently this is a workaround for the coupling of 2D fenics with pseudo 3D openfoam
             return vertices_x, vertices_y
+
+    def function_type(self, function):
+        """ Determines if the function is scalar- or vector-valued based on
+        rank evaluation.
+        """
+        if function.value_rank() == 0:
+            return FunctionType.SCALAR
+        elif function.value_rank() == 1:
+            return FunctionType.VECTOR
+        else:
+            raise Exception("Error determining function type")
 
     def finalize(self):
         """Finalizes the coupling interface."""
