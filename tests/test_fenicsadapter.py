@@ -42,13 +42,13 @@ class TestCheckpointing(TestCase):
     u_cp_mocked = MockedArray(n_vertices)  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
-    dummy_config = "tests/precice-adapter-config-WR.json"
+    dummy_config = "tests/precice-adapter-config.json"
     # todo if we support multirate, we should use the lines below for checkpointing
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
     mesh_id = MagicMock()
-    vertex_ids = MagicMock()
+    vertex_ids = np.random.rand(10)
     write_data_name = "Dummy-Write"
     read_data_name = "Dummy-Read"
     n_substeps = 5

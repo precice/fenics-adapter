@@ -17,7 +17,7 @@ class TestWaveformBindings(TestCase):
     dt = 1
     t = 0
     n = 0
-    dummy_config_WR = "tests/precice-adapter-config-WR.json"
+    dummy_config = "tests/precice-adapter-config.json"
     n_substeps = 2
     n_vertices = 5
 
@@ -50,9 +50,9 @@ class TestWaveformBindings(TestCase):
 
         Interface.get_data_id = MagicMock()
         dummy_mesh_id = MagicMock()
-        dummy_vertex_ids = MagicMock()
+        dummy_vertex_ids = np.random.rand(10)
         bindings = WaveformBindings("Dummy", 0, 1)
-        bindings.configure_waveform_relaxation(self.dummy_config_WR)
+        bindings.configure_waveform_relaxation(self.dummy_config)
         bindings._precice_tau = self.dt
         old_data = np.random.rand(self.n_vertices)
         read_data = old_data
@@ -69,10 +69,10 @@ class TestWaveformBindings(TestCase):
         Interface.get_data_id = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
-        bindings.configure_waveform_relaxation(self.dummy_config_WR)
+        bindings.configure_waveform_relaxation(self.dummy_config)
         bindings._precice_tau = self.dt
         dummy_mesh_id = MagicMock()
-        dummy_vertex_ids = MagicMock()
+        dummy_vertex_ids = np.random.rand(10)
         old_data = np.random.rand(self.n_vertices)
         to_be_written = old_data + np.random.rand(self.n_vertices)
         write_data = to_be_written
@@ -90,10 +90,10 @@ class TestWaveformBindings(TestCase):
         Interface.read_block_scalar_data = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
-        bindings.configure_waveform_relaxation(self.dummy_config_WR)
+        bindings.configure_waveform_relaxation(self.dummy_config)
         bindings._precice_tau = self.dt
         dummy_mesh_id = MagicMock()
-        dummy_vertex_ids = MagicMock()
+        dummy_vertex_ids = np.random.rand(10)
         bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", self.n_substeps)
         bindings._precice_tau = self.dt
         Interface.is_action_required= MagicMock(return_value=False)
@@ -117,7 +117,7 @@ class TestWaveformBindings(TestCase):
     def test_perform_substep(self):
         from fenicsadapter.waveform_bindings import WaveformBindings
         bindings = WaveformBindings("Dummy", 0, 1)
-        bindings.configure_waveform_relaxation(self.dummy_config_WR)
+        bindings.configure_waveform_relaxation(self.dummy_config)
         u0 = MagicMock(name="u0")
         u1 = MagicMock(name="u1")
         u1new = MagicMock(name="u1_new")

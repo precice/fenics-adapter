@@ -256,10 +256,9 @@ class Adapter:
         self.set_read_field(read_field)
         self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
-        n_data = self._write_data.shape[0]  # TODO this is not nice currently...
 
         self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name,
-                                             self._read_data_name, n_data)
+                                             self._read_data_name, self._config.get_n_substeps())
 
         if self._interface.is_action_required(fenicsadapter.waveform_bindings.action_write_initial_data()):
             self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)
@@ -267,7 +266,7 @@ class Adapter:
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
-            self._interface.readBlockScalarData(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t)
+            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t)
 
         if self._interface.is_action_required(fenicsadapter.waveform_bindings.action_write_iteration_checkpoint()):
             self._u_cp = u_n.copy(deepcopy=True)

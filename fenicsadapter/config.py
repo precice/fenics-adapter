@@ -47,6 +47,7 @@ class Config:
         self._coupling_mesh_name = data["interface"]["coupling_mesh_name"]
         self._write_data_name = data["interface"]["write_data_name"]
         self._read_data_name = data["interface"]["read_data_name"]
+        self._n_substeps = data["waveform"]["n_substeps"]
         # todo check that either both keys (N_this and N_other) exist or not.
         try:
             self._N_this = data["interface"]["N_this"]
@@ -74,3 +75,6 @@ class Config:
 
     def get_write_data_name(self):
         return self._write_data_name
+
+    def get_n_substeps(self):
+        return self._n_substeps

@@ -20,7 +20,7 @@ from .config import Config
 
 
 class WaveformBindings(precice.Interface):
-    def configure_waveform_relaxation(self, adapter_config_filename='precice-adapter-config-WR.json'):
+    def configure_waveform_relaxation(self, adapter_config_filename='precice-adapter-config.json'):
         self._sample_counter_this = 0
         self._sample_counter_other = 0
 
@@ -34,6 +34,7 @@ class WaveformBindings(precice.Interface):
         self._window_time = self._current_window_start  # keeps track of window time
 
     def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name, n_substeps):
+        print("INIT WAVEFORMS!")
         # constant information of mesh
         self._mesh_id = mesh_id
         self._n_vertices = n_vertices
@@ -63,7 +64,7 @@ class WaveformBindings(precice.Interface):
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
-        assert (self._vertex_ids == vertex_ids)
+        assert ((self._vertex_ids == vertex_ids).all())
         assert (self._write_data_name == write_data_name)
 
     def read_block_scalar_data(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
@@ -74,7 +75,7 @@ class WaveformBindings(precice.Interface):
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
-        assert (self._vertex_ids == vertex_ids)
+        assert ((self._vertex_ids == vertex_ids).all())
         assert (self._read_data_name == read_data_name)
 
     def advance(self, dt):
@@ -211,6 +212,7 @@ class Waveform:
 
     def _sample(self, local_time):
         from scipy.interpolate import interp1d
+        print("sample Waveform at %f" % local_time)
 
         if not self._n_datapoints:
             raise NoDataError
@@ -238,9 +240,11 @@ class Waveform:
         return self._temporal_grid * self._window_size + self._window_start
 
     def _time_is_on_grid(self, time):
+        print("Grid: {grid}".format(grid=self.global_temporal_grid()))
         return time in self.global_temporal_grid()
 
     def update(self, data, global_time):
+        print("Global time: {global_time}".format(global_time=global_time))
         if not self._time_is_on_grid(global_time):
             raise NotOnTemporalGridError
         assert (data.shape[0] == self._n_datapoints)
