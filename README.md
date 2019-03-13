@@ -29,7 +29,7 @@ Make sure to install
 
 ### Build and install the adapter
 
-Run ``python3 setup.py install`` from your shell. Use ``sudo`` if necessary.
+Run ``python3 setup.py install --user`` from your shell.
 
 ### Test the adapter
 
