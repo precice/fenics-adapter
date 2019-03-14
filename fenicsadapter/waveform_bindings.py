@@ -305,7 +305,7 @@ class Waveform:
 
     def _time_is_on_grid(self, time):
         #print("Grid: {grid}".format(grid=self.global_temporal_grid()))
-        return time in self.global_temporal_grid()
+        return np.isclose(self.global_temporal_grid(), time).any()
 
     def _update(self, data, local_time):
         print("_update at {local_time}".format(local_time=local_time))
@@ -319,7 +319,7 @@ class Waveform:
     def update(self, data, global_time):
         #print("Global time: {global_time}".format(global_time=global_time))
         if not self._time_is_on_grid(global_time):
-            msg = "trying to sample at {global_time} while temporal grid is {grid}global_time, self.global_temporal_grid()"
+            msg = "trying to update at {global_time} while temporal grid is {grid}".format(global_time=global_time, grid=self.global_temporal_grid())
             raise NotOnTemporalGridError(msg)
         assert (data.shape[0] == self._n_datapoints)
         self._update(data, self.global_to_local_time(global_time))

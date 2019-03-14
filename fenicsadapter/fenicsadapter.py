@@ -218,6 +218,7 @@ class Adapter:
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
         self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t+dt)
         max_dt = self._interface.advance(dt)
+        self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+dt)
 
         precice_step_complete = False
         
@@ -242,7 +243,6 @@ class Adapter:
             self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_iteration_checkpoint())
             precice_step_complete = True
 
-        self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, self._t_cp+dt)
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
         return t, n, precice_step_complete, max_dt
