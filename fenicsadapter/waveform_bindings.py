@@ -38,7 +38,8 @@ class WaveformBindings(precice.Interface):
         self._current_window_start = 0  # defines start of window
         self._window_time = self._current_window_start  # keeps track of window time
 
-    def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name, n_substeps):
+    def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name,
+                             write_data_init=None, read_data_init=None):
         print("INIT WAVEFORMS!")
         # constant information of mesh
         self._mesh_id = mesh_id
@@ -47,28 +48,34 @@ class WaveformBindings(precice.Interface):
 
         # constant write data name prefix
         self._write_data_name = write_data_name
-        self._write_data_buffer = self._get_empty_write_buffer()
+        self._write_data_buffer = self._get_empty_write_buffer(write_data_init)
 
         # constant read data name prefix
         self._read_data_name = read_data_name
-        self._read_data_buffer = self._get_empty_read_buffer()
+        self._read_data_buffer = self._get_empty_read_buffer(read_data_init)
 
-    def _get_empty_write_buffer(self):
-        return self._get_empty_buffer(self._n_this)
+    def _get_empty_write_buffer(self, write_data_init=None):
+        return self._get_empty_buffer(self._n_this, write_data_init)
 
-    def _get_empty_read_buffer(self):
-        return self._get_empty_buffer(self._n_other)
+    def _get_empty_read_buffer(self, read_data_init=None):
+        return self._get_empty_buffer(self._n_other, read_data_init)
 
-    def _get_empty_buffer(self, n_substeps):
+    def _get_empty_buffer(self, n_substeps, data_init=None):
+        if data_init is None:
+            data_init = np.zeros(self._n_vertices)
+        #print("creating new waveform! start @ {start}, width {tau}".format(start=self._current_window_start, tau=self._precice_tau))
         buffer = Waveform(self._current_window_start, self._precice_tau, n_substeps)
-        buffer.initialize(np.zeros(self._n_vertices))
+        buffer.initialize(data_init)
         return buffer
 
     def write_block_scalar_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
+        print("write at time {time}".format(time=time))
         self._write_data_buffer.update(write_data[:], time)
+        print("write_data is {write_data}".format(write_data=write_data[:]))
+        print("write_data is {write_data}".format(write_data=self._write_data_buffer.sample(time)))
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
@@ -79,7 +86,9 @@ class WaveformBindings(precice.Interface):
         assert(self._config.get_read_data_name() == read_data_name)
         assert(self._is_inside_current_window(time))
         # we get the data from the interpolant. New data will be obtained from the other participant via preCICE in advance
-        read_data[:] = self._read_data_buffer.sample(time)[:]
+        print("read at time {time}".format(time=time))
+        read_data[:] = self._read_data_buffer.sample(time)[:].copy()
+        print("read_data is {read_data}".format(read_data=read_data))
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
@@ -95,6 +104,8 @@ class WaveformBindings(precice.Interface):
             substep_time = write_waveform.get_global_time(substep)
             write_data = write_waveform.sample(substep_time)
             super().write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
+            print("writing at time {time}".format(time=substep_time))
+            print("write data called {name}:{write_data}".format(name=write_data_name, write_data=write_data))
 
     def _read_all_window_data_from_precice(self):
         read_data_name_prefix = self._read_data_name
@@ -103,8 +114,10 @@ class WaveformBindings(precice.Interface):
             read_data_name = read_data_name_prefix + str(substep)
             read_data_id = self.get_data_id(read_data_name, self._mesh_id)
             substep_time = read_waveform.get_global_time(substep)
-            read_data = np.zeros(read_waveform.sample(substep_time).shape)
+            read_data = read_waveform.sample(substep_time)
             super().read_block_scalar_data(read_data_id, self._n_vertices, self._vertex_ids, read_data)
+            print("reading at time {time}".format(time=substep_time))
+            print("read_data called {name}:{read_data}".format(name=read_data_name, read_data=read_data))
             read_waveform.update(read_data, substep_time)
 
     def advance(self, dt):
@@ -122,12 +135,21 @@ class WaveformBindings(precice.Interface):
             # checkpointing
             if self.is_action_required(action_read_iteration_checkpoint()):
                 # repeat window
+                print("REPEAT")
+                self._window_time = 0
                 pass
             else:
+                print("NEXT")
                 # go to next window
-                self._current_window_start += self._window_time
+                write_data_init = self._write_data_buffer.sample(self._current_window_end()).copy()
+                read_data_init = self._read_data_buffer.sample(self._current_window_end()).copy()
+                print("write_data_init with {write_data} from t = {time}".format(write_data=write_data_init, time=self._current_window_end()))
+                self._current_window_start += self._window_size()
+                self._window_time = 0
+                self._write_data_buffer = self._get_empty_write_buffer(write_data_init)
+                self._read_data_buffer = self._get_empty_read_buffer(read_data_init)
+                self._print_window_status()
 
-            self._reset_window()
         else:
             print("remaining time: {remain}".format(remain=self._remaining_window_time()))
             max_dt = self._remaining_window_time()  # = window time remaining
@@ -144,6 +166,7 @@ class WaveformBindings(precice.Interface):
 
     def _window_is_completed(self):
         if np.isclose(self._window_size(), self._window_time):
+            print("COMPLETE!")
             return True
         else:
             return False
@@ -161,28 +184,6 @@ class WaveformBindings(precice.Interface):
 
     def _window_size(self):
         return self._precice_tau
-
-    def _reset_window(self):
-        self._window_time = 0
-        self._write_data_buffer = self._get_empty_write_buffer()
-        self._read_data_buffer = self._get_empty_read_buffer()
-
-    def _perform_substep(self, write_function, t, dt, n):
-        # increase counters and window time
-        self._window_time += dt
-
-        # perform temporal interpolation on interface mesh
-        # TODO
-        # store interface write data
-        # TODO
-        # update interface read data
-        # TODO
-
-        t += dt
-        n += 1
-        success = True
-
-        return t, n, success
 
     def initialize(self):
         self._precice_tau = super().initialize()
@@ -262,8 +263,16 @@ class Waveform:
         if not self._n_datapoints:
             raise NoDataError
 
-        if not (0 <= local_time <= 1):
-            raise OutOfLocalWindowError(local_time)
+        atol = 1e-08  # todo: this is equal to atol used by default in np.isclose. Is there a nicer way to implement the check below?
+        if not (0 - atol <= local_time <= 1 + atol):
+            msg = "\nlocal time: {time} on local grid {grid}\n" \
+                  "corresponds to\n" \
+                  "global time: {global_time} on global grid {ggrid}".format(
+                time=local_time,
+                grid=self._temporal_grid,
+                global_time=self._local_to_global_time(local_time),
+                ggrid=self.global_temporal_grid())
+            raise OutOfLocalWindowError(msg)
 
         return_value = np.zeros(self._n_datapoints)
         for i in range(self._n_datapoints):
@@ -271,6 +280,13 @@ class Waveform:
             for t in self._temporal_grid:
                 values_along_time[t] = self._samples_in_time[t][i]
             interpolant = interp1d(list(values_along_time.keys()), list(values_along_time.values()))
+            if not (0 <= local_time <= 1) and (0 - atol <= local_time <= 1 + atol):  # local time is at the boundary of the interval within a given tolerance
+                if local_time < 0:
+                    local_time = 0
+                elif local_time > 1:
+                    local_time = 1
+                else:
+                    raise Exception("unexpected behavior!")
             return_value[i] = interpolant(local_time)
         return return_value
 
@@ -288,16 +304,22 @@ class Waveform:
         return self._temporal_grid * self._window_size + self._window_start
 
     def _time_is_on_grid(self, time):
-        print("Grid: {grid}".format(grid=self.global_temporal_grid()))
+        #print("Grid: {grid}".format(grid=self.global_temporal_grid()))
         return time in self.global_temporal_grid()
 
     def _update(self, data, local_time):
-        self._samples_in_time[local_time] = data
+        print("_update at {local_time}".format(local_time=local_time))
+        if local_time in self._samples_in_time.keys():
+            self._samples_in_time[local_time] = data
+        else:
+            key = self._temporal_grid[np.isclose(self._temporal_grid, local_time)][0]
+            self._samples_in_time[key] = data
+            #raise Exception("local_time {local_time} not found! Better use {key}".format(local_time=local_time, key=key))
 
     def update(self, data, global_time):
-        print("Global time: {global_time}".format(global_time=global_time))
+        #print("Global time: {global_time}".format(global_time=global_time))
         if not self._time_is_on_grid(global_time):
             msg = "trying to sample at {global_time} while temporal grid is {grid}global_time, self.global_temporal_grid()"
-            raise NotOnTemporalGridError()
+            raise NotOnTemporalGridError(msg)
         assert (data.shape[0] == self._n_datapoints)
         self._update(data, self.global_to_local_time(global_time))

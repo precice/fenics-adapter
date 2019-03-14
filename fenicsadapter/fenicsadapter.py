@@ -218,8 +218,6 @@ class Adapter:
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
         self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t+dt)
         max_dt = self._interface.advance(dt)
-        self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+dt)
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)  # TODO: this should go somewhere inside _perform_substep, however, if we do not use Waveform relaxation, we have to run the command after calling advance and readBlockScalarData
 
         precice_step_complete = False
         
@@ -244,6 +242,9 @@ class Adapter:
             self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_iteration_checkpoint())
             precice_step_complete = True
 
+        self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, self._t_cp+dt)
+        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+
         return t, n, precice_step_complete, max_dt
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
@@ -258,7 +259,9 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name,
-                                             self._read_data_name, self._config.get_n_substeps())
+                                             self._read_data_name,
+                                             write_data_init=self._write_data,
+                                             read_data_init=self._read_data)
 
         if self._interface.is_action_required(fenicsadapter.waveform_bindings.action_write_initial_data()):
             self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)

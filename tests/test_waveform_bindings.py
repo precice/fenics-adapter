@@ -18,7 +18,6 @@ class TestWaveformBindings(TestCase):
     t = 0
     n = 0
     dummy_config = "tests/precice-adapter-config-WR10.json"
-    n_substeps = 2
     n_vertices = 5
 
     def setUp(self):
@@ -57,7 +56,7 @@ class TestWaveformBindings(TestCase):
         old_data = np.random.rand(self.n_vertices)
         read_data = old_data
         to_be_read = old_data + 1
-        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", self.n_substeps)
+        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read")
         bindings._read_data_buffer.update(to_be_read, 0)
         bindings.read_block_scalar_data("Dummy-Read", dummy_mesh_id, self.n_vertices, dummy_vertex_ids, read_data, 0)
         self.assertTrue(np.isclose(read_data, to_be_read).all())
@@ -76,7 +75,7 @@ class TestWaveformBindings(TestCase):
         old_data = np.random.rand(self.n_vertices)
         to_be_written = old_data + np.random.rand(self.n_vertices)
         write_data = to_be_written
-        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", self.n_substeps)
+        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read")
         bindings._write_data_buffer.update(old_data, 0)
         bindings.write_block_scalar_data("Dummy-Write", dummy_mesh_id, self.n_vertices, dummy_vertex_ids, write_data, 0)
         self.assertTrue(np.isclose(to_be_written, bindings._write_data_buffer.sample(0)).all())
@@ -94,7 +93,7 @@ class TestWaveformBindings(TestCase):
         bindings._precice_tau = self.dt
         dummy_mesh_id = MagicMock()
         dummy_vertex_ids = np.random.rand(10)
-        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", self.n_substeps)
+        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read")
         bindings._precice_tau = self.dt
         Interface.is_action_required= MagicMock(return_value=False)
         self.assertEqual(bindings._current_window_start, 0.0)
@@ -119,25 +118,3 @@ class TestWaveformBindings(TestCase):
             self.assertTrue(np.isclose(bindings._current_window_start, 1.0))
         bindings.advance(.1)
         self.assertTrue(np.isclose(bindings._current_window_start, 1.0))
-
-    def test_perform_substep(self):
-        from fenicsadapter.waveform_bindings import WaveformBindings
-        bindings = WaveformBindings("Dummy", 0, 1)
-        bindings.configure_waveform_relaxation(self.dummy_config, self.dummy_config)
-        u0 = MagicMock(name="u0")
-        u1 = MagicMock(name="u1")
-        u1new = MagicMock(name="u1_new")
-        v0 = MagicMock(name="v0")
-        v1 = MagicMock(name="v1")
-
-        bindings._write_data = [u0, u1]
-        bindings._read_data = [v0, v1]
-
-        bindings._perform_substep(u1new, self.t, self.dt, self.n)
-        # TODO as soon as the functionality of the bindings gets more concrete, reactivate these assertions
-        """
-        self.assertEqual(bindings._write_data[0], u0)
-        self.assertEqual(bindings._write_data[1], u1new)
-        self.assertEqual(bindings._read_data[0], v0)
-        self.assertEqual(bindings._read_data[1], v1)
-        """
