@@ -22,14 +22,14 @@ This adapter was developed by [Benjamin Rüth](https://www5.in.tum.de/wiki/index
 Make sure to install 
 
 * preCICE (https://github.com/precice/precice/wiki)
-* python3 (this adapter supports **only python3**)
+* python3 (this adapter **only supports python3**)
 * the python language bindings for preCICE (https://github.com/precice/precice/blob/develop/src/precice/bindings/python/README.md)
 * fenics (https://fenicsproject.org/)
 * and scipy (`pip3 install scipy`)
 
 ### Build and install the adapter
 
-Run ``python3 setup.py install`` from your shell. Use ``sudo`` if necessary.
+Run ``python3 setup.py install --user`` from your shell.
 
 ### Test the adapter
 
