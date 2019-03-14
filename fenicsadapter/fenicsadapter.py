@@ -57,14 +57,14 @@ class Adapter:
 
     :ivar _config: object of class Config, which stores data from the JSON config file
     """
-    def __init__(self, adapter_config_filename='precice-adapter-config.json'):
+    def __init__(self, adapter_config_filename, other_adapter_config_filename):
 
         self._config = Config(adapter_config_filename)
 
         self._solver_name = self._config.get_solver_name()
 
         self._interface = fenicsadapter.waveform_bindings.WaveformBindings(self._solver_name, 0, 1)
-        self._interface.configure_waveform_relaxation(adapter_config_filename)
+        self._interface.configure_waveform_relaxation(adapter_config_filename, other_adapter_config_filename)
         self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.get_dimensions()
 

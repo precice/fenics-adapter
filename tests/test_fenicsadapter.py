@@ -42,7 +42,7 @@ class TestCheckpointing(TestCase):
     u_cp_mocked = MockedArray(n_vertices)  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
-    dummy_config = "tests/precice-adapter-config.json"
+    dummy_config = "tests/precice-adapter-config-WR1.json"
     # todo if we support multirate, we should use the lines below for checkpointing
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
@@ -110,7 +110,7 @@ class TestCheckpointing(TestCase):
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
 
         value_u_np1 = self.u_np1_mocked.value
@@ -151,7 +151,7 @@ class TestCheckpointing(TestCase):
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
 
         precice_step_complete = False
@@ -190,7 +190,7 @@ class TestCheckpointing(TestCase):
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
 
         precice_step_complete = False
@@ -208,7 +208,7 @@ class TestCheckpointing(TestCase):
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestIsCouplingOngoing(TestCase):
-    dummy_config = "tests/precice-adapter-config.json"
+    dummy_config = "tests/precice-adapter-config-WR10.json"
 
     def setUp(self):
         warnings.simplefilter('ignore', category=ImportWarning)
@@ -221,6 +221,6 @@ class TestIsCouplingOngoing(TestCase):
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock()
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
 
         self.assertEqual(precice.is_coupling_ongoing(), True)
