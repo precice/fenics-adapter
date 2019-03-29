@@ -168,10 +168,9 @@ class WaveformBindings(precice.Interface):
     def _current_window_end(self):
         return self._current_window_start + self._window_size()
 
-    def _is_inside_current_window(self, global_time):
-        local_time = global_time - self._current_window_start
+    def _is_inside_current_window(self, time):
         tol = self._window_size() * 10**-5
-        return 0-tol <= local_time <= self._window_size()+tol
+        return 0-tol <= time - self._current_window_start <= self._window_size() + tol
 
     def _window_size(self):
         return self._precice_tau
@@ -229,21 +228,6 @@ class Waveform:
         self._temporal_grid = None
         self.empty_data()
 
-    def get_local_time(self, grid_id):
-        print(self._temporal_grid)
-        print(grid_id)
-        return self._temporal_grid[grid_id]
-
-    def get_global_time(self, grid_id):
-        return self._local_to_global_time(self.get_local_time(grid_id))
-
-    def get_dt(self):
-        # todo: currently, we assume a constant dt for a waveform. Generally, this is not the case and we should allow adaptive strategies!
-        return self._get_dt() * self._window_size
-
-    def _get_dt(self):
-        return self._dt
-
     def _window_end(self):
         return self._window_start + self._window_size
 
@@ -290,54 +274,30 @@ class Waveform:
                 t = self._temporal_grid[j]
                 print(self._samples_in_time)
                 values_along_time[t] = self._samples_in_time[i, j]
-            print("###")
-            print(self._temporal_grid)
-            print(values_along_time)
-            print("###")
             interpolant = interp1d(list(values_along_time.keys()), list(values_along_time.values()))
-            if not (0 <= time <= 1) and (0 - atol <= time <= 1 + atol):  # local time is at the boundary of the interval within a given tolerance
-                if time < 0:
-                    time = 0
-                elif time > 1:
-                    time = 1
-                else:
-                    raise Exception("unexpected behavior!")
-            print("###")
-            print(time)
-            print("###")
             try:
                 return_value[i] = interpolant(time)
             except ValueError:
                 time_min = np.min(self._temporal_grid)
                 time_max = np.max(self._temporal_grid)
 
-                if not time_min <= time <= time_max:  # local_time is not in valid range [time_min,time_max]
+                if not time_min <= time <= time_max:  # time is not in valid range [time_min,time_max]
                     atol = 10**-8
-                    if time_min-atol <= time <= time_min:  # local_time < time_min within within tolerance atol -> truncuate
+                    if time_min-atol <= time <= time_min:  # time < time_min within within tolerance atol -> truncuate
                         time = time_min
-                    elif time_max <= time <= time_max+atol:  # local_time > time_max within within tolerance atol -> truncuate
+                    elif time_max <= time <= time_max+atol:  # time > time_max within within tolerance atol -> truncuate
                         time = time_max
                     else:
-                        raise Exception("Invalid local time {local_time} computed!".format(local_time=time))
+                        raise Exception("Invalid time {time} computed!".format(time=time))
                 return_value[i] = interpolant(time)
 
         return return_value
 
-    def global_to_local_time(self, global_time):
-        local_time = (global_time - self._window_start)/self._window_size
-        return local_time
-
-    def _local_to_global_time(self, local_time):
-        return (local_time * self._window_size) + self._window_start
-
-    def global_temporal_grid(self):
-        return self._temporal_grid
-
-    def append(self, data, global_time):
+    def append(self, data, time):
         assert (data.shape[0] == self._n_datapoints)
-        if global_time in self._temporal_grid or (self._temporal_grid and global_time <= self._temporal_grid[-1]):
-            raise Exception("It is only allowed to append data associated with time that is larger than the already existing time. Trying to append invalid global time = {global_time} to temporal grid = {temporal_grid}".format(global_time=global_time, temporal_grid=self._temporal_grid))
-        self._append_sample(data, global_time)
+        if time in self._temporal_grid or (self._temporal_grid and time <= self._temporal_grid[-1]):
+            raise Exception("It is only allowed to append data associated with time that is larger than the already existing time. Trying to append invalid time = {time} to temporal grid = {temporal_grid}".format(time=time, temporal_grid=self._temporal_grid))
+        self._append_sample(data, time)
 
     def empty_data(self):
         self._samples_in_time = np.empty(shape=(self._n_datapoints, 0))  # store samples in time in this data structure. Number of rows = number of gridpoints per sample; number of columns = number of sampls in time
