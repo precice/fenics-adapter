@@ -19,9 +19,6 @@ except ImportError:
 from .config import Config
 
 
-class WrongTimestepSizeError(Exception):
-    pass
-
 class WaveformBindings(precice.Interface):
 
     def configure_waveform_relaxation(self, adapter_config_filename, other_adapter_config_filename):
@@ -39,7 +36,7 @@ class WaveformBindings(precice.Interface):
         self._window_time = self._current_window_start  # keeps track of window time
 
     def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name,
-                             write_data_init=None, read_data_init=None):
+                             write_data_init, read_data_init):
         print("INIT WAVEFORMS!")
         # constant information of mesh
         self._mesh_id = mesh_id
@@ -54,28 +51,21 @@ class WaveformBindings(precice.Interface):
         self._read_data_name = read_data_name
         self._read_data_buffer = self._get_empty_read_buffer(read_data_init)
 
-    def _get_empty_write_buffer(self, write_data_init=None):
-        return self._get_empty_buffer(self._n_this, write_data_init)
+    def _get_empty_write_buffer(self, write_data_init):
+        buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+        buffer.append(write_data_init, self._current_window_start)
+        return buffer
 
-    def _get_empty_read_buffer(self, read_data_init=None):
-        return self._get_empty_buffer(self._n_other, read_data_init)
-
-    def _get_empty_buffer(self, n_substeps, data_init=None):
-        if data_init is None:
-            data_init = np.zeros(self._n_vertices)
-        #print("creating new waveform! start @ {start}, width {tau}".format(start=self._current_window_start, tau=self._precice_tau))
-        buffer = Waveform(self._current_window_start, self._precice_tau, n_substeps)
-        buffer.initialize(data_init)
+    def _get_empty_read_buffer(self, read_data_init):
+        buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+        buffer.initialize_constant(read_data_init)
         return buffer
 
     def write_block_scalar_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
-        print("write at time {time}".format(time=time))
-        self._write_data_buffer.update(write_data[:], time)
-        print("write_data is {write_data}".format(write_data=write_data[:]))
-        print("write_data is {write_data}".format(write_data=self._write_data_buffer.sample(time)))
+        self._write_data_buffer.append(write_data[:], time)
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
@@ -101,8 +91,8 @@ class WaveformBindings(precice.Interface):
         for substep in range(self._n_this):
             write_data_name = write_data_name_prefix + str(substep)
             write_data_id = self.get_data_id(write_data_name, self._mesh_id)
-            substep_time = write_waveform.get_global_time(substep)
-            write_data = write_waveform.sample(substep_time)
+            substep_time = write_waveform._temporal_grid[substep]
+            write_data = write_waveform._samples_in_time[:,substep]
             super().write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
             print("writing at time {time}".format(time=substep_time))
             print("write data called {name}:{write_data}".format(name=write_data_name, write_data=write_data))
@@ -110,21 +100,22 @@ class WaveformBindings(precice.Interface):
     def _read_all_window_data_from_precice(self):
         read_data_name_prefix = self._read_data_name
         read_waveform = self._read_data_buffer
+        init_data, init_time = read_waveform.get_init()
+        read_waveform.empty_data()
+        read_waveform.append(init_data, init_time)
+        read_times = np.linspace(self._current_window_start, self._current_window_end(), self._n_other + 1)  # todo THIS IS HARDCODED! FOR ADAPTIVE GRIDS THIS IS NOT FITTING.
         for substep in range(self._n_other):
             read_data_name = read_data_name_prefix + str(substep)
             read_data_id = self.get_data_id(read_data_name, self._mesh_id)
-            substep_time = read_waveform.get_global_time(substep)
-            read_data = read_waveform.sample(substep_time)
+            read_data = init_data.copy()
+            substep_time = read_times[substep + 1]
             super().read_block_scalar_data(read_data_id, self._n_vertices, self._vertex_ids, read_data)
             print("reading at time {time}".format(time=substep_time))
             print("read_data called {name}:{read_data}".format(name=read_data_name, read_data=read_data))
-            read_waveform.update(read_data, substep_time)
+            read_waveform.append(read_data, substep_time)
 
     def advance(self, dt):
         self._window_time += dt
-        if not np.isclose(dt, self._write_data_buffer.get_dt()):
-            msg = "Expected timestep size dt={dt_expected}. Received dt={dt_received}.".format(dt_expected=self._write_data_buffer.get_dt(), dt_received=dt)
-            raise WrongTimestepSizeError(msg)
 
         if self._window_is_completed():
             print("WINDOW COMPLETE!")
@@ -186,7 +177,7 @@ class WaveformBindings(precice.Interface):
         return self._precice_tau
 
     def initialize(self):
-        self._precice_tau = super().initialize()
+        self._precice_tau = super().initialize_constant()
         return np.max([self._precice_tau, self._remaining_window_time()])
 
     def initialize_data(self):
@@ -222,23 +213,25 @@ class NoDataError(Exception):
 
 
 class Waveform:
-    def __init__(self, window_start, window_size, n_samples):
+    def __init__(self, window_start, window_size, n_datapoints):
         """
         :param window_start: starting time of the window
         :param window_size: size of window
         :param n_samples: number of samples on window
         """
-        assert (n_samples >= 2)
+        assert (n_datapoints >= 1)
         assert (window_size > 0)
-        self._temporal_grid, self._dt = np.linspace(0, 1, n_samples, retstep=True)
-        self._samples_in_time = dict()
+
         self._window_size = window_size
         self._window_start = window_start
-        self._n_datapoints = None
-        for t in self._temporal_grid:
-            self._samples_in_time[t] = None
+        self._n_datapoints = n_datapoints
+        self._samples_in_time = None
+        self._temporal_grid = None
+        self.empty_data()
 
     def get_local_time(self, grid_id):
+        print(self._temporal_grid)
+        print(grid_id)
         return self._temporal_grid[grid_id]
 
     def get_global_time(self, grid_id):
@@ -251,75 +244,105 @@ class Waveform:
     def _get_dt(self):
         return self._dt
 
-    def initialize(self, data):
-        self._n_datapoints = data.shape[0]
-        for t in self._temporal_grid:
-            self._samples_in_time[t] = data.copy()
+    def _window_end(self):
+        return self._window_start + self._window_size
 
-    def _sample(self, local_time):
+    def _append_sample(self, data, time):
+        """
+        appends a new piece of data for given time to the datastructures
+        :param data: new dataset
+        :param time: associated time
+        :return:
+        """
+        data = data.reshape((data.size,1))
+        print("###")
+        print(self._samples_in_time.shape)
+        print(data.shape)
+        print("###")
+        self._samples_in_time = np.append(self._samples_in_time, data, axis=1)
+        self._temporal_grid.append(time)
+
+    def initialize_constant(self, data):
+        assert (not self._temporal_grid)  # list self._temporal_grid is empty
+        assert (self._samples_in_time.size == 0)  # numpy.array self._samples_in_time is empty
+
+        self._append_sample(data, self._window_start)
+        self._append_sample(data, self._window_end())
+
+    def sample(self, time):
         from scipy.interpolate import interp1d
-        print("sample Waveform at %f" % local_time)
+        print("sample Waveform at %f" % time)
 
-        if not self._n_datapoints:
+        if not self._temporal_grid:
             raise NoDataError
 
         atol = 1e-08  # todo: this is equal to atol used by default in np.isclose. Is there a nicer way to implement the check below?
-        if not (0 - atol <= local_time <= 1 + atol):
-            msg = "\nlocal time: {time} on local grid {grid}\n" \
-                  "corresponds to\n" \
-                  "global time: {global_time} on global grid {ggrid}".format(
-                time=local_time,
-                grid=self._temporal_grid,
-                global_time=self._local_to_global_time(local_time),
-                ggrid=self.global_temporal_grid())
+        if not (np.min(self._temporal_grid) - atol <= time <= np.max(self._temporal_grid) + atol):
+            msg = "\ntime: {time} on temporal grid {grid}\n".format(
+                time=time,
+                grid=self._temporal_grid)
             raise OutOfLocalWindowError(msg)
 
         return_value = np.zeros(self._n_datapoints)
         for i in range(self._n_datapoints):
             values_along_time = dict()
-            for t in self._temporal_grid:
-                values_along_time[t] = self._samples_in_time[t][i]
+            for j in range(len(self._temporal_grid)):
+                t = self._temporal_grid[j]
+                print(self._samples_in_time)
+                values_along_time[t] = self._samples_in_time[i, j]
+            print("###")
+            print(self._temporal_grid)
+            print(values_along_time)
+            print("###")
             interpolant = interp1d(list(values_along_time.keys()), list(values_along_time.values()))
-            if not (0 <= local_time <= 1) and (0 - atol <= local_time <= 1 + atol):  # local time is at the boundary of the interval within a given tolerance
-                if local_time < 0:
-                    local_time = 0
-                elif local_time > 1:
-                    local_time = 1
+            if not (0 <= time <= 1) and (0 - atol <= time <= 1 + atol):  # local time is at the boundary of the interval within a given tolerance
+                if time < 0:
+                    time = 0
+                elif time > 1:
+                    time = 1
                 else:
                     raise Exception("unexpected behavior!")
-            return_value[i] = interpolant(local_time)
+            print("###")
+            print(time)
+            print("###")
+            try:
+                return_value[i] = interpolant(time)
+            except ValueError:
+                time_min = np.min(self._temporal_grid)
+                time_max = np.max(self._temporal_grid)
+
+                if not time_min <= time <= time_max:  # local_time is not in valid range [time_min,time_max]
+                    atol = 10**-8
+                    if time_min-atol <= time <= time_min:  # local_time < time_min within within tolerance atol -> truncuate
+                        time = time_min
+                    elif time_max <= time <= time_max+atol:  # local_time > time_max within within tolerance atol -> truncuate
+                        time = time_max
+                    else:
+                        raise Exception("Invalid local time {local_time} computed!".format(local_time=time))
+                return_value[i] = interpolant(time)
+
         return return_value
 
-    def sample(self, global_time):
-        local_time = self.global_to_local_time(global_time)
-        return self._sample(local_time)
-
     def global_to_local_time(self, global_time):
-        return (global_time - self._window_start)/self._window_size
+        local_time = (global_time - self._window_start)/self._window_size
+        return local_time
 
     def _local_to_global_time(self, local_time):
         return (local_time * self._window_size) + self._window_start
 
     def global_temporal_grid(self):
-        return self._temporal_grid * self._window_size + self._window_start
+        return self._temporal_grid
 
-    def _time_is_on_grid(self, time):
-        #print("Grid: {grid}".format(grid=self.global_temporal_grid()))
-        return np.isclose(self.global_temporal_grid(), time).any()
-
-    def _update(self, data, local_time):
-        print("_update at {local_time}".format(local_time=local_time))
-        if local_time in self._samples_in_time.keys():
-            self._samples_in_time[local_time] = data
-        else:
-            key = self._temporal_grid[np.isclose(self._temporal_grid, local_time)][0]
-            self._samples_in_time[key] = data
-            #raise Exception("local_time {local_time} not found! Better use {key}".format(local_time=local_time, key=key))
-
-    def update(self, data, global_time):
-        #print("Global time: {global_time}".format(global_time=global_time))
-        if not self._time_is_on_grid(global_time):
-            msg = "trying to update at {global_time} while temporal grid is {grid}".format(global_time=global_time, grid=self.global_temporal_grid())
-            raise NotOnTemporalGridError(msg)
+    def append(self, data, global_time):
         assert (data.shape[0] == self._n_datapoints)
-        self._update(data, self.global_to_local_time(global_time))
+        if global_time in self._temporal_grid or (self._temporal_grid and global_time <= self._temporal_grid[-1]):
+            raise Exception("It is only allowed to append data associated with time that is larger than the already existing time. Trying to append invalid global time = {global_time} to temporal grid = {temporal_grid}".format(global_time=global_time, temporal_grid=self._temporal_grid))
+        self._append_sample(data, global_time)
+
+    def empty_data(self):
+        self._samples_in_time = np.empty(shape=(self._n_datapoints, 0))  # store samples in time in this data structure. Number of rows = number of gridpoints per sample; number of columns = number of sampls in time
+        self._temporal_grid = list()  # store time associated to samples in this datastructure
+
+    def get_init(self):
+        return self._samples_in_time[:,0], self._temporal_grid[0]
+

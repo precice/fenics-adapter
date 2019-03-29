@@ -84,7 +84,7 @@ class TestCheckpointing(TestCase):
         from fenicsadapter.waveform_bindings import WaveformBindings
 
         if type(precice._interface) is WaveformBindings:
-            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name)
+            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, precice._write_data, precice._read_data)
 
     def test_advance_success(self):
         """

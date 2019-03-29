@@ -22,42 +22,22 @@ class TestWaveform(TestCase):
         self.n_samples = 10
         self.global_time_grid = self.window_start + self.window_size * np.linspace(0, 1, self.n_samples)
         self.input_data = np.array([1, 2, 3])
+        self.n_datapoints = len(self.input_data)
 
     def test_initialize_data(self):
         from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.window_start, self.window_size, self.n_samples)
-        self.waveform.initialize(self.input_data)
-
-    def test_update_data(self):
-        from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.window_start, self.window_size, self.n_samples)
-        from fenicsadapter.waveform_bindings import NotOnTemporalGridError
-
-        self.waveform.initialize(self.input_data)
-        self.waveform.update(self.input_data * 2, self.global_time_grid[0])
-
-        with self.assertRaises(NotOnTemporalGridError):
-            self.waveform.update(self.input_data * 2, 0)
-
-        out = self.waveform.sample(self.global_time_grid[0])
-        npt.assert_almost_equal(out, self.input_data*2)
-
-        for t in self.global_time_grid[1:]:
-            out = self.waveform.sample(t)
-            npt.assert_almost_equal(out, self.input_data)
-
-        out = self.waveform.sample(.5 * (self.global_time_grid[0] + self.global_time_grid[1]))
-        npt.assert_almost_equal(out, self.input_data*1.5)
+        self.waveform = Waveform(self.window_start, self.window_size, self.n_datapoints)
+        self.waveform.initialize_constant(self.input_data)
 
     def test_sample_data(self):
         from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.window_start, self.window_size, self.n_samples)
+        self.waveform = Waveform(self.window_start, self.window_size, self.n_datapoints)
         from fenicsadapter.waveform_bindings import OutOfLocalWindowError, NoDataError
 
         with self.assertRaises(NoDataError):
             out = self.waveform.sample(0)
 
-        self.waveform.initialize(self.input_data)
+        self.waveform.initialize_constant(self.input_data)
 
         for t in np.linspace(self.global_time_grid[0], self.global_time_grid[-1]):
             out = self.waveform.sample(t)
