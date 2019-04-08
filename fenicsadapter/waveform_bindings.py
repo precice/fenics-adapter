@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 try:
@@ -126,9 +126,23 @@ class WaveformBindings(precice.Interface):
 
         if self._window_is_completed():
             logging.info("Window is complete.")
+            logging.info("print read waveform")
+            logging.info(self._read_data_name)
+            self._read_data_buffer.print_waveform()
+            logging.info("print write waveform")
+            logging.info(self._write_data_name)
+            self._write_data_buffer.print_waveform()
+
             self._write_all_window_data_to_precice()
             max_dt = super().advance(self._window_time)  # = time given by preCICE
             self._read_all_window_data_from_precice()
+
+            logging.info("print read waveform")
+            logging.info(self._read_data_name)
+            self._read_data_buffer.print_waveform()
+            logging.info("print write waveform")
+            logging.info(self._write_data_name)
+            self._write_data_buffer.print_waveform()
 
             # checkpointing
             if self.is_action_required(action_read_iteration_checkpoint()):
@@ -341,4 +355,8 @@ class Waveform:
 
     def get_empty_ndarray(self):
         return np.empty(self._n_datapoints)
+
+    def print_waveform(self):
+        logging.info("time: {time}".format(time=self._temporal_grid))
+        logging.info("data: {data}".format(data=self._samples_in_time))
 

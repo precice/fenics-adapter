@@ -220,6 +220,7 @@ class Adapter:
         self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t+dt)
         max_dt = self._interface.advance(dt)
         self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+dt)
+        print(self._read_data)
 
         precice_step_complete = False
         
