@@ -57,8 +57,7 @@ class TestWaveformBindings(TestCase):
         write_data = np.random.rand(self.n_vertices)
         read_data = old_data
         to_be_read = old_data + 1
-        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", write_data, read_data)
-        bindings._read_data_buffer.empty_data()
+        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read")
         bindings._read_data_buffer.append(to_be_read, 0)
         bindings._read_data_buffer.append(to_be_read, 1)
         bindings.read_block_scalar_data("Dummy-Read", dummy_mesh_id, self.n_vertices, dummy_vertex_ids, read_data, 0)
@@ -79,8 +78,7 @@ class TestWaveformBindings(TestCase):
         to_be_written = old_data + np.random.rand(self.n_vertices)
         write_data = to_be_written
         read_data = np.random.rand(self.n_vertices)
-        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", write_data, read_data)
-        bindings._write_data_buffer.empty_data()
+        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read")
         bindings._write_data_buffer.append(old_data, 0)
         bindings._write_data_buffer.append(old_data, 1)
         bindings._write_data_buffer.empty_data()
@@ -101,9 +99,12 @@ class TestWaveformBindings(TestCase):
         bindings._precice_tau = self.dt
         dummy_mesh_id = MagicMock()
         dummy_vertex_ids = np.random.rand(self.n_vertices)
-        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read", np.zeros(self.n_vertices), np.zeros(self.n_vertices))
+        bindings.initialize_waveforms(dummy_mesh_id, self.n_vertices, dummy_vertex_ids, "Dummy-Write", "Dummy-Read")
+        bindings._write_data_buffer.append(np.zeros(self.n_vertices), 0)
+        bindings._read_data_buffer.append(np.zeros(self.n_vertices), 0)
+        bindings._read_data_buffer.append(np.zeros(self.n_vertices), 1)
         bindings._precice_tau = self.dt
-        Interface.is_action_required= MagicMock(return_value=False)
+        Interface.is_action_required = MagicMock(return_value=False)
         self.assertEqual(bindings._current_window_start, 0.0)
         for i in range(9):
             self.assertTrue(np.isclose(bindings._window_time, i * .1))

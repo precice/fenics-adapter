@@ -10,6 +10,7 @@ from scipy.interpolate import interp1d
 import numpy as np
 from .config import Config
 
+
 import fenicsadapter.waveform_bindings
 
 
@@ -259,9 +260,7 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name,
-                                             self._read_data_name,
-                                             write_data_init=self._write_data,
-                                             read_data_init=self._read_data)
+                                             self._read_data_name)
 
         if self._interface.is_action_required(fenicsadapter.waveform_bindings.action_write_initial_data()):
             self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)

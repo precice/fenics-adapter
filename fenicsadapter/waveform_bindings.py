@@ -1,4 +1,8 @@
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 
 try:
     import precice
@@ -30,38 +34,29 @@ class WaveformBindings(precice.Interface):
         self._precice_tau = None
 
         # multirate time stepping
-        self._n_this = self._config.get_n_substeps() + 1  # number of timesteps in this window, by default: no WR
-        self._n_other = self._other_config.get_n_substeps() + 1 # number of timesteps in other window, todo: in the end we don't want to worry about the other solver's resolution!
+        self._n_this = self._config.get_n_substeps()  # number of timesteps in this window, by default: no WR
+        self._n_other = self._other_config.get_n_substeps()  # number of timesteps in other window, todo: in the end we don't want to worry about the other solver's resolution!
         self._current_window_start = 0  # defines start of window
         self._window_time = self._current_window_start  # keeps track of window time
 
-    def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name,
-                             write_data_init, read_data_init):
-        print("INIT WAVEFORMS!")
+    def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name):
+        logging.debug("Calling initialize_waveforms")
+        logging.info("Initializing waveforms.")
         # constant information of mesh
         self._mesh_id = mesh_id
         self._n_vertices = n_vertices
         self._vertex_ids = vertex_ids
 
-        # constant write data name prefix
+        logging.debug("Creating write_data_buffer")
         self._write_data_name = write_data_name
-        self._write_data_buffer = self._get_empty_write_buffer(write_data_init)
+        self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
 
-        # constant read data name prefix
+        logging.debug("Creating read_data_buffer")
         self._read_data_name = read_data_name
-        self._read_data_buffer = self._get_empty_read_buffer(read_data_init)
-
-    def _get_empty_write_buffer(self, write_data_init):
-        buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
-        buffer.append(write_data_init, self._current_window_start)
-        return buffer
-
-    def _get_empty_read_buffer(self, read_data_init):
-        buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
-        buffer.initialize_constant(read_data_init)
-        return buffer
+        self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
 
     def write_block_scalar_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
+        logging.debug("calling write_block_scalar_data for time {time}".format(time=time))
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
@@ -73,12 +68,13 @@ class WaveformBindings(precice.Interface):
         assert (self._write_data_name == write_data_name)
 
     def read_block_scalar_data(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
+        logging.debug("calling read_block_scalar_data for time {time}".format(time=time))
         assert(self._config.get_read_data_name() == read_data_name)
         assert(self._is_inside_current_window(time))
         # we get the data from the interpolant. New data will be obtained from the other participant via preCICE in advance
-        print("read at time {time}".format(time=time))
+        logging.debug("read at time {time}".format(time=time))
         read_data[:] = self._read_data_buffer.sample(time)[:].copy()
-        print("read_data is {read_data}".format(read_data=read_data))
+        logging.debug("read_data is {read_data}".format(read_data=read_data))
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
@@ -86,39 +82,50 @@ class WaveformBindings(precice.Interface):
         assert (self._read_data_name == read_data_name)
 
     def _write_all_window_data_to_precice(self):
+        logging.debug("Calling _write_all_window_data_to_precice")
         write_data_name_prefix = self._write_data_name
         write_waveform = self._write_data_buffer
-        for substep in range(self._n_this):
+        logging.debug("write_waveform._temporal_grid = {grid}".format(grid=write_waveform._temporal_grid))
+        for substep in range(self._n_this + 1):
+            logging.debug("writing substep {substep} of {n_this}".format(substep=substep, n_this=self._n_this))
             write_data_name = write_data_name_prefix + str(substep)
             write_data_id = self.get_data_id(write_data_name, self._mesh_id)
             substep_time = write_waveform._temporal_grid[substep]
-            write_data = write_waveform._samples_in_time[:,substep]
+            write_data = write_waveform._samples_in_time[:, substep]
             super().write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
-            print("writing at time {time}".format(time=substep_time))
-            print("write data called {name}:{write_data}".format(name=write_data_name, write_data=write_data))
+            logging.debug("write data called {name}:{write_data} @ time = {time}".format(name=write_data_name,
+                                                                                         write_data=write_data,
+                                                                                         time=substep_time))
+
+    def _rollback_write_data_buffer(self):
+        data, time = self._write_data_buffer.get_init()
+        self._write_data_buffer.empty_data()
+        self._write_data_buffer.append(data, time)
 
     def _read_all_window_data_from_precice(self):
+        logging.debug("Calling _read_all_window_data_from_precice")
         read_data_name_prefix = self._read_data_name
         read_waveform = self._read_data_buffer
-        init_data, init_time = read_waveform.get_init()
+        read_ndarray = read_waveform.get_empty_ndarray()
         read_waveform.empty_data()
-        read_waveform.append(init_data, init_time)
         read_times = np.linspace(self._current_window_start, self._current_window_end(), self._n_other + 1)  # todo THIS IS HARDCODED! FOR ADAPTIVE GRIDS THIS IS NOT FITTING.
-        for substep in range(self._n_other):
+        for substep in range(self._n_other + 1):
             read_data_name = read_data_name_prefix + str(substep)
             read_data_id = self.get_data_id(read_data_name, self._mesh_id)
-            read_data = init_data.copy()
-            substep_time = read_times[substep + 1]
+            read_data = np.copy(read_ndarray)
+            substep_time = read_times[substep]
             super().read_block_scalar_data(read_data_id, self._n_vertices, self._vertex_ids, read_data)
-            print("reading at time {time}".format(time=substep_time))
-            print("read_data called {name}:{read_data}".format(name=read_data_name, read_data=read_data))
+            logging.debug("reading at time {time}".format(time=substep_time))
+            logging.debug("read_data called {name}:{read_data} @ time = {time}".format(name=read_data_name,
+                                                                                       read_data=read_data,
+                                                                                       time=substep_time))
             read_waveform.append(read_data, substep_time)
 
     def advance(self, dt):
         self._window_time += dt
 
         if self._window_is_completed():
-            print("WINDOW COMPLETE!")
+            logging.info("Window is complete.")
             self._write_all_window_data_to_precice()
             max_dt = super().advance(self._window_time)  # = time given by preCICE
             self._read_all_window_data_from_precice()
@@ -126,38 +133,47 @@ class WaveformBindings(precice.Interface):
             # checkpointing
             if self.is_action_required(action_read_iteration_checkpoint()):
                 # repeat window
-                print("REPEAT")
+                logging.info("Repeat window.")
+                self._rollback_write_data_buffer()
                 self._window_time = 0
                 pass
             else:
-                print("NEXT")
+                logging.info("Next window.")
                 # go to next window
                 write_data_init = self._write_data_buffer.sample(self._current_window_end()).copy()
                 read_data_init = self._read_data_buffer.sample(self._current_window_end()).copy()
-                print("write_data_init with {write_data} from t = {time}".format(write_data=write_data_init, time=self._current_window_end()))
+                logging.debug("write_data_init with {write_data} from t = {time}".format(write_data=write_data_init,
+                                                                                         time=self._current_window_end()))
+                logging.debug("read_data_init with {read_data} from t = {time}".format(read_data=read_data_init,
+                                                                                       time=self._current_window_end()))
                 self._current_window_start += self._window_size()
                 self._window_time = 0
-                self._write_data_buffer = self._get_empty_write_buffer(write_data_init)
-                self._read_data_buffer = self._get_empty_read_buffer(read_data_init)
+                # initialize window start of new window with data from window end of old window
+                self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+                self._write_data_buffer.append(write_data_init, self._current_window_start)
+                # use constant extrapolation as initial guess for read data
+                self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+                self._read_data_buffer.append(read_data_init, self._current_window_start)
+                self._read_data_buffer.append(read_data_init, self._current_window_end())
                 self._print_window_status()
 
         else:
-            print("remaining time: {remain}".format(remain=self._remaining_window_time()))
+            logging.debug("remaining time: {remain}".format(remain=self._remaining_window_time()))
             max_dt = self._remaining_window_time()  # = window time remaining
             assert(max_dt > 0)
 
         return max_dt
 
     def _print_window_status(self):
-        print("## window status:")
-        print(self._current_window_start)
-        print(self._window_size())
-        print(self._window_time)
-        print("##")
+        logging.debug("## window status:")
+        logging.debug(self._current_window_start)
+        logging.debug(self._window_size())
+        logging.debug(self._window_time)
+        logging.debug("##")
 
     def _window_is_completed(self):
         if np.isclose(self._window_size(), self._window_time):
-            print("COMPLETE!")
+            logging.debug("COMPLETE!")
             return True
         else:
             return False
@@ -176,24 +192,42 @@ class WaveformBindings(precice.Interface):
         return self._precice_tau
 
     def initialize(self):
-        self._precice_tau = super().initialize_constant()
+        self._precice_tau = super().initialize()
         return np.max([self._precice_tau, self._remaining_window_time()])
 
-    def initialize_data(self):
-        return super().initialize_data()
+    def is_action_required(self, action):
+        if action == precice.action_write_initial_data():
+            return True  # if we use waveform relaxation, we require initial data for both participants to be able to fill the write buffers correctly
+        elif action == precice.action_write_iteration_checkpoint() or action == precice.action_read_iteration_checkpoint():
+            return super().is_action_required(action)
+        else:
+            raise Exception("unexpected action. %s", str(action))
 
-    def _do_interpolation(self, data, window_time):
-        # this is currently a very limited dummy implementation
+    def fulfilled_action(self, action):
+        if action == precice.action_write_initial_data():
+            return None  # do not forward to precice. We have to check for this condition again in initialize_data
+        elif action == precice.action_write_iteration_checkpoint() or action == precice.action_read_iteration_checkpoint():
+            return super().fulfilled_action(action)  # forward to precice
+        else:
+            raise Exception("unexpected action. %s", str(action))
 
-        # todo support "real" multirate, then remove following assertion
-        assert(self._n_this == self._n_other)  # if self._N_this == self._N_other, we can assume that self._write_data = self._read_data and do not have to interpolate
+    def initialize_data(self, time=0):
+        logging.debug("Calling initialize_data")
+        if super().is_action_required(precice.action_write_initial_data()):
+            for substep in range(1, self._n_this + 1):
+                write_data_init = self._write_data_buffer._samples_in_time[:, 0]
+                time = substep * self._precice_tau / self._n_this
+                self._write_data_buffer.append(write_data_init, time)
+            self._write_all_window_data_to_precice()
+            self._rollback_write_data_buffer()
+            super().fulfilled_action(precice.action_write_initial_data())
 
-        # todo support sampling data at arbitrary times
-        assert(window_time * self._n_this % self._window_size() == 0)  # sampling time is exactly aligned with substep
+        return_value = super().initialize_data()
 
-        id_sample_at = round(window_time / self._window_size() * self._n_this)
+        if self.is_read_data_available():
+            self._read_all_window_data_from_precice()
 
-        return data[id_sample_at]
+        return return_value
 
 
 class OutOfLocalWindowError(Exception):
@@ -239,10 +273,10 @@ class Waveform:
         :return:
         """
         data = data.reshape((data.size,1))
-        print("###")
-        print(self._samples_in_time.shape)
-        print(data.shape)
-        print("###")
+        logging.debug("###")
+        logging.debug(self._samples_in_time.shape)
+        logging.debug(data.shape)
+        logging.debug("###")
         self._samples_in_time = np.append(self._samples_in_time, data, axis=1)
         self._temporal_grid.append(time)
 
@@ -255,7 +289,7 @@ class Waveform:
 
     def sample(self, time):
         from scipy.interpolate import interp1d
-        print("sample Waveform at %f" % time)
+        logging.debug("sample Waveform at %f" % time)
 
         if not self._temporal_grid:
             raise NoDataError
@@ -272,7 +306,6 @@ class Waveform:
             values_along_time = dict()
             for j in range(len(self._temporal_grid)):
                 t = self._temporal_grid[j]
-                print(self._samples_in_time)
                 values_along_time[t] = self._samples_in_time[i, j]
             interpolant = interp1d(list(values_along_time.keys()), list(values_along_time.values()))
             try:
@@ -304,5 +337,8 @@ class Waveform:
         self._temporal_grid = list()  # store time associated to samples in this datastructure
 
     def get_init(self):
-        return self._samples_in_time[:,0], self._temporal_grid[0]
+        return self._samples_in_time[:, 0], self._temporal_grid[0]
+
+    def get_empty_ndarray(self):
+        return np.empty(self._n_datapoints)
 

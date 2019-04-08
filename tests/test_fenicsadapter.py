@@ -84,7 +84,7 @@ class TestCheckpointing(TestCase):
         from fenicsadapter.waveform_bindings import WaveformBindings
 
         if type(precice._interface) is WaveformBindings:
-            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, precice._write_data, precice._read_data)
+            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name)
 
     def test_advance_success(self):
         """
@@ -112,6 +112,7 @@ class TestCheckpointing(TestCase):
 
         precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
+        precice._interface = Interface  # mock away waveform bindings
 
         value_u_np1 = self.u_np1_mocked.value
 
@@ -153,6 +154,7 @@ class TestCheckpointing(TestCase):
 
         precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
+        precice._interface = Interface  # mock away waveform bindings
 
         precice_step_complete = False
         # time and iteration count should be rolled back by a not successful call of advance
@@ -192,6 +194,7 @@ class TestCheckpointing(TestCase):
 
         precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
+        precice._interface = Interface  # mock away waveform bindings
 
         precice_step_complete = False
         # time and iteration count should be rolled back by a not successful call of advance
