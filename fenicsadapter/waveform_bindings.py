@@ -303,7 +303,7 @@ class Waveform:
 
     def sample(self, time):
         from scipy.interpolate import interp1d
-        logging.debug("sample Waveform at %f" % time)
+        logging.info("sample Waveform at %f" % time)
 
         if not self._temporal_grid:
             raise NoDataError
@@ -338,6 +338,7 @@ class Waveform:
                         raise Exception("Invalid time {time} computed!".format(time=time))
                 return_value[i] = interpolant(time)
 
+        logging.info("result is {result}.".format(result=return_value))
         return return_value
 
     def append(self, data, time):
