@@ -101,12 +101,7 @@ class CustomExpression(UserExpression):
         """ Determines if function being interpolated is vector-valued based on
         dimension of provided vals vector
         """
-        if self._vals.ndim > 1:
-            return True
-        elif self._vals.ndim == 1:
-            return False
-        else:
-            raise Exception("Dimension of the function is 0 or negative!")
+        return not self.isScalarValues()
 
 
 class Adapter:
