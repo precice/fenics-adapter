@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function
+from dolfin import UserExpression, SubDomain, Function, Measure, Expression
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -156,6 +156,7 @@ class Adapter:
 
         #function space
         self._function_space = None
+        self.dss = None #intgration domain for evaluation an integral over the domain
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         """Converts FEniCS data of type dolfin.Function into
@@ -246,7 +247,7 @@ class Adapter:
         self.create_coupling_boundary_condition()
         return dolfin.DirichletBC(self._function_space, self._coupling_bc_expression, self._coupling_subdomain)
 
-    def create_coupling_neumann_boundary_condition(self, test_functions):
+    def create_coupling_neumann_boundary_condition(self, test_functions, boundary_marker=0):
         """Creates the coupling Neumann boundary conditions using
         create_coupling_boundary_condition() method.
 
@@ -256,7 +257,10 @@ class Adapter:
         """
         self._function_space = test_functions.function_space()
         self.create_coupling_boundary_condition()
-        return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
+        if boundary_marker==0: #there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
+            return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
+        else: #For multiple Neumann BCs integration should only be performed over the respective domain. TODO: fix the problem here
+            return self._coupling_bc_expression * test_functions * self.dss(boundary_marker)
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
@@ -280,9 +284,18 @@ class Adapter:
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
 
         # communication
-        self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+        if self.function_type(write_function) == FunctionType.SCALAR:
+            self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+        elif self.function_type(write_function) == FunctionType.VECTOR:
+            self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+        
         max_dt = self._interface.advance(dt)
-        self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+        
+        if self.function_type(write_function) == FunctionType.SCALAR:
+            self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+        
+        elif self.function_type(write_function) == FunctionType.VECTOR:
+            self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         # update boundary condition with read data
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
@@ -312,7 +325,7 @@ class Adapter:
 
         return t, n, precice_step_complete, max_dt
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0, coupling_marker=0):
         """Initializes remaining attributes. Called once, from the solver.
 
         :param read_field: function applied on the read field
@@ -348,6 +361,9 @@ class Adapter:
             self._t_cp = t
             self._n_cp = n
             self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
+            
+        #create an integration domain for the coupled boundary
+        self.dss=Measure('ds', domain=mesh, subdomain_data=coupling_marker)
 
         return self._precice_tau
 
