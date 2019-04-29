@@ -37,3 +37,9 @@ class Interface:
 
     def get_dimensions(self):
         raise Exception("not implemented")
+
+    def is_write_data_required(self, foo):
+        raise Exception("not implemented")
+
+    def is_read_data_available(self):
+        raise Exception("not implemented")

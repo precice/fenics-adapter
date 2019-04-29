@@ -25,6 +25,11 @@ class MockedArray:
         """
         self.value = new_value.value
 
+    def copy(self):
+        returned_array = MockedArray()
+        returned_array.value = self.value
+        return returned_array
+
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
@@ -58,6 +63,7 @@ class TestCheckpointing(TestCase):
         warnings.simplefilter('ignore', category=ImportWarning)
 
     def mock_the_adapter(self, precice):
+        from fenicsadapter.solverstate import SolverState
         """
         We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
         necessary to test checkpointing.
@@ -70,9 +76,8 @@ class TestCheckpointing(TestCase):
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
         # initialize checkpointing manually
-        precice._t_cp = self.t_cp_mocked
-        precice._u_cp = self.u_cp_mocked
-        precice._n_cp = self.n_cp_mocked
+        mocked_state = SolverState(self.u_cp_mocked, self.t_cp_mocked, self.n_cp_mocked)
+        precice._checkpoint.write(mocked_state)
         precice._precice_tau = 1
         precice._n_vertices = self.n_vertices
         precice._vertex_ids = self.vertex_ids
@@ -107,6 +112,8 @@ class TestCheckpointing(TestCase):
         Interface.get_data_id = MagicMock(return_value=self.data_id)
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
+        Interface.is_read_data_available = MagicMock(return_value=True)
+        Interface.is_write_data_required = MagicMock(return_value=True)
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
@@ -121,12 +128,11 @@ class TestCheckpointing(TestCase):
         desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
         self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
                          desired_output)
-
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
-        # we expect that precice._u_cp.value has been updated to value_u_np1
-        self.assertEqual(precice._u_cp.value, value_u_np1)
+        # we expect that the value of the checkpoint has been updated to value_u_np1
+        self.assertEqual(precice._checkpoint.get_state().u.value, value_u_np1)
 
     def test_advance_rollback(self):
         """
@@ -149,6 +155,8 @@ class TestCheckpointing(TestCase):
         Interface.get_data_id = MagicMock(return_value=self.data_id)
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
+        Interface.is_read_data_available = MagicMock(return_value=True)
+        Interface.is_write_data_required = MagicMock(return_value=True)
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
@@ -165,8 +173,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
 
-        # we expect that precice._u_cp.value has not been updated
-        self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
+        # we expect that the value of the checkpoint has not been updated
+        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
 
     def test_advance_continue(self):
         """
@@ -187,8 +195,10 @@ class TestCheckpointing(TestCase):
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock(return_value=self.mesh_id)
         Interface.get_data_id = MagicMock(return_value=self.data_id)
-        Interface.write_block_scalar_data = MagicMock()
-        Interface.read_block_scalar_data = MagicMock()
+        Interface.write_block_scalar_data = MagicMock()  # todo: if we use the check is_write_data_required from below, this line can be removed
+        Interface.read_block_scalar_data = MagicMock()  # todo: if we use the check is_read_data_available from below, this line can be removed
+        Interface.is_read_data_available = MagicMock(return_value=False)  # inside subcycling we do not write or read data
+        Interface.is_write_data_required = MagicMock(return_value=False)
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
@@ -205,8 +215,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
-        # we expect that precice._u_cp.value has not been updated
-        self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
+        # we expect that the value of the checkpoint has not been updated
+        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
 
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
