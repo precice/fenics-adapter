@@ -9,6 +9,7 @@ from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
 from .config import Config
+from .checkpointing import Checkpoint
 
 try:
     import precice
@@ -104,9 +105,7 @@ class Adapter:
         self._precice_tau = None
 
         ## checkpointing
-        self._u_cp = None  # checkpoint for temperature inside domain
-        self._t_cp = None  # time of the checkpoint
-        self._n_cp = None  # timestep of the checkpoint
+        self._checkpoint = Checkpoint()
 
     def convert_fenics_to_precice(self, data, mesh, subdomain):
         """Converts FEniCS data of type dolfin.Function into
@@ -208,12 +207,27 @@ class Adapter:
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
+    def _restore_solver_state_from_checkpoint(self, u):
+        t, n = self._checkpoint.read(u)
+        self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+        return t, n
+
+    def _advance_solver_state(self, u_np1, u, t, n, dt):
+        u.assign(u_np1)
+        t += dt
+        n += 1
+        return t, n
+
+    def _save_solver_state_to_checkpoint(self, u, t, n):
+        self._checkpoint.write(u, t, n)
+        self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
+
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
         The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
 
         This means:
-        * either, the checkpoint self._u_cp is assigned to u_n to repeat the iteration,
+        * either, the olf value of the checkpoint is assigned to u_n to repeat the iteration,
         * or u_n+1 is assigned to u_n and the checkpoint is updated correspondingly.
 
         :param write_function: a FEniCS function being sent to the other participant as boundary condition at the coupling interface
@@ -230,37 +244,31 @@ class Adapter:
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
 
         # communication
-        self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+        if self._interface.is_write_data_required(dt):
+            self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
         max_dt = self._interface.advance(dt)
-        self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
+        if self._interface.is_read_data_available():
+            self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         # update boundary condition with read data
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
-        precice_step_complete = False
+        precice_step_success = False
+        solver_state_has_been_restored = False
 
         # checkpointing
         if self._interface.is_action_required(precice.action_read_iteration_checkpoint()):
-            # continue FEniCS computation from checkpoint
-            u_n.assign(self._u_cp)  # set u_n to value of checkpoint
-            t = self._t_cp
-            n = self._n_cp
-            self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+            t, n = self._restore_solver_state_from_checkpoint(u_n)
+            solver_state_has_been_restored = True
         else:
-            u_n.assign(u_np1)
-            t = new_t = t + dt  # todo the variables new_t, new_n could be saved, by just using t and n below, however I think it improved readability.
-            n = new_n = n + 1
+            t, n = self._advance_solver_state(u_np1, u_n, t, n, dt)
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
-            # continue FEniCS computation with u_np1
-            # update checkpoint
-            self._u_cp.assign(u_np1)
-            self._t_cp = new_t
-            self._n_cp = new_n
-            self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
-            precice_step_complete = True
+            assert (not solver_state_has_been_restored)  # avoids invalid control flow
+            self._save_solver_state_to_checkpoint(u_np1, t, n)
+            precice_step_success = True
 
-        return t, n, precice_step_complete, max_dt
+        return t, n, precice_step_success, max_dt
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
         """Initializes remaining attributes. Called once, from the solver.
@@ -283,10 +291,7 @@ class Adapter:
             self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
-            self._u_cp = u_n.copy(deepcopy=True)
-            self._t_cp = t
-            self._n_cp = n
-            self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
+            self._save_solver_state_to_checkpoint(u_n, t, n)
 
         return self._precice_tau
 
