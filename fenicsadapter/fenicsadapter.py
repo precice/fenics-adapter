@@ -209,13 +209,25 @@ class Adapter:
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
     def _restore_solver_state_from_checkpoint(self, state):
+        """Resets the solver's state to the checkpoint's state.
+        :param state: current state of the FEniCS solver
+        """
         state.update(self._checkpoint.get_state())
         self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
 
     def _advance_solver_state(self, state, u_np1, dt):
+        """Advances the solver's state by one timestep.
+        :param state: old state
+        :param u_np1: new value
+        :param dt: timestep size
+        :return:
+        """
         state.update(SolverState(u_np1, self._checkpoint.get_state().t + dt, self._checkpoint.get_state().n + 1))
 
     def _save_solver_state_to_checkpoint(self, state):
+        """Writes given solver state to checkpoint.
+        :param state: state being saved as checkpoint
+        """
         self._checkpoint.write(state)
         self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
 
@@ -272,7 +284,6 @@ class Adapter:
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
         """Initializes remaining attributes. Called once, from the solver.
-
         :param read_field: function applied on the read field
         :param write_field: function applied on the write field
         """
