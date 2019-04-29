@@ -1,23 +1,17 @@
+from .solverstate import SolverState
+
 class Checkpoint:
 
     def __init__(self):
         """
         A checkpoint for the solver state
         """
-        self._u = None  # checkpoint for function value inside domain
-        self._t = None  # time of the checkpoint
-        self._n = None  # timestep of the checkpoint
+        self._state = None
 
-    def read(self, u):
-        """
-        read solver state from checkpoint to u
-        :param u: function value, which is set to checkpoint value (call-by-reference)
-        :return: checkpoint time and timestep
-        """
-        u.assign(self._u)  # set u to value of checkpoint
-        return self._t, self._n
+    def get_state(self):
+        return self._state
 
-    def write(self, u, t, n):
+    def write(self, new_state):
         """
         write checkpoint from solver state.
         :param u: function value
@@ -25,20 +19,13 @@ class Checkpoint:
         :param n: timestep
         """
         if not self.is_empty():
-            self._u.assign(u)
+            self._state.update(new_state)
         else:
-            self._u = u.copy()
-        self._t = t
-        self._n = n
+            self._state = new_state
 
     def is_empty(self):
         """
-        Returns whether checkpoint is empty. An empty checkpoint has the function value self._u from self.__init__
+        Returns whether checkpoint is empty. An empty checkpoint has no state saved.
         :return:
         """
-        checkpoint_is_empty = not self._u
-        if checkpoint_is_empty:  # if checkpoint_is_empty, assert that self._t and self._n are also None
-            assert (not self._t)
-            assert (not self._n)
-
-        return checkpoint_is_empty
+        return not self._state

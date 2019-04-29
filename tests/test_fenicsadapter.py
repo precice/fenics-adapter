@@ -54,6 +54,7 @@ class TestCheckpointing(TestCase):
         warnings.simplefilter('ignore', category=ImportWarning)
 
     def mock_the_adapter(self, precice):
+        from fenicsadapter.solverstate import SolverState
         """
         We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
         necessary to test checkpointing.
@@ -65,7 +66,8 @@ class TestCheckpointing(TestCase):
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
         # initialize checkpointing manually
-        precice._checkpoint.write(self.u_cp_mocked, self.t_cp_mocked, self.n_cp_mocked)
+        mocked_state = SolverState(self.u_cp_mocked, self.t_cp_mocked, self.n_cp_mocked)
+        precice._checkpoint.write(mocked_state)
 
     def test_advance_success(self):
         """
@@ -106,8 +108,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
-        # we expect that precice._u_cp.value has been updated to value_u_np1
-        self.assertEqual(precice._checkpoint._u.value, value_u_np1)
+        # we expect that the value of the checkpoint has been updated to value_u_np1
+        self.assertEqual(precice._checkpoint.get_state().u.value, value_u_np1)
 
     def test_advance_rollback(self):
         """
@@ -147,8 +149,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
 
-        # we expect that precice._u_cp.value has not been updated
-        self.assertEqual(precice._checkpoint._u.value, self.u_cp_mocked.value)
+        # we expect that the value of the checkpoint has not been updated
+        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
 
     def test_advance_continue(self):
         """
@@ -187,8 +189,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
-        # we expect that precice._u_cp.value has not been updated
-        self.assertEqual(precice._checkpoint._u.value, self.u_cp_mocked.value)
+        # we expect that the value of the checkpoint has not been updated
+        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
 
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})

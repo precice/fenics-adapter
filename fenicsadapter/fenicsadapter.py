@@ -10,6 +10,7 @@ from scipy.interpolate import interp1d
 import numpy as np
 from .config import Config
 from .checkpointing import Checkpoint
+from .solverstate import SolverState
 
 try:
     import precice
@@ -207,19 +208,15 @@ class Adapter:
         self.create_coupling_boundary_condition()
         return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
 
-    def _restore_solver_state_from_checkpoint(self, u):
-        t, n = self._checkpoint.read(u)
+    def _restore_solver_state_from_checkpoint(self, state):
+        state.update(self._checkpoint.get_state())
         self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
-        return t, n
 
-    def _advance_solver_state(self, u_np1, u, t, n, dt):
-        u.assign(u_np1)
-        t += dt
-        n += 1
-        return t, n
+    def _advance_solver_state(self, state, u_np1, dt):
+        state.update(SolverState(u_np1, self._checkpoint.get_state().t + dt, self._checkpoint.get_state().n + 1))
 
-    def _save_solver_state_to_checkpoint(self, u, t, n):
-        self._checkpoint.write(u, t, n)
+    def _save_solver_state_to_checkpoint(self, state):
+        self._checkpoint.write(state)
         self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
@@ -238,6 +235,8 @@ class Adapter:
         :param n: current timestep
         :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly.
         """
+
+        state = SolverState(u_n, t, n)
 
         # sample write data at interface
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
@@ -258,16 +257,17 @@ class Adapter:
 
         # checkpointing
         if self._interface.is_action_required(precice.action_read_iteration_checkpoint()):
-            t, n = self._restore_solver_state_from_checkpoint(u_n)
+            self._restore_solver_state_from_checkpoint(state)
             solver_state_has_been_restored = True
         else:
-            t, n = self._advance_solver_state(u_np1, u_n, t, n, dt)
+            self._advance_solver_state(state, u_np1, dt)
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             assert (not solver_state_has_been_restored)  # avoids invalid control flow
-            self._save_solver_state_to_checkpoint(u_np1, t, n)
+            self._save_solver_state_to_checkpoint(state)
             precice_step_success = True
 
+        _, t, n = state.get_state()
         return t, n, precice_step_success, max_dt
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
@@ -291,7 +291,8 @@ class Adapter:
             self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids, self._read_data)
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
-            self._save_solver_state_to_checkpoint(u_n, t, n)
+            initial_state = SolverState(u_n, t, n)
+            self._save_solver_state_to_checkpoint(initial_state)
 
         return self._precice_tau
 
