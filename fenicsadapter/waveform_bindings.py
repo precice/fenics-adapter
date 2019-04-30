@@ -225,19 +225,20 @@ class WaveformBindings(precice.Interface):
         else:
             raise Exception("unexpected action. %s", str(action))
 
-    def initialize_data(self, time=0, read_zero=None):
+    def initialize_data(self, time=0, read_zero=None, write_zero=None):
         """
 
         :param time:
         :param read_zero: read data that should be used at the very beginning
+        :param write_zero: write data that should be used at the very beginning
         :return:
         """
         logging.debug("Calling initialize_data")
         if super().is_action_required(precice.action_write_initial_data()):
+            logging.info("writing in initialize_data()")
             for substep in range(1, self._n_this + 1):
-                write_data_init = self._write_data_buffer._samples_in_time[:, 0]
                 time = substep * self._precice_tau / self._n_this
-                self._write_data_buffer.append(write_data_init, time)
+                self._write_data_buffer.append(write_zero, time)
             self._write_all_window_data_to_precice()
             self._rollback_write_data_buffer()
             super().fulfilled_action(precice.action_write_initial_data())
@@ -245,6 +246,7 @@ class WaveformBindings(precice.Interface):
         return_value = super().initialize_data()
 
         if self.is_read_data_available():
+            logging.info("reading in initialize_data()")
             self._read_data_buffer.empty_data(keep_first_sample=False)
             if isinstance(read_zero, np.ndarray):
                 self._read_data_buffer.append(read_zero, self._current_window_start)
