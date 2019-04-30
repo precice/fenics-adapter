@@ -41,7 +41,7 @@ class WaveformBindings(precice.Interface):
 
     def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name):
         logging.debug("Calling initialize_waveforms")
-        logging.info("Initializing waveforms.")
+        logging.debug("Initializing waveforms.")
         # constant information of mesh
         self._mesh_id = mesh_id
         self._n_vertices = n_vertices
@@ -124,35 +124,35 @@ class WaveformBindings(precice.Interface):
         self._window_time += dt
 
         if self._window_is_completed():
-            logging.info("Window is complete.")
-            logging.info("print read waveform")
-            logging.info(self._read_data_name)
+            logging.debug("Window is complete.")
+            logging.debug("print read waveform")
+            logging.debug(self._read_data_name)
             self._read_data_buffer.print_waveform()
-            logging.info("print write waveform")
-            logging.info(self._write_data_name)
+            logging.debug("print write waveform")
+            logging.debug(self._write_data_name)
             self._write_data_buffer.print_waveform()
 
             self._write_all_window_data_to_precice()
-            logging.info("calling precice.advance")
+            logging.debug("calling precice.advance")
             read_data_last = self._read_data_buffer.sample(self._current_window_end()).copy()  # store last read data before advance, otherwise it might be lost if window is finished
             max_dt = super().advance(self._window_time)  # = time given by preCICE
             self._read_all_window_data_from_precice()
 
-            logging.info("print read waveform")
-            logging.info(self._read_data_name)
+            logging.debug("print read waveform")
+            logging.debug(self._read_data_name)
             self._read_data_buffer.print_waveform()
-            logging.info("print write waveform")
-            logging.info(self._write_data_name)
+            logging.debug("print write waveform")
+            logging.debug(self._write_data_name)
             self._write_data_buffer.print_waveform()
 
             if self.is_action_required(action_read_iteration_checkpoint()):  # repeat window
                 # repeat window
-                logging.info("Repeat window.")
+                logging.debug("Repeat window.")
                 self._rollback_write_data_buffer()
                 self._window_time = 0
                 pass
             else:  # window is finished
-                logging.info("Next window.")
+                logging.debug("Next window.")
                 # go to next window
                 read_data_init = read_data_last
                 write_data_init = self._write_data_buffer.sample(self._current_window_end()).copy()
@@ -316,7 +316,7 @@ class Waveform:
 
     def sample(self, time):
         from scipy.interpolate import interp1d
-        logging.info("sample Waveform at %f" % time)
+        logging.debug("sample Waveform at %f" % time)
 
         if not self._temporal_grid:
             raise NoDataError
@@ -351,7 +351,7 @@ class Waveform:
                         raise Exception("Invalid time {time} computed!".format(time=time))
                 return_value[i] = interpolant(time)
 
-        logging.info("result is {result}.".format(result=return_value))
+        logging.debug("result is {result}.".format(result=return_value))
         return return_value
 
     def append(self, data, time):
@@ -379,6 +379,6 @@ class Waveform:
         self._samples_in_time[:, 0] = self._samples_in_time[:, 1]
 
     def print_waveform(self):
-        logging.info("time: {time}".format(time=self._temporal_grid))
-        logging.info("data: {data}".format(data=self._samples_in_time))
+        logging.debug("time: {time}".format(time=self._temporal_grid))
+        logging.debug("data: {data}".format(data=self._samples_in_time))
 
