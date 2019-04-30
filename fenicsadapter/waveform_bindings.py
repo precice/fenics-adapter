@@ -86,7 +86,7 @@ class WaveformBindings(precice.Interface):
         write_data_name_prefix = self._write_data_name
         write_waveform = self._write_data_buffer
         logging.debug("write_waveform._temporal_grid = {grid}".format(grid=write_waveform._temporal_grid))
-        for substep in range(self._n_this + 1):
+        for substep in range(1, self._n_this + 1):
             logging.debug("writing substep {substep} of {n_this}".format(substep=substep, n_this=self._n_this))
             write_data_name = write_data_name_prefix + str(substep)
             write_data_id = self.get_data_id(write_data_name, self._mesh_id)
@@ -98,18 +98,17 @@ class WaveformBindings(precice.Interface):
                                                                                          time=substep_time))
 
     def _rollback_write_data_buffer(self):
-        data, time = self._write_data_buffer.get_init()
-        self._write_data_buffer.empty_data()
-        self._write_data_buffer.append(data, time)
+        self._write_data_buffer.empty_data(keep_first_sample=True)
 
     def _read_all_window_data_from_precice(self):
         logging.debug("Calling _read_all_window_data_from_precice")
         read_data_name_prefix = self._read_data_name
         read_waveform = self._read_data_buffer
         read_ndarray = read_waveform.get_empty_ndarray()
-        read_waveform.empty_data()
+        read_waveform.empty_data(keep_first_sample=True)
         read_times = np.linspace(self._current_window_start, self._current_window_end(), self._n_other + 1)  # todo THIS IS HARDCODED! FOR ADAPTIVE GRIDS THIS IS NOT FITTING.
-        for substep in range(self._n_other + 1):
+
+        for substep in range(1, self._n_other + 1):
             read_data_name = read_data_name_prefix + str(substep)
             read_data_id = self.get_data_id(read_data_name, self._mesh_id)
             read_data = np.copy(read_ndarray)
@@ -134,6 +133,8 @@ class WaveformBindings(precice.Interface):
             self._write_data_buffer.print_waveform()
 
             self._write_all_window_data_to_precice()
+            logging.info("calling precice.advance")
+            read_data_last = self._read_data_buffer.sample(self._current_window_end()).copy()  # store last read data before advance, otherwise it might be lost if window is finished
             max_dt = super().advance(self._window_time)  # = time given by preCICE
             self._read_all_window_data_from_precice()
 
@@ -144,18 +145,17 @@ class WaveformBindings(precice.Interface):
             logging.info(self._write_data_name)
             self._write_data_buffer.print_waveform()
 
-            # checkpointing
-            if self.is_action_required(action_read_iteration_checkpoint()):
+            if self.is_action_required(action_read_iteration_checkpoint()):  # repeat window
                 # repeat window
                 logging.info("Repeat window.")
                 self._rollback_write_data_buffer()
                 self._window_time = 0
                 pass
-            else:
+            else:  # window is finished
                 logging.info("Next window.")
                 # go to next window
+                read_data_init = read_data_last
                 write_data_init = self._write_data_buffer.sample(self._current_window_end()).copy()
-                read_data_init = self._read_data_buffer.sample(self._current_window_end()).copy()
                 logging.debug("write_data_init with {write_data} from t = {time}".format(write_data=write_data_init,
                                                                                          time=self._current_window_end()))
                 logging.debug("read_data_init with {read_data} from t = {time}".format(read_data=read_data_init,
@@ -225,7 +225,13 @@ class WaveformBindings(precice.Interface):
         else:
             raise Exception("unexpected action. %s", str(action))
 
-    def initialize_data(self, time=0):
+    def initialize_data(self, time=0, read_zero=None):
+        """
+
+        :param time:
+        :param read_zero: read data that should be used at the very beginning
+        :return:
+        """
         logging.debug("Calling initialize_data")
         if super().is_action_required(precice.action_write_initial_data()):
             for substep in range(1, self._n_this + 1):
@@ -239,7 +245,14 @@ class WaveformBindings(precice.Interface):
         return_value = super().initialize_data()
 
         if self.is_read_data_available():
+            self._read_data_buffer.empty_data(keep_first_sample=False)
+            if isinstance(read_zero, np.ndarray):
+                self._read_data_buffer.append(read_zero, self._current_window_start)
+            else:
+                self._read_data_buffer.append(self._read_data_buffer.get_empty_ndarray(), self._current_window_start)
             self._read_all_window_data_from_precice()
+            if not isinstance(read_zero, np.ndarray):
+                self._read_data_buffer.copy_second_to_first()
 
         return return_value
 
@@ -347,15 +360,23 @@ class Waveform:
             raise Exception("It is only allowed to append data associated with time that is larger than the already existing time. Trying to append invalid time = {time} to temporal grid = {temporal_grid}".format(time=time, temporal_grid=self._temporal_grid))
         self._append_sample(data, time)
 
-    def empty_data(self):
+    def empty_data(self, keep_first_sample=False):
+        if keep_first_sample:
+            first_sample, first_time = self.get_init()
+            assert(first_time == self._window_start)
         self._samples_in_time = np.empty(shape=(self._n_datapoints, 0))  # store samples in time in this data structure. Number of rows = number of gridpoints per sample; number of columns = number of sampls in time
         self._temporal_grid = list()  # store time associated to samples in this datastructure
+        if keep_first_sample:
+            self._append_sample(first_sample, first_time)
 
     def get_init(self):
         return self._samples_in_time[:, 0], self._temporal_grid[0]
 
     def get_empty_ndarray(self):
         return np.empty(self._n_datapoints)
+
+    def copy_second_to_first(self):
+        self._samples_in_time[:, 0] = self._samples_in_time[:, 1]
 
     def print_waveform(self):
         logging.info("time: {time}".format(time=self._temporal_grid))

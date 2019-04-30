@@ -284,7 +284,8 @@ class Adapter:
         if self._interface.is_action_required(fenicsadapter.waveform_bindings.action_write_initial_data()):
             self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)
             self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_initial_data())
-        self._interface.initialize_data()
+
+        self._interface.initialize_data(read_zero=self._read_data)
 
         if self._interface.is_read_data_available():
             self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t)
