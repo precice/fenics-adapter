@@ -135,16 +135,12 @@ class WaveformBindings(precice.Interface):
             self._write_all_window_data_to_precice()
             logging.debug("calling precice.advance")
             read_data_last = self._read_data_buffer.sample(self._current_window_end()).copy()  # store last read data before advance, otherwise it might be lost if window is finished
+            write_data_last = self._write_data_buffer.sample(self._current_window_end()).copy()  # store last write data before advance, otherwise it might be lost if window is finished
             max_dt = super().advance(self._window_time)  # = time given by preCICE
-            self._read_all_window_data_from_precice()
 
-            logging.debug("print read waveform")
-            logging.debug(self._read_data_name)
-            self._read_data_buffer.print_waveform()
             logging.debug("print write waveform")
             logging.debug(self._write_data_name)
             self._write_data_buffer.print_waveform()
-
             if self.is_action_required(action_read_iteration_checkpoint()):  # repeat window
                 # repeat window
                 logging.debug("Repeat window.")
@@ -155,7 +151,7 @@ class WaveformBindings(precice.Interface):
                 logging.debug("Next window.")
                 # go to next window
                 read_data_init = read_data_last
-                write_data_init = self._write_data_buffer.sample(self._current_window_end()).copy()
+                write_data_init = write_data_last
                 logging.debug("write_data_init with {write_data} from t = {time}".format(write_data=write_data_init,
                                                                                          time=self._current_window_end()))
                 logging.debug("read_data_init with {read_data} from t = {time}".format(read_data=read_data_init,
@@ -168,8 +164,13 @@ class WaveformBindings(precice.Interface):
                 # use constant extrapolation as initial guess for read data
                 self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
                 self._read_data_buffer.append(read_data_init, self._current_window_start)
-                self._read_data_buffer.append(read_data_init, self._current_window_end())
                 self._print_window_status()
+
+            self._read_all_window_data_from_precice()  # actual reading has to take place after we checked whether the window is finished or not
+
+            logging.debug("print read waveform")
+            logging.debug(self._read_data_name)
+            self._read_data_buffer.print_waveform()
 
         else:
             logging.debug("remaining time: {remain}".format(remain=self._remaining_window_time()))

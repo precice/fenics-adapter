@@ -245,9 +245,6 @@ class Adapter:
         if True:  # todo: add self._interface.is_write_data_required(dt). We should add this check. However, it is currently not properly implemented for waveform relaxation
             self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t+dt)
         max_dt = self._interface.advance(dt)
-        if True:  # todo: add self._interface.is_read_data_available().  We should add this check. However, it is currently not properly implemented for waveform relaxation
-            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+dt)
-        print(self._read_data)
 
         precice_step_complete = False
         solver_state_has_been_restored = False
@@ -264,8 +261,14 @@ class Adapter:
             self._save_solver_state_to_checkpoint(state)
             precice_step_complete = True
 
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
         _, t, n = state.get_state()
+
+        if True:  # todo: add self._interface.is_read_data_available().  We should add this check. However, it is currently not properly implemented for waveform relaxation
+            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+dt)  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
+        print(self._read_data)
+
+        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+
         return t, n, precice_step_complete, max_dt
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
