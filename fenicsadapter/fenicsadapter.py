@@ -15,6 +15,10 @@ from .solverstate import SolverState
 
 import fenicsadapter.waveform_bindings
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 
 class CustomExpression(UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
@@ -201,6 +205,7 @@ class Adapter:
         """Resets the solver's state to the checkpoint's state.
         :param state: current state of the FEniCS solver
         """
+        logging.debug("Restore solver state")
         state.update(self._checkpoint.get_state())
         self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_read_iteration_checkpoint())
 
@@ -211,12 +216,16 @@ class Adapter:
         :param dt: timestep size
         :return:
         """
-        state.update(SolverState(u_np1, self._checkpoint.get_state().t + dt, self._checkpoint.get_state().n + 1))
+        logging.debug("Advance solver state")
+        logging.debug("old state: t={time}".format(time=state.t))
+        state.update(SolverState(u_np1, state.t + dt, self._checkpoint.get_state().n + 1))
+        logging.debug("new state: t={time}".format(time=state.t))
 
     def _save_solver_state_to_checkpoint(self, state):
         """Writes given solver state to checkpoint.
         :param state: state being saved as checkpoint
         """
+        logging.debug("Save solver state")
         self._checkpoint.write(state)
         self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_iteration_checkpoint())
 
