@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function
+from dolfin import UserExpression, SubDomain, Function, Constant
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -252,7 +252,7 @@ class Adapter:
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
         self._write_data = self.convert_fenics_to_precice(write_function, self._mesh_fenics, self._coupling_subdomain)
         if True:  # todo: add self._interface.is_write_data_required(dt). We should add this check. However, it is currently not properly implemented for waveform relaxation
-            self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t+dt)
+            self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t + dt)
         max_dt = self._interface.advance(dt)
 
         precice_step_complete = False
@@ -273,14 +273,14 @@ class Adapter:
         _, t, n = state.get_state()
 
         if True:  # todo: add self._interface.is_read_data_available().  We should add this check. However, it is currently not properly implemented for waveform relaxation
-            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+dt)  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
+            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t + dt)  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
         print(self._read_data)
 
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
         return t, n, precice_step_complete, max_dt
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, wr_factor=1, n=0, read_slope=0, write_slope=0):
         """Initializes remaining attributes. Called once, from the solver.
         :param read_field: function applied on the read field
         :param write_field: function applied on the write field
@@ -290,6 +290,10 @@ class Adapter:
         self.set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
+        dt = Constant(0)
+        self.fenics_dt = self._precice_tau / wr_factor  # todo: don't store this here! Just a hack... -> better dynamically update dt in advance
+        dt.assign(np.min([self.fenics_dt, self._precice_tau]))
+
         self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name,
                                              self._read_data_name)
 
@@ -297,17 +301,17 @@ class Adapter:
             self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)
             self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_initial_data())
 
-        self._interface.initialize_data(read_zero=self._read_data, write_zero=self._write_data)
+        self._interface.initialize_data(read_zero=self._read_data, write_zero=self._write_data, read_zero_slope=read_slope, write_zero_slope=write_slope)
 
         if self._interface.is_read_data_available():
-            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t+self._precice_tau)  # todo: only correct, if self._precice_tau = fenics_ds
+            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t + dt(0))
             print(self._read_data)
 
         if self._interface.is_action_required(fenicsadapter.waveform_bindings.action_write_iteration_checkpoint()):
             initial_state = SolverState(u_n, t, n)
             self._save_solver_state_to_checkpoint(initial_state)
 
-        return self._precice_tau
+        return dt
 
     def is_coupling_ongoing(self):
         """Determines whether simulation should continue. Called from the

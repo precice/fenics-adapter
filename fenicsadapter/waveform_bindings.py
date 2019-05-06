@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 try:
@@ -60,6 +60,8 @@ class WaveformBindings(precice.Interface):
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
+        logging.debug("write data name is {write_data_name}".format(write_data_name=write_data_name))
+        logging.debug("write data is {write_data}".format(write_data=write_data))
         self._write_data_buffer.append(write_data[:], time)
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
@@ -125,30 +127,24 @@ class WaveformBindings(precice.Interface):
 
         if self._window_is_completed():
             logging.debug("Window is complete.")
-            logging.debug("print read waveform")
-            logging.debug(self._read_data_name)
-            self._read_data_buffer.print_waveform()
+
             logging.debug("print write waveform")
             logging.debug(self._write_data_name)
             self._write_data_buffer.print_waveform()
-
             self._write_all_window_data_to_precice()
             logging.debug("calling precice.advance")
             read_data_last = self._read_data_buffer.sample(self._current_window_end()).copy()  # store last read data before advance, otherwise it might be lost if window is finished
             write_data_last = self._write_data_buffer.sample(self._current_window_end()).copy()  # store last write data before advance, otherwise it might be lost if window is finished
             max_dt = super().advance(self._window_time)  # = time given by preCICE
 
-            logging.debug("print write waveform")
-            logging.debug(self._write_data_name)
-            self._write_data_buffer.print_waveform()
             if self.is_action_required(action_read_iteration_checkpoint()):  # repeat window
                 # repeat window
-                logging.debug("Repeat window.")
+                logging.info("Repeat window.")
                 self._rollback_write_data_buffer()
                 self._window_time = 0
-                pass
+                self._read_all_window_data_from_precice()
             else:  # window is finished
-                logging.debug("Next window.")
+                logging.info("Next window.")
                 # go to next window
                 read_data_init = read_data_last
                 write_data_init = write_data_last
@@ -159,14 +155,17 @@ class WaveformBindings(precice.Interface):
                 self._current_window_start += self._window_size()
                 self._window_time = 0
                 # initialize window start of new window with data from window end of old window
+                logging.debug("create new write data buffer")
                 self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
                 self._write_data_buffer.append(write_data_init, self._current_window_start)
                 # use constant extrapolation as initial guess for read data
+                self._read_all_window_data_from_precice()  # this read buffer will be overwritten anyway. todo: initial guess is currently not treated properly!
+                logging.debug("create new read data buffer with initial guess")
                 self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
-                self._read_data_buffer.append(read_data_init, self._current_window_start)
+                for dt_extrapolate in np.linspace(0, self._window_size(), num=self._n_this+1, endpoint=True):
+                    self._read_data_buffer.append(read_data_init + self.read_slope * dt_extrapolate,
+                                                  self._current_window_start + dt_extrapolate)  # create initial guess (linear in time)
                 self._print_window_status()
-
-            self._read_all_window_data_from_precice()  # actual reading has to take place after we checked whether the window is finished or not
 
             logging.debug("print read waveform")
             logging.debug(self._read_data_name)
@@ -226,7 +225,7 @@ class WaveformBindings(precice.Interface):
         else:
             raise Exception("unexpected action. %s", str(action))
 
-    def initialize_data(self, time=0, read_zero=None, write_zero=None):
+    def initialize_data(self, time=0, read_zero=None, read_zero_slope=0, write_zero=None, write_zero_slope=0):
         """
 
         :param time:
@@ -235,11 +234,13 @@ class WaveformBindings(precice.Interface):
         :return:
         """
         logging.debug("Calling initialize_data")
+        self.write_slope = write_zero_slope
+        self.read_slope = read_zero_slope
         if super().is_action_required(precice.action_write_initial_data()):
             logging.info("writing in initialize_data()")
             for substep in range(1, self._n_this + 1):
                 time = substep * self._precice_tau / self._n_this
-                self._write_data_buffer.append(write_zero, time)
+                self._write_data_buffer.append(write_zero + self.write_slope * time, time)
             self._write_all_window_data_to_precice()
             self._rollback_write_data_buffer()
             super().fulfilled_action(precice.action_write_initial_data())
@@ -302,11 +303,7 @@ class Waveform:
         :param time: associated time
         :return:
         """
-        data = data.reshape((data.size,1))
-        logging.debug("###")
-        logging.debug(self._samples_in_time.shape)
-        logging.debug(data.shape)
-        logging.debug("###")
+        data = data.reshape((data.size, 1))
         self._samples_in_time = np.append(self._samples_in_time, data, axis=1)
         self._temporal_grid.append(time)
 
