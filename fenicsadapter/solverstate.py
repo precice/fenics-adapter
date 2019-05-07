@@ -19,10 +19,24 @@ class SolverState:
 
     def update(self, other_state):
         """
-        updates the state using FEniCS assing function
+        updates the state using FEniCS assing function. self.u is updated.
+        This may also have an effect outside of this object! Compare to SolverState.copy(other_state).
         :param other_state:
-        :return:
         """
         self.u.assign(other_state.u)
         self.t = other_state.t
         self.n = other_state.n
+
+    def copy(self, other_state):
+        """
+        copies a state using FEniCS copy function. self.u is overwritten.
+        This does not have an effect outside of this object! Compare to SolverState.update(other_state).
+        :param other_state:
+        """
+        self.u = other_state.u.copy()
+        self.t = other_state.t
+        self.n = other_state.n
+
+    def print_state(self):
+        u, t, n = self.get_state()
+        return "u={u}, t={t}, n={n}".format(u=u, t=t, n=n)

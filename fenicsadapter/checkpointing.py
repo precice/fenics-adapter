@@ -18,10 +18,10 @@ class Checkpoint:
         :param t: time
         :param n: timestep
         """
-        if not self.is_empty():
-            self._state.update(new_state)
-        else:
-            self._state = new_state
+        if self.is_empty():
+            self._state = SolverState(None, None, None)
+
+        self._state.copy(new_state)
 
     def is_empty(self):
         """
