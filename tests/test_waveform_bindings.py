@@ -95,6 +95,8 @@ class TestWaveformBindings(TestCase):
         Interface.read_block_scalar_data = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         bindings = WaveformBindings("Dummy", 0, 1)
+        bindings.read_slope = 0
+        bindings.write_slope = 0
         bindings.configure_waveform_relaxation(self.dummy_config, self.dummy_config)
         bindings._precice_tau = self.dt
         dummy_mesh_id = MagicMock()

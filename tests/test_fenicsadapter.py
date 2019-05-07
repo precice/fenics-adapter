@@ -14,7 +14,7 @@ class MockedArray:
     """
     mock of dolfin.Function
     """
-    def __init__(self, size):
+    def __init__(self):
         self.value = MagicMock()
 
     def assign(self, new_value):
@@ -42,9 +42,9 @@ class TestCheckpointing(TestCase):
     n = 0  # current iteration count
     t = 0  # current time
     n_vertices = 10
-    u_n_mocked = MockedArray(n_vertices)  # result at the beginning of the timestep
-    u_np1_mocked = MockedArray(n_vertices)  # newly computed result
-    u_cp_mocked = MockedArray(n_vertices)  # value of the checkpoint
+    u_n_mocked = MockedArray()  # result at the beginning of the timestep
+    u_np1_mocked = MockedArray()  # newly computed result
+    u_cp_mocked = MockedArray()  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
     dummy_config = "tests/precice-adapter-config-WR1.json"
