@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function, Measure, Expression
+from dolfin import UserExpression, SubDomain, Function, Measure, Expression, dot
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -247,7 +247,7 @@ class Adapter:
         self.create_coupling_boundary_condition()
         return dolfin.DirichletBC(self._function_space, self._coupling_bc_expression, self._coupling_subdomain)
 
-    def create_coupling_neumann_boundary_condition(self, test_functions, boundary_marker=0):
+    def create_coupling_neumann_boundary_condition(self, test_functions, boundary_marker=None):
         """Creates the coupling Neumann boundary conditions using
         create_coupling_boundary_condition() method.
 
@@ -257,10 +257,10 @@ class Adapter:
         """
         self._function_space = test_functions.function_space()
         self.create_coupling_boundary_condition()
-        if boundary_marker==0: #there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
-            return self._coupling_bc_expression * test_functions * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
+        if not boundary_marker: #there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
+            return dot(self._coupling_bc_expression, test_functions) * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
         else: #For multiple Neumann BCs integration should only be performed over the respective domain. TODO: fix the problem here
-            return self._coupling_bc_expression * test_functions * self.dss(boundary_marker)
+            return dot(self._coupling_bc_expression, test_functions) * self.dss(boundary_marker)
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
