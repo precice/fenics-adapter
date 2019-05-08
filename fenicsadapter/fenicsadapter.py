@@ -280,7 +280,7 @@ class Adapter:
 
         return t, n, precice_step_complete, max_dt
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, wr_factor=1, n=0, read_slope=0, write_slope=0):
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, wr_factor=1, n=0):
         """Initializes remaining attributes. Called once, from the solver.
         :param read_field: function applied on the read field
         :param write_field: function applied on the write field
@@ -301,7 +301,7 @@ class Adapter:
             self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data, t)
             self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_initial_data())
 
-        self._interface.initialize_data(read_zero=self._read_data, write_zero=self._write_data, read_zero_slope=read_slope, write_zero_slope=write_slope)
+        self._interface.initialize_data(read_zero=self._read_data, write_zero=self._write_data)
 
         if self._interface.is_read_data_available():
             self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t + dt(0))

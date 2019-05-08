@@ -163,7 +163,7 @@ class WaveformBindings(precice.Interface):
                 logging.debug("create new read data buffer with initial guess")
                 self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
                 for dt_extrapolate in np.linspace(0, self._window_size(), num=self._n_this+1, endpoint=True):
-                    self._read_data_buffer.append(read_data_init + self.read_slope * dt_extrapolate,
+                    self._read_data_buffer.append(read_data_init, 
                                                   self._current_window_start + dt_extrapolate)  # create initial guess (linear in time)
                 self._print_window_status()
 
@@ -225,7 +225,7 @@ class WaveformBindings(precice.Interface):
         else:
             raise Exception("unexpected action. %s", str(action))
 
-    def initialize_data(self, time=0, read_zero=None, read_zero_slope=0, write_zero=None, write_zero_slope=0):
+    def initialize_data(self, time=0, read_zero=None, write_zero=None):
         """
 
         :param time:
@@ -234,13 +234,11 @@ class WaveformBindings(precice.Interface):
         :return:
         """
         logging.debug("Calling initialize_data")
-        self.write_slope = write_zero_slope
-        self.read_slope = read_zero_slope
         if super().is_action_required(precice.action_write_initial_data()):
             logging.info("writing in initialize_data()")
             for substep in range(1, self._n_this + 1):
                 time = substep * self._precice_tau / self._n_this
-                self._write_data_buffer.append(write_zero + self.write_slope * time, time)
+                self._write_data_buffer.append(write_zero, time)
             self._write_all_window_data_to_precice()
             self._rollback_write_data_buffer()
             super().fulfilled_action(precice.action_write_initial_data())
