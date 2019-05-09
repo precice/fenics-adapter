@@ -25,4 +25,6 @@ matrix:
       - pip3 install scipy
 
 script: 
+  - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='precice')" > precice/setup.py
+  - $PY -m pip install precice
   - $PY setup.py test 
