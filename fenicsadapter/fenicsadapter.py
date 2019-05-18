@@ -280,7 +280,7 @@ class Adapter:
 
         return t, n, precice_step_complete, max_dt
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, wr_factor=1, n=0):
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n, t=0, n=0):
         """Initializes remaining attributes. Called once, from the solver.
         :param read_field: function applied on the read field
         :param write_field: function applied on the write field
@@ -291,7 +291,7 @@ class Adapter:
         self._precice_tau = self._interface.initialize()
 
         dt = Constant(0)
-        self.fenics_dt = self._precice_tau / wr_factor  # todo: don't store this here! Just a hack... -> better dynamically update dt in advance
+        self.fenics_dt = self._precice_tau / self._config.get_n_substeps()
         dt.assign(np.min([self.fenics_dt, self._precice_tau]))
 
         self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name,
