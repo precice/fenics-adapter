@@ -37,12 +37,11 @@ class Config:
         :var data: data decoded from JSON files
         :var read_file: stores file path
         """
-
-        path = os.path.join(os.getcwd(), os.path.dirname(sys.argv[0]), adapter_config_filename)
+        folder = os.path.dirname(os.path.join(os.getcwd(), os.path.dirname(sys.argv[0]), adapter_config_filename))
+        path = os.path.join(folder, os.path.basename(adapter_config_filename))
         read_file = open(path, "r")
         data = json.load(read_file)
-
-        self._config_file_name = data["config_file_name"]
+        self._config_file_name = os.path.join(folder, data["config_file_name"])
         self._solver_name = data["solver_name"]
         self._coupling_mesh_name = data["interface"]["coupling_mesh_name"]
         self._write_data_name = data["interface"]["write_data_name"]
@@ -78,3 +77,4 @@ class Config:
 
     def get_n_substeps(self):
         return self._n_substeps
+
