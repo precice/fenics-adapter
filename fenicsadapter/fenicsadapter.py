@@ -34,20 +34,53 @@ class CustomExpression(UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
     provided by preCICE, using RBF interpolation.
     """
+    def __init__(self, element):
+        UserExpression.__init__(self, element=element)
+        self._f=[]
+        self._dimension=None
+    
     def set_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self.update_boundary_data(vals, coords_x, coords_y, coords_z)
 
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self._coords_x = coords_x
+        self._dimension = 3
         if coords_y is None:
+            self._dimension -= 1
             coords_y = np.zeros(self._coords_x.shape)
         self._coords_y = coords_y
         if coords_z is None:
+            self._dimension -= 1
             coords_z = np.zeros(self._coords_x.shape)
+            
         self._coords_z = coords_z
 
         self._vals = vals
+        self._f = []
+        
+        
+        if self._dimension ==1: # for 1D only R->R mapping is allowed by preCICE, no need to implement Vector case
+            self._f.append(Rbf(self._coords_x, self._vals.flatten()))
+        elif self._dimension ==2:
+            if self.isScalarValues(): #check if scalar or vector-valued
+                self._f.append(Rbf(self._coords_x, self._coords_y, self._vals.flatten()))
+            elif self.isVectorValues():
+                self._f.append(Rbf(self._coords_x, self._coords_y, self._vals[:,0].flatten())) # extract dim_no element of each vector
+                self._f.append(Rbf(self._coords_x, self._coords_y, self._vals[:,1].flatten())) # extract dim_no element of each vector
 
+            else: # TODO: this is already checked in isScalarValues()!
+                raise Exception("Dimension of the function is 0 or negative!")
+                
+        else: # this case has not been tested yet
+            if self.isScalarValues():
+                self._f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
+            elif self.isVectorValues():
+                self._f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:,dim_no].flatten())
+            else: # TODO: this is already checked in isScalarValues()!
+                raise Exception("Dimension of the function is 0 or negative!")
+        
+        
+        
         if self.isScalarValues():
             assert (self._vals.shape == self._coords_x.shape)
         elif self.isVectorValues():
@@ -55,24 +88,13 @@ class CustomExpression(UserExpression):
 
     def rbf_interpol(self, x, dim_no):
         if x.__len__() == 1: # for 1D only R->R mapping is allowed by preCICE, no need to implement Vector case
-            f = Rbf(self._coords_x, self._vals.flatten())
-            return f(x)
-        if x.__len__() == 2:
-            if self.isScalarValues(): #check if scalar or vector-valued
-                f = Rbf(self._coords_x, self._coords_y, self._vals.flatten())
-            elif self.isVectorValues():
-                f = Rbf(self._coords_x, self._coords_y, self._vals[:,dim_no].flatten()) # extract dim_no element of each vector
-            else: # TODO: this is already checked in isScalarValues()!
-                raise Exception("Dimension of the function is 0 or negative!")
-            return f(x[0], x[1])
-        if x.__len__() == 3: # this case has not been tested yet
-            if self.isScalarValues():
-                f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
-            elif self.isVectorValues():
-                f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:,dim_no].flatten())
-            else: # TODO: this is already checked in isScalarValues()!
-                raise Exception("Dimension of the function is 0 or negative!")
-            return f(x[0], x[1], x[2])
+            return self._f(x)
+        
+        if x.__len__() == 2:            
+            return self._f(x[0], x[1])
+        
+        if x.__len__() == 3: # this case has not been tested yet           
+            return self._f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
         f = interp1d(self._coords_x, self._vals)
@@ -84,7 +106,7 @@ class CustomExpression(UserExpression):
         scalar- and vector-valued functions evaluation.
         """
         for i in range(self._vals.ndim):
-            value[i] = self.rbf_interpol(x,i)
+            value[i] = self._f[i](x[0],x[1])
 
     def isScalarValues(self):
         """ Determines if function being interpolated is scalar-valued based on
@@ -197,8 +219,7 @@ class Adapter:
                     #zeros have to be inserted for the y-entry
                     
                     precice_write_data = np.column_stack((self._write_data[:,0], np.zeros(self._n_vertices), self._write_data[:,1]))
-                    print("Write data:")
-                    print(precice_write_data.ravel())
+
                     assert(precice_write_data.shape[0]==self._n_vertices and precice_write_data.shape[1]==self._dimensions)                         
                     self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, precice_write_data.ravel())
                     
@@ -238,7 +259,6 @@ class Adapter:
             
                 self._read_data[:,0] = precice_read_data[:,0]
                 self._read_data[:,1] = precice_read_data[:,2] # y is the dead direction so it is left out
-                print("read forces:", self._read_data)
             else: 
                 raise Exception("Dimensions don't match!")
             
@@ -390,8 +410,8 @@ class Adapter:
 
         # update boundary condition with read data
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
-        print("Evaluate Force Field at different pionts. Should be [1 0] for Dummies")
-        print(self._coupling_bc_expression((0,1)))
+        #print("Evaluate Force Field at different pionts. Should be [1 0] for Dummies")
+        #print(self._coupling_bc_expression((0,1)))
 
         precice_step_complete = False
 
@@ -425,7 +445,7 @@ class Adapter:
         :param read_field: function applied on the read field
         :param write_field: function applied on the write field
         """
-        print("Begin initializating the fenics adapter...")
+        print("Initializating the fenics adapter...")
         
         self._fenics_dimensions = dimension
         
@@ -459,7 +479,7 @@ class Adapter:
             
         #create an integration domain for the coupled boundary
         self.dss=Measure('ds', domain=mesh, subdomain_data=coupling_marker)
-        print("initialization successful")
+        print("Initialization successful")
 
         return self._precice_tau
 
