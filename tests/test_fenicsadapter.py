@@ -56,7 +56,7 @@ class TestCheckpointing(TestCase):
         """
         # define functions that are called by advance, but not necessary for the test
         precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice.convert_fenics_to_precice = MagicMock()
+        precice._convert_fenics_to_precice = MagicMock()
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
         # initialize checkpointing manually

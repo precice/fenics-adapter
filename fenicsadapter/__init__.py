@@ -1,2 +1,3 @@
-from .fenicsadapter import Adapter, CustomExpression
+from .fenicsadapter import Adapter
+from .core import CustomExpression
 
