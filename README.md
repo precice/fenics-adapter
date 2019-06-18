@@ -29,7 +29,7 @@ Make sure to install
 
 ### Build and install the adapter
 
-Run ``python3 setup.py install --user`` from your shell.
+Run ``pip3 install --user .`` from your shell.
 
 ### Test the adapter
 

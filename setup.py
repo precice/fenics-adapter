@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 # from https://stackoverflow.com/a/9079062
 import sys  
@@ -13,5 +13,6 @@ setup(name='fenics-adapter',
       author_email='benjamin.rueth@tum.de',
       license='LGPL-3.0',
       packages=['fenicsadapter'],
+      install_requires=['precice', 'fenics', 'scipy', 'numpy'],
       test_suite='tests',
       zip_safe=False)
