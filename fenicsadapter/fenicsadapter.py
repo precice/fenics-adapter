@@ -17,7 +17,7 @@ import fenicsadapter.waveform_bindings
 
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 
 class CustomExpression(UserExpression):
@@ -274,7 +274,6 @@ class Adapter:
 
         if True:  # todo: add self._interface.is_read_data_available().  We should add this check. However, it is currently not properly implemented for waveform relaxation
             self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t + dt)  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
-        print(self._read_data)
 
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
@@ -305,7 +304,6 @@ class Adapter:
 
         if self._interface.is_read_data_available():
             self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, self._read_data, t + dt(0))
-            print(self._read_data)
 
         if self._interface.is_action_required(fenicsadapter.waveform_bindings.action_write_iteration_checkpoint()):
             initial_state = SolverState(u_n, t, n)
