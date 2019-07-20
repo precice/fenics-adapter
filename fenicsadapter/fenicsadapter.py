@@ -319,3 +319,10 @@ class Adapter:
     def finalize(self):
         """Finalizes the coupling interface."""
         self._interface.finalize()
+
+    def get_solver_name(self):
+        """Returns name of this solver as defined in config file.
+
+        :return: Solver name.
+        """
+        return self._solver_name
