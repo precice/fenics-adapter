@@ -7,6 +7,7 @@ import dolfin
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
+from fenics import MPI
 
 
 try:
@@ -155,30 +156,43 @@ class Adapter:
         self._interface.configure(precice_config_file_name)
 
     def read_block_scalar_data(self, read_data_name, mesh_name):
-        _, n_vertices = extract_subdomain_vertices(self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
-        mesh_id = self._interface.get_mesh_id(mesh_name)
-        read_data_id = self._interface.get_data_id(read_data_name, mesh_id)
-        read_data_buffer = np.empty(n_vertices)
-        self._interface.read_block_scalar_data(read_data_id, n_vertices, self._vertex_ids, read_data_buffer)
+        print("rank {rank}: Called read_block_scalar_data".format(rank=MPI.rank(MPI.comm_world)))
+        if self._n_vertices > 0:
+            mesh_id = self._interface.get_mesh_id(mesh_name)
+            read_data_id = self._interface.get_data_id(read_data_name, mesh_id)
+            read_data_buffer = np.empty(self._n_vertices)
+
+            self._interface.read_block_scalar_data(read_data_id, self._n_vertices, self._vertex_ids, read_data_buffer)
+            print("rank {rank}: read data {read_data}".format(rank=MPI.rank(MPI.comm_world), read_data=read_data_buffer))
+        else:
+            print("rank {rank}: no data has to be read".format(rank=MPI.rank(MPI.comm_world)))
+            read_data_buffer = np.empty(self._n_vertices)
         return self._create_coupling_boundary_condition(read_data_buffer)
 
     def write_block_scalar_data(self, write_data_name, mesh_name, u):
-        mesh_id = self._interface.get_mesh_id(mesh_name)
-        write_data_id = self._interface.get_data_id(write_data_name, mesh_id)
+        print("rank {rank}: Called write_block_scalar_data".format(rank=MPI.rank(MPI.comm_world)))
+        if self._n_vertices > 0:
+            mesh_id = self._interface.get_mesh_id(mesh_name)
+            write_data_id = self._interface.get_data_id(write_data_name, mesh_id)
 
-        # sample write data at interface
-        write_data = convert_fenics_to_precice(u, self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
+            # sample write data at interface
+            write_data = convert_fenics_to_precice(u, self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
 
-        # communication
-        self._interface.write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
+            # communication
+            print("rank {rank}: writes data {write_data}".format(rank=MPI.rank(MPI.comm_world), write_data=write_data))
+            self._interface.write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
+        print("rank {rank}: done with write_block_scalar_data".format(rank=MPI.rank(MPI.comm_world)))
 
     def initialize(self):
+        print("rank {rank}: Called initialize".format(rank=MPI.rank(MPI.comm_world)))
         return self._interface.initialize()
 
     def initialize_data(self):
+        print("rank {rank}: Called initialize_data".format(rank=MPI.rank(MPI.comm_world)))
         self._interface.initialize_data()
 
     def is_read_data_available(self):
+        print("rank {rank}: Called is_read_data_available".format(rank=MPI.rank(MPI.comm_world)))
         return self._interface.is_read_data_available()
 
     def set_coupling_mesh(self, mesh_name, fenics_mesh, coupling_subdomain):
@@ -191,9 +205,12 @@ class Adapter:
         coupling_mesh_vertices, self._n_vertices = extract_subdomain_vertices(self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
         mesh_id = self._interface.get_mesh_id(mesh_name)
         self._vertex_ids = np.empty(self._n_vertices)
-        self._interface.set_mesh_vertices(mesh_id, self._n_vertices, coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+        print("rank {rank}: Sends mesh vertices {vertices}".format(rank=MPI.rank(MPI.comm_world), vertices=coupling_mesh_vertices))
+        if self._n_vertices > 0:
+            self._interface.set_mesh_vertices(mesh_id, self._n_vertices, coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
     def advance(self, dt):
+        print("rank {rank}: Called advance".format(rank=MPI.rank(MPI.comm_world)))
         return self._interface.advance(dt)
 
     def create_coupling_boundary_condition(self, u_init):
@@ -203,7 +220,8 @@ class Adapter:
     def _create_coupling_boundary_condition(self, data):
         """Creates the coupling boundary conditions using CustomExpression."""
         x_vert, y_vert = extract_subdomain_coordinates(self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
-
+        print("rank {rank}: Coupling data {data}".format(rank=MPI.rank(MPI.comm_world),
+                                                         data=data))
         try:  # works with dolfin 1.6.0
             coupling_bc_expression = CustomExpression()
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
