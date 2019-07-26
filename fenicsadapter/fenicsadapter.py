@@ -11,15 +11,15 @@ class Adapter:
 
     :ivar _config: object of class Config, which stores data from the JSON config file
     """
-    def __init__(self, adapter_config_filename='precice-adapter-config.json'):
+    def __init__(self, adapter_config_filename='precice-adapter-config.json',
+                 interpolation_strategy=fenicsadapter.core.GeneralInterpolationExpression):
 
         self._config = Config(adapter_config_filename)
 
         self._coupling_bc_expression = None  # initialized later
 
-        self.adapter = fenicsadapter.core.Adapter(self._config.get_solver_name(), 0, 1)
+        self.adapter = fenicsadapter.core.Adapter(self._config.get_solver_name(), 0, 1, interpolation_strategy=interpolation_strategy)
         self.adapter.configure(self._config.get_config_file_name())
-
 
         ## identifies mesh, write and read data
         self._mesh_name = self._config.get_coupling_mesh_name()
@@ -141,4 +141,7 @@ class Adapter:
         self.adapter.finalize()
 
     def get_solver_name(self):
+        """Returns name of this solver as defined in config file.
+        :return: Solver name.
+        """
         return self._config.get_solver_name()

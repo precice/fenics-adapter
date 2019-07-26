@@ -8,7 +8,6 @@ from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
 
-
 try:
     import precice
     from precice import action_read_iteration_checkpoint
@@ -97,10 +96,13 @@ def convert_fenics_to_precice(data, mesh, subdomain, dimension):
 
 class CustomExpression(dolfin.UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
-    provided by preCICE, using RBF interpolation.
+    provided by preCICE.
     """
     def set_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self._update_boundary_data(vals, coords_x, coords_y, coords_z)
+
+    def update(self, other_expression):
+        self._update_boundary_data(other_expression._vals, other_expression._coords_x, other_expression._coords_y, other_expression._coords_z)
 
     def _update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         self._coords_x = coords_x
@@ -114,10 +116,23 @@ class CustomExpression(dolfin.UserExpression):
         self._vals = vals.flatten()
         assert (self._vals.shape == self._coords_x.shape)
 
-    def update(self, other_expression):
-        self._update_boundary_data(other_expression._vals, other_expression._coords_x, other_expression._coords_y, other_expression._coords_z)
+    def interpolate(self, x):
+        """
+        TODO: the correct way to deal with this would be using an abstract class. Since this is technically more complex and the current implementation is a workaround anyway, we do not use the proper solution, but this hack.
+        """
+        raise Exception("Please use one of the classes derived from this class, that implements an actual strategy for"
+                        "interpolation.")
+        pass
 
-    def rbf_interpol(self, x):
+    def eval(self, value, x):
+        value[0] = self.interpolate(x)
+
+
+class GeneralInterpolationExpression(CustomExpression):
+    """Uses RBF interpolation for implementation of CustomExpression.interpolate. Allows for arbitrary coupling
+    interfaces, but has limited accuracy.
+    """
+    def interpolate(self, x):
         if x.__len__() == 1:
             f = Rbf(self._coords_x, self._vals.flatten())
             return f(x)
@@ -128,19 +143,30 @@ class CustomExpression(dolfin.UserExpression):
             f = Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten())
             return f(x[0], x[1], x[2])
 
-    def lin_interpol(self, x):
+
+class ExactInterpolationExpression(CustomExpression):
+    """Uses cubic spline interpolation for implementation of CustomExpression.interpolate. Only allows intepolation on
+    coupling that are parallel to the y axis, and if the coordinates in self._coords_y are ordered such that the nodes
+    on the coupling mesh are traversed w.r.t their connectivity.
+    However, this method allows to exactly recover the solution at the coupling interface, if it is a polynomial of
+    order 3 or lower.
+    See also https://github.com/precice/fenics-adapter/milestone/1
+    """
+    def interpolate(self, x):
         f = interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind="cubic")
         return f(x[1])
-
-    def eval(self, value, x):
-        value[0] = self.lin_interpol(x)
 
 
 class Adapter:
 
-    def __init__(self, solver_name, rank, size):
+    def __init__(self, solver_name, rank, size,
+                 interpolation_strategy=GeneralInterpolationExpression):
 
         self._interface = precice.Interface(solver_name, rank, size)
+
+        ## coupling mesh
+        self._fenics_mesh = None  # initialized later
+        self._coupling_subdomain = None  # initialized later
 
         ## coupling mesh related quantities
         self._coupling_mesh_vertices = None
@@ -150,6 +176,8 @@ class Adapter:
         # read/write buffers
         self._write_data = None
         self._read_data = None
+
+        self._my_expression = interpolation_strategy
 
     def configure(self, precice_config_file_name):
         self._interface.configure(precice_config_file_name)
@@ -201,13 +229,13 @@ class Adapter:
         return self._create_coupling_boundary_condition(data)
 
     def _create_coupling_boundary_condition(self, data):
-        """Creates the coupling boundary conditions using CustomExpression."""
+        """Creates the coupling boundary conditions using self._my_expression."""
         x_vert, y_vert = extract_subdomain_coordinates(self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
 
         try:  # works with dolfin 1.6.0
-            coupling_bc_expression = CustomExpression()
+            coupling_bc_expression = self._my_expression()
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_bc_expression = CustomExpression(degree=0)
+            coupling_bc_expression = self._my_expression(degree=0)
         coupling_bc_expression.set_boundary_data(data, x_vert, y_vert)
         return coupling_bc_expression
 

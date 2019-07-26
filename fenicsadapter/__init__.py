@@ -1,3 +1,2 @@
 from .fenicsadapter import Adapter
-from .core import CustomExpression
-
+from .core import GeneralInterpolationExpression, ExactInterpolationExpression
