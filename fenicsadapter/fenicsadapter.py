@@ -51,7 +51,7 @@ class CustomExpression(UserExpression):
             return f(x[0], x[1], x[2])
 
     def lin_interpol(self, x):
-        f = interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate")
+        f = interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind="cubic")
         return f(x[1])
 
     def eval(self, value, x):
