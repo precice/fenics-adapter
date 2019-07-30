@@ -29,7 +29,7 @@ except ImportError:
 
 class FunctionType(Enum):
     """ Defines scalar- and vector-valued function """
-    SCALAR = 0  # scalar valued funtion
+    SCALAR = 0  # scalar valued function
     VECTOR = 1  # vector valued function
 
 
@@ -228,7 +228,6 @@ class Adapter:
         self._mesh_fenics = None  # initialized later
         self._coupling_bc_expression = None  # initialized later
         self._fenics_dimensions = None  # initialized later
-        self._vector_function = None  # initialized later
 
         # coupling mesh related quantities
         self._coupling_mesh_vertices = None  # initialized later
@@ -241,11 +240,13 @@ class Adapter:
         self._write_data_name = self._config.get_write_data_name()
         self._write_data_id = self._interface.get_data_id(self._write_data_name, self._mesh_id)
         self._write_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
+        self._write_function_type = None  # stores whether write function is scalar or vector valued
 
         # read data related quantities (read data is read by this solver from preCICE)
         self._read_data_name = self._config.get_read_data_name()
         self._read_data_id = self._interface.get_data_id(self._read_data_name, self._mesh_id)
         self._read_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
+        self._write_function_type = None  # stores whether read function is scalar or vector valued
 
         # numerics
         self._precice_tau = None
@@ -260,7 +261,7 @@ class Adapter:
         self._function_space = None
         self._dss = None  # measure for boundary integral
         
-    def convert_fenics_to_precice(self, data):
+    def _convert_fenics_to_precice(self, data):
         """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
         :param data: FEniCS boundary function
@@ -268,19 +269,22 @@ class Adapter:
         :return: array of FEniCS function values at each point on the boundary
         """
         if type(data) is dolfin.Function:
-            x_all, y_all = self.extract_coupling_boundary_coordinates()
+            x_all, y_all = self._extract_coupling_boundary_coordinates()
             return np.array([data(x, y) for x, y in zip(x_all, y_all)])
         else:
             raise Exception("Cannot handle data type %s" % type(data))
             
-    def write_block_data(self):
+    def _write_block_data(self):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted.
         """
-        if  self._function_type is FunctionType.SCALAR: #write_field.value_rank() == 0:
+
+        assert (self._write_function_type in list(FunctionType))
+
+        if self._write_function_type is FunctionType.SCALAR:
                 self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids,
                                                         self._write_data)
-        elif self._function_type is FunctionType.VECTOR:
+        elif self._write_function_type is FunctionType.VECTOR:
                 
                 if self._can_apply_2d_3d_coupling():
                     precice_write_data = np.column_stack((self._write_data[:, 0],
@@ -290,27 +294,31 @@ class Adapter:
                     assert(precice_write_data.shape[0] == self._n_vertices and
                            precice_write_data.shape[1] == self._dimensions)
 
-                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, precice_write_data.ravel())
+                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids,
+                                                            precice_write_data.ravel())
                     
                 elif self._fenics_dimensions == self._dimensions:
-                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data.ravel())
+                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids,
+                                                            self._write_data.ravel())
                 else:
                     raise Exception("Dimensions don't match.")
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def read_block_data(self):
+    def _read_block_data(self):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) read_data is converted.
 
         Note: For quasi 2D fenics in a 3D coupled simulation the y component of the vectors is deleted.
         """
+
+        assert(self._read_function_type in list(FunctionType))
         
-        if self._function_type is FunctionType.SCALAR:
+        if self._read_function_type is FunctionType.SCALAR:
             self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids,
                                                    self._read_data)
         
-        elif self._function_type is FunctionType.VECTOR:
+        elif self._read_function_type is FunctionType.VECTOR:
             if self._fenics_dimensions == self._dimensions:
                 self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids,
                                                        self._read_data.ravel())
@@ -330,7 +338,7 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def extract_coupling_boundary_vertices(self):
+    def _extract_coupling_boundary_vertices(self):
         """Extracts vertices which lie on the boundary.
         :return: stack of vertices
         """
@@ -366,29 +374,31 @@ class Adapter:
         """
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
-        self._coupling_mesh_vertices, self._n_vertices = self.extract_coupling_boundary_vertices()
+        self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
-    def set_write_field(self, write_function_init):
+    def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
         beginning of the simulation.
 
         :param write_function_init: function on the write field
         """
-        self._write_data = self.convert_fenics_to_precice(write_function_init)
+        self._write_function_type = self._determine_function_type(write_function_init)
+        self._write_data = self._convert_fenics_to_precice(write_function_init)
 
-    def set_read_field(self, read_function_init):
+    def _set_read_field(self, read_function_init):
         """Sets the read field. Called by initalize() function at the
         beginning of the simulation.
 
         :param read_function_init: function on the read field
         """
-        self._read_data = self.convert_fenics_to_precice(read_function_init)
+        self._read_function_type = self._determine_function_type(read_function_init)
+        self._read_data = self._convert_fenics_to_precice(read_function_init)
 
-    def create_coupling_boundary_condition(self):
+    def _create_coupling_boundary_condition(self):
         """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
-        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
+        x_vert, y_vert = self._extract_coupling_boundary_coordinates()
 
         try:  # works with dolfin 1.6.0
             self._coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element()) # elemnt information must be provided, else DOLFIN assumes scalar function
@@ -403,7 +413,7 @@ class Adapter:
         :return: dolfin.DirichletBC()
         """
         self._function_space = function_space
-        self.create_coupling_boundary_condition()
+        self._create_coupling_boundary_condition()
         return dolfin.DirichletBC(self._function_space, self._coupling_bc_expression, self._coupling_subdomain)
 
     def create_coupling_neumann_boundary_condition(self, test_functions, boundary_marker=None):
@@ -415,7 +425,7 @@ class Adapter:
          FEniCS Tutorial Volume I." (2016).)
         """
         self._function_space = test_functions.function_space()
-        self.create_coupling_boundary_condition()
+        self._create_coupling_boundary_condition()
         if not boundary_marker: # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
             return dot(test_functions, self._coupling_bc_expression) * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
         else: # For multiple Neumann BCs integration should only be performed over the respective domain.
@@ -441,18 +451,15 @@ class Adapter:
         """
 
         # sample write data at interface
-        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-        self._write_data = self.convert_fenics_to_precice(write_function)
+        x_vert, y_vert = self._extract_coupling_boundary_coordinates()
+        self._write_data = self._convert_fenics_to_precice(write_function)
 
         # communication
-        if self._determine_function_type(write_function) == FunctionType.SCALAR:
-            self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
-        elif self._determine_function_type(write_function) == FunctionType.VECTOR:
-            self.write_block_data()
+        self._write_block_data()
 
         max_dt = self._interface.advance(dt)
         
-        self.read_block_data()
+        self._read_block_data()
         
         # update boundary condition with read data
         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
@@ -516,20 +523,18 @@ class Adapter:
                 raise Exception("No proper treatment for dimensional mismatch is implemented. Aborting!")
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
-        self.set_read_field(read_field)
-        self.set_write_field(write_field)
+        self._set_read_field(read_field)
+        self._set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
         
-        self._function_type = self._determine_function_type(write_field)
-        
         if self._interface.is_action_required(precice.action_write_initial_data()):
-            self.write_block_data()
+            self._write_block_data()
             self._interface.fulfilled_action(precice.action_write_initial_data())
                 
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
-            self.read_block_data()
+            self._read_block_data()
 
         self._interface.initialize_data()
 
@@ -550,13 +555,13 @@ class Adapter:
         """
         return self._interface.is_coupling_ongoing()
 
-    def extract_coupling_boundary_coordinates(self):
+    def _extract_coupling_boundary_coordinates(self):
         """Extracts the coordinates of vertices that lay on the boundary. 3D
         case currently handled as 2D.
 
         :return: x and y cooridinates.
         """
-        vertices, _ = self.extract_coupling_boundary_vertices()
+        vertices, _ = self._extract_coupling_boundary_vertices()
         vertices_x = vertices[0, :]
         vertices_y = vertices[1, :]
         if self._dimensions == 3:

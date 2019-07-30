@@ -23,6 +23,9 @@ class MockedArray:
         """
         self.value = new_value.value
 
+    def value_rank(self):
+        return 0
+
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
@@ -36,6 +39,7 @@ class TestCheckpointing(TestCase):
     t = 0  # current time
     u_n_mocked = MockedArray()  # result at the beginning of the timestep
     u_np1_mocked = MockedArray()  # newly computed result
+    write_function_mocked = MockedArray()
     u_cp_mocked = MockedArray()  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
@@ -49,20 +53,23 @@ class TestCheckpointing(TestCase):
         warnings.simplefilter('ignore', category=ImportWarning)
 
     def mock_the_adapter(self, precice):
+        from fenicsadapter.fenicsadapter import FunctionType
         """
         We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
         necessary to test checkpointing.
         :param precice: the fenicsadapter
         """
         # define functions that are called by advance, but not necessary for the test
-        precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice.convert_fenics_to_precice = MagicMock()
+        precice._extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
+        precice._convert_fenics_to_precice = MagicMock()
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
         # initialize checkpointing manually
         precice._t_cp = self.t_cp_mocked
         precice._u_cp = self.u_cp_mocked
         precice._n_cp = self.n_cp_mocked
+        precice._write_function_type = FunctionType.SCALAR
+        precice._read_function_type = FunctionType.SCALAR
 
     def test_advance_success(self):
         """
