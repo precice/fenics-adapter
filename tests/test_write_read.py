@@ -28,7 +28,7 @@ class TestWriteData(TestCase):
     scalar_V = FunctionSpace(mesh, "P", 2)
     scalar_function = interpolate(scalar_expr, scalar_V)
 
-    vector_expr = Expression(("x[0]*x[0] + x[1]*x[1]", "x[0]*x[0] - x[1]*x[1]"), degree=2)
+    vector_expr = Expression(("x[0] + x[1]*x[1]", "x[0] - x[1]*x[1]"), degree=2)
     vector_V = VectorFunctionSpace(mesh, "P", 2)
     vector_function = interpolate(vector_expr, vector_V)
 
@@ -63,7 +63,7 @@ class TestWriteData(TestCase):
 
         expected_data_id = 15
         expected_size = 11
-        expected_values = np.array([x_right**2 + y**2 for y in np.linspace(y_bottom, y_top, 11)])
+        expected_values = np.array([self.scalar_expr(x_right, y) for y in np.linspace(y_bottom, y_top, 11)])
         expected_ids = np.zeros(11)
 
         expected_args = [expected_data_id, expected_size, expected_ids, expected_values]
@@ -102,8 +102,8 @@ class TestWriteData(TestCase):
 
         expected_data_id = 15
         expected_size = 11
-        expected_values_x = np.array([x_right ** 2 + y ** 2 for y in np.linspace(y_bottom, y_top, 11)])
-        expected_values_y = np.array([x_right ** 2 - y ** 2 for y in np.linspace(y_bottom, y_top, 11)])
+        expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
+        expected_values_y = np.array([self.vector_expr(x_right, y)[1] for y in np.linspace(y_bottom, y_top, 11)])
         expected_values = np.stack([expected_values_x, expected_values_y]).T.ravel()
         expected_ids = np.zeros(11)
 
