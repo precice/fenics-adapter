@@ -26,9 +26,11 @@ class TestWriteData(TestCase):
 
     scalar_expr = Expression("x[0]*x[0] + x[1]*x[1]", degree=2)
     scalar_V = FunctionSpace(mesh, "P", 2)
+    scalar_function = interpolate(scalar_expr, scalar_V)
 
     vector_expr = Expression(("x[0]*x[0] + x[1]*x[1]", "x[0]*x[0] - x[1]*x[1]"), degree=2)
     vector_V = VectorFunctionSpace(mesh, "P", 2)
+    vector_function = interpolate(vector_expr, vector_V)
 
     def setUp(self):
         pass
@@ -38,7 +40,7 @@ class TestWriteData(TestCase):
         import fenicsadapter
         Interface.configure = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
-        Interface.read_block_scalar_data = MagicMock()
+        Interface.read_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock()
         Interface.initialize = MagicMock()
@@ -50,12 +52,14 @@ class TestWriteData(TestCase):
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
 
-        write_u = interpolate(self.scalar_expr, self.scalar_V)
+        write_u = self.scalar_function
+        read_u = self.vector_function
+        u_init = self.scalar_function
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
-        precice.initialize(RightBoundary(), self.mesh, write_u, write_u, write_u)
-        precice.advance(write_u, write_u, write_u, 0, 0, 0)
+        precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
+        precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
         expected_size = 11
@@ -75,7 +79,7 @@ class TestWriteData(TestCase):
         import fenicsadapter
         Interface.configure = MagicMock()
         Interface.write_block_vector_data = MagicMock()
-        Interface.read_block_vector_data = MagicMock()
+        Interface.read_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock()
         Interface.initialize = MagicMock()
@@ -87,12 +91,14 @@ class TestWriteData(TestCase):
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
 
-        write_u = interpolate(self.vector_expr, self.vector_V)
+        write_u = self.vector_function
+        read_u = self.scalar_function
+        u_init = self.vector_function
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
-        precice.initialize(RightBoundary(), self.mesh, write_u, write_u, write_u)
-        precice.advance(write_u, write_u, write_u, 0, 0, 0)
+        precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
+        precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
         expected_size = 11
@@ -118,7 +124,7 @@ class TestWriteData(TestCase):
                 read_data[i] = i
 
         Interface.configure = MagicMock()
-        Interface.write_block_scalar_data = MagicMock()
+        Interface.write_block_vector_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock(side_effect=return_dummy_data)
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock()
@@ -131,12 +137,14 @@ class TestWriteData(TestCase):
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
 
-        read_u = interpolate(self.scalar_expr, self.scalar_V)
+        write_u = self.vector_function
+        read_u = self.scalar_function
+        u_init = self.vector_function
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
-        precice.initialize(RightBoundary(), self.mesh, read_u, read_u, read_u)
-        precice.advance(read_u, read_u, read_u, 0, 0, 0)
+        precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
+        precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
         expected_size = 11
@@ -160,7 +168,7 @@ class TestWriteData(TestCase):
                 read_data[i] = i
 
         Interface.configure = MagicMock()
-        Interface.write_block_vector_data = MagicMock()
+        Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_vector_data = MagicMock(side_effect=return_dummy_data)
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock()
@@ -173,12 +181,14 @@ class TestWriteData(TestCase):
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
 
-        read_u = interpolate(self.vector_expr, self.vector_V)
+        write_u = self.scalar_function
+        read_u = self.vector_function
+        u_init = self.scalar_function
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
-        precice.initialize(RightBoundary(), self.mesh, read_u, read_u, read_u)
-        precice.advance(read_u, read_u, read_u, 0, 0, 0)
+        precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
+        precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
         expected_size = 11
