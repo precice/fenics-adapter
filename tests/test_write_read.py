@@ -22,6 +22,14 @@ class RightBoundary(SubDomain):
 class TestWriteData(TestCase):
     dummy_config = "tests/precice-adapter-config.json"
 
+    mesh = UnitSquareMesh(10, 10)
+
+    scalar_expr = Expression("x[0]*x[0] + x[1]*x[1]", degree=2)
+    scalar_V = FunctionSpace(mesh, "P", 2)
+
+    vector_expr = Expression(("x[0]*x[0] + x[1]*x[1]", "x[0]*x[0] - x[1]*x[1]"), degree=2)
+    vector_V = VectorFunctionSpace(mesh, "P", 2)
+
     def setUp(self):
         pass
 
@@ -42,15 +50,12 @@ class TestWriteData(TestCase):
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
 
-        expr = Expression("x[0]*x[0] + x[1]*x[1]", degree=2)
-        mesh = UnitSquareMesh(10, 10)
-        V = FunctionSpace(mesh, "P", 2)
-        u = interpolate(expr, V)
+        write_u = interpolate(self.scalar_expr, self.scalar_V)
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
-        precice.initialize(RightBoundary(), mesh, u, u, u)
-        precice.advance(u, u, u, 0, 0, 0)
+        precice.initialize(RightBoundary(), self.mesh, write_u, write_u, write_u)
+        precice.advance(write_u, write_u, write_u, 0, 0, 0)
 
         expected_data_id = 15
         expected_size = 11
@@ -82,15 +87,12 @@ class TestWriteData(TestCase):
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
 
-        expr = Expression(("x[0]*x[0] + x[1]*x[1]", "x[0]*x[0] - x[1]*x[1]"), degree=2)
-        mesh = UnitSquareMesh(10, 10)
-        V = VectorFunctionSpace(mesh, "P", 2)
-        u = interpolate(expr, V)
+        write_u = interpolate(self.vector_expr, self.vector_V)
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
-        precice.initialize(RightBoundary(), mesh, u, u, u)
-        precice.advance(u, u, u, 0, 0, 0)
+        precice.initialize(RightBoundary(), self.mesh, write_u, write_u, write_u)
+        precice.advance(write_u, write_u, write_u, 0, 0, 0)
 
         expected_data_id = 15
         expected_size = 11
@@ -106,3 +108,87 @@ class TestWriteData(TestCase):
                 self.assertTrue(arg == expected_arg)
             elif type(arg) is np.ndarray:
                 np.testing.assert_almost_equal(arg, expected_arg)
+
+    def test_read_scalar_data(self):
+        from precice import Interface
+        import fenicsadapter
+
+        def return_dummy_data(unused1, unused2, unused3, read_data):
+            for i in range(len(read_data)):
+                read_data[i] = i
+
+        Interface.configure = MagicMock()
+        Interface.write_block_scalar_data = MagicMock()
+        Interface.read_block_scalar_data = MagicMock(side_effect=return_dummy_data)
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock()
+        Interface.initialize = MagicMock()
+        Interface.initialize_data = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
+        Interface.fulfilled_action = MagicMock()
+        Interface.advance = MagicMock()
+        Interface.get_mesh_id = MagicMock()
+        Interface.get_data_id = MagicMock(return_value=15)
+        Interface.is_read_data_available = MagicMock(return_value=False)
+
+        read_u = interpolate(self.scalar_expr, self.scalar_V)
+
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._coupling_bc_expression = MagicMock()
+        precice.initialize(RightBoundary(), self.mesh, read_u, read_u, read_u)
+        precice.advance(read_u, read_u, read_u, 0, 0, 0)
+
+        expected_data_id = 15
+        expected_size = 11
+        expected_values = np.array([i for i in range(11)])
+        expected_ids = np.zeros(11)
+
+        expected_args = [expected_data_id, expected_size, expected_ids, expected_values]
+
+        for arg, expected_arg in zip(Interface.read_block_scalar_data.call_args[0], expected_args):
+            if type(arg) is int:
+                self.assertTrue(arg == expected_arg)
+            elif type(arg) is np.ndarray:
+                np.testing.assert_allclose(arg, expected_arg)
+
+    def test_read_vector_data(self):
+        from precice import Interface
+        import fenicsadapter
+
+        def return_dummy_data(unused1, unused2, unused3, read_data):
+            for i in range(len(read_data)):
+                read_data[i] = i
+
+        Interface.configure = MagicMock()
+        Interface.write_block_vector_data = MagicMock()
+        Interface.read_block_vector_data = MagicMock(side_effect=return_dummy_data)
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock()
+        Interface.initialize = MagicMock()
+        Interface.initialize_data = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
+        Interface.fulfilled_action = MagicMock()
+        Interface.advance = MagicMock()
+        Interface.get_mesh_id = MagicMock()
+        Interface.get_data_id = MagicMock(return_value=15)
+        Interface.is_read_data_available = MagicMock(return_value=False)
+
+        read_u = interpolate(self.vector_expr, self.vector_V)
+
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._coupling_bc_expression = MagicMock()
+        precice.initialize(RightBoundary(), self.mesh, read_u, read_u, read_u)
+        precice.advance(read_u, read_u, read_u, 0, 0, 0)
+
+        expected_data_id = 15
+        expected_size = 11
+        expected_values = np.array([i for i in range(2 * 11)])
+        expected_ids = np.zeros(11)
+
+        expected_args = [expected_data_id, expected_size, expected_ids, expected_values]
+
+        for arg, expected_arg in zip(Interface.read_block_vector_data.call_args[0], expected_args):
+            if type(arg) is int:
+                self.assertTrue(arg == expected_arg)
+            elif type(arg) is np.ndarray:
+                np.testing.assert_allclose(arg, expected_arg)
