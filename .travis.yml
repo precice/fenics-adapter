@@ -1,9 +1,9 @@
 matrix: 
   include: 
   - os: linux  
-    language: python 
+    language: python
     python: "3.5" 
-    env: PY=python
+    env: PY=python3
     before_install:
     - sudo apt-get install software-properties-common
     - sudo add-apt-repository -y ppa:fenics-packages/fenics
