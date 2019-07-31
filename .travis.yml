@@ -6,7 +6,7 @@ matrix:
     env: PY=python
     before_install:
     - sudo apt-get install software-properties-common
-    - sudo add-apt-repository ppa:fenics-packages/fenics
+    - sudo add-apt-repository -y ppa:fenics-packages/fenics
     - sudo apt-get update
     - sudo apt-get install --no-install-recommends fenics
     install: 
