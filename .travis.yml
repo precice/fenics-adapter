@@ -4,12 +4,13 @@ matrix:
     language: python 
     python: "3.5" 
     env: PY=python
+    before_install:
+    - sudo apt-get install software-properties-common
+    - sudo add-apt-repository ppa:fenics-packages/fenics
+    - sudo apt-get update
+    - sudo apt-get install --no-install-recommends fenics
     install: 
     - pip install scipy
-    - apt-get install software-properties-common
-    - add-apt-repository ppa:fenics-packages/fenics
-    - apt-get update
-    - apt-get install --no-install-recommends fenics
 
 script: 
   - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='precice')" > precice/setup.py
