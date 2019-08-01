@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function, Measure, Expression, dot
+from dolfin import UserExpression, SubDomain, Function, Measure, Expression, dot, PointSource
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -334,8 +334,11 @@ class Adapter:
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
                 # z is the dead direction so it is supposed that the data is close to zero
-                #print(precice_read_data)
-                #assert(np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2])))
+                print("Z-component of read-data")
+                print(precice_read_data[:,2])
+                print("full read data:")
+                print(precice_read_data)
+                assert(np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2])))
                 assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-8)
             else: 
                 raise Exception("Dimensions don't match.")
@@ -436,6 +439,19 @@ class Adapter:
             # TODO: fix the problem here
             raise Exception("Boundary markers are not implemented yet")
             return dot(self._coupling_bc_expression, test_functions) * self.dss(boundary_marker)
+        
+    def create_force_boundary_condition(self, function_space):
+        """
+        Creates 2 lists of PointSources that can be applied to the assembled system. 
+        Since 
+        """
+        point_sources_x = []
+        point_sources_y = []
+        
+        nodes, n = self._extract_coupling_boundary_vertices()
+        
+        for i in np.range(n):
+            point_sources_x.append(PointSource(function_space.sub(0), ))
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
