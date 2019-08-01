@@ -334,8 +334,7 @@ class Adapter:
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
                 # z is the dead direction so it is supposed that the data is close to zero
-                #print(precice_read_data)
-                #assert(np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2])))
+                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]))
                 assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-8)
             else: 
                 raise Exception("Dimensions don't match.")
