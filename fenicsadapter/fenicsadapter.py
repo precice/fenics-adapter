@@ -144,8 +144,8 @@ class GeneralInterpolationExpression(CustomExpression):
             if self.is_scalar_valued():  # check if scalar or vector-valued
                 interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals.flatten()))
             elif self.is_vector_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals[:,0].flatten())) # extract dim_no element of each vector
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals[:,1].flatten())) # extract dim_no element of each vector
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals[:, 0].flatten())) # extract dim_no element of each vector
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals[:, 1].flatten())) # extract dim_no element of each vector
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         elif self._dimension == 3:
@@ -287,9 +287,10 @@ class Adapter:
         elif self._write_function_type is FunctionType.VECTOR:
                 
                 if self._can_apply_2d_3d_coupling():
+                    # in 2d-3d coupling z dimension is set to zero
                     precice_write_data = np.column_stack((self._write_data[:, 0],
-                                                          np.zeros(self._n_vertices),  # in 2d-3d coupling y dimension is dead
-                                                          self._write_data[:, 1]))
+                                                          self._write_data[:, 1],
+                                                          np.zeros(self._n_vertices)))
 
                     assert(precice_write_data.shape[0] == self._n_vertices and
                            precice_write_data.shape[1] == self._dimensions)
@@ -331,8 +332,11 @@ class Adapter:
                 precice_read_data = np.reshape(precice_data,(self._n_vertices, self._dimensions), 'C')
 
                 self._read_data[:, 0] = precice_read_data[:, 0]
-                self._read_data[:, 1] = precice_read_data[:, 2]
-                # y is the dead direction so it is left out
+                self._read_data[:, 1] = precice_read_data[:, 1]
+                # z is the dead direction so it is supposed that the data is close to zero
+                #print(precice_read_data)
+                #assert(np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2])))
+                assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-8)
             else: 
                 raise Exception("Dimensions don't match.")
         else:
@@ -358,8 +362,8 @@ class Adapter:
                 if self._dimensions == 2:
                     vertices_y.append(v.x(1))
                 elif self._can_apply_2d_3d_coupling():
-                    vertices_z.append(v.x(1))
-                    vertices_y.append(0)
+                    vertices_y.append(v.x(1))
+                    vertices_z.append(0)
                 else:
                     raise Exception("Dimensions do not match!")
 
@@ -520,7 +524,10 @@ class Adapter:
             if self._can_apply_2d_3d_coupling():
                 logging.warning("2D-3D coupling will be applied. Y coordinates of all nodes are set to zero.")
             else:
-                raise Exception("No proper treatment for dimensional mismatch is implemented. Aborting!")
+                raise Exception("fenics_dimension = {}, precice_dimension = {}. "
+                                "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
+                    self._fenics_dimensions,
+                    self._dimensions))
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._set_read_field(read_field)
@@ -567,10 +574,8 @@ class Adapter:
         if self._dimensions == 3:
             vertices_z = vertices[2, :]
 
-        if self._dimensions == 2:
+        if self._dimensions == 2 or self._can_apply_2d_3d_coupling():
             return vertices_x, vertices_y
-        elif self._can_apply_2d_3d_coupling():
-            return vertices_x, vertices_z
         else:
             raise Exception("Error: These Dimensions are not supported by the adapter.")
 

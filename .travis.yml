@@ -1,28 +1,16 @@
 matrix: 
   include: 
   - os: linux  
-    language: python 
+    language: python
     python: "3.5" 
-    env: PY=python
+    env: PY=python3
+    before_install:
+    - sudo apt-get install software-properties-common
+    - sudo add-apt-repository -y ppa:fenics-packages/fenics
+    - sudo apt-get update
+    - sudo apt-get install -y --no-install-recommends fenics
     install: 
     - pip install scipy
-  - os: windows 
-    # does not support python 
-    language: bash 
-    env: PY=py
-    python: "3.5"
-    before_install: choco install python --version 3.5.4 
-    install: 
-      - $PY -m pip install --upgrade pip
-      - $PY -m pip install scipy 
-      - $PY -m pip install --upgrade setuptools
-
-  - os: osx
-    # does not support python
-    language: generic 
-    env: PY=python3
-    install: 
-      - pip3 install scipy
 
 script: 
   - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='precice')" > precice/setup.py
