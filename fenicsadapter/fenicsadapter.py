@@ -334,10 +334,6 @@ class Adapter:
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
                 # z is the dead direction so it is supposed that the data is close to zero
-                print("Z-component of read-data")
-                print(precice_read_data[:,2])
-                print("full read data:")
-                print(precice_read_data)
                 np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]))
                 assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-8)
             else: 
@@ -550,7 +546,7 @@ class Adapter:
             logging.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
                                                                                             self._dimensions))
             if self._can_apply_2d_3d_coupling():
-                logging.warning("2D-3D coupling will be applied. Y coordinates of all nodes are set to zero.")
+                logging.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
             else:
                 raise Exception("fenics_dimension = {}, precice_dimension = {}. "
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
