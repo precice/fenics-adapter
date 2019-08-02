@@ -338,7 +338,7 @@ class Adapter:
                 print(precice_read_data[:,2])
                 print("full read data:")
                 print(precice_read_data)
-                assert(np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2])))
+                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]))
                 assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-8)
             else: 
                 raise Exception("Dimensions don't match.")
@@ -445,13 +445,25 @@ class Adapter:
         Creates 2 lists of PointSources that can be applied to the assembled system. 
         Since 
         """
-        point_sources_x = []
-        point_sources_y = []
+        if self._can_apply_2d_3d_coupling():
+            point_sources_x = []
+            point_sources_y = []
         
-        nodes, n = self._extract_coupling_boundary_vertices()
+            vertices_x = vertices[0, :]
+            vertices_y = vertices[1, :]
         
-        for i in np.range(n):
-            point_sources_x.append(PointSource(function_space.sub(0), ))
+            nodes, n = self._extract_coupling_boundary_vertices()
+        
+            for i in np.range(n):
+                point_sources_x.append(PointSource(function_space.sub(0), Point(nodes[:,n]),read_data[n,0]))
+                point_sources_y.append(PointSource(function_space.sub(1), Point(nodes[:,n]), read_data[n,1]))
+        
+        else:
+            raise Exception("Force-boundaries are only implemented for 2d-3d coupling.")
+            
+        return point_sources_x, point_sources_y
+
+
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
