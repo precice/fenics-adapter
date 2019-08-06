@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function, Measure, Expression, dot, PointSource
+from dolfin import Point, UserExpression, SubDomain, Function, Measure, Expression, dot, PointSource
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -261,6 +261,11 @@ class Adapter:
         self._function_space = None
         self._dss = None  # measure for boundary integral
         
+        # Force-coupling
+        self._x_forces = None # list of PointSources for Forces
+        self._y_forces = None
+        self._force_boundary = None
+        
     def _convert_fenics_to_precice(self, data):
         """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -330,12 +335,13 @@ class Adapter:
                                                        precice_data)
                 
                 precice_read_data = np.reshape(precice_data,(self._n_vertices, self._dimensions), 'C')
-
+                print("precice-read-data:")
+                print(precice_read_data)
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
                 # z is the dead direction so it is supposed that the data is close to zero
-                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]))
-                assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-8)
+                #np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
+                #assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-5)
             else: 
                 raise Exception("Dimensions don't match.")
         else:
@@ -439,25 +445,29 @@ class Adapter:
     def create_force_boundary_condition(self, function_space):
         """
         Creates 2 lists of PointSources that can be applied to the assembled system. 
-        Since 
+        This is only implemented for 2D-pseudo3D coupling.
         """
+        self._function_space = function_space
+        self._force_boundary = True
+
         if self._can_apply_2d_3d_coupling():
-            point_sources_x = []
-            point_sources_y = []
+            self._x_forces = []
+            self._y_forces = []
         
-            vertices_x = vertices[0, :]
-            vertices_y = vertices[1, :]
+            vertices_x = self._coupling_mesh_vertices[0, :]
+            vertices_y = self._coupling_mesh_vertices[1, :]
+               
+            print("Adapter read_data:")
+            print(self._read_data)
         
-            nodes, n = self._extract_coupling_boundary_vertices()
-        
-            for i in np.range(n):
-                point_sources_x.append(PointSource(function_space.sub(0), Point(nodes[:,n]),read_data[n,0]))
-                point_sources_y.append(PointSource(function_space.sub(1), Point(nodes[:,n]), read_data[n,1]))
+            for i in range(self._n_vertices):
+                self._x_forces.append(PointSource(function_space.sub(0), Point(vertices_x[i], vertices_y[i]),-self._read_data[i,0]))
+                self._y_forces.append(PointSource(function_space.sub(1), Point(vertices_x[i], vertices_y[i]), -self._read_data[i,1]))
         
         else:
             raise Exception("Force-boundaries are only implemented for 2d-3d coupling.")
             
-        return point_sources_x, point_sources_y
+        return self._x_forces, self._y_forces
 
 
 
@@ -490,7 +500,10 @@ class Adapter:
         self._read_block_data()
         
         # update boundary condition with read data
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+        if self._force_boundary:
+            self._update_forces()
+        else:
+            self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
         precice_step_complete = False
 
@@ -514,7 +527,9 @@ class Adapter:
             self._n_cp = new_n
             self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
             precice_step_complete = True
-
+            
+        if self._force_boundary:
+            return t, n, precice_step_complete, max_dt, self._x_forces, self._y_forces
         return t, n, precice_step_complete, max_dt
 
     def _can_apply_2d_3d_coupling(self):
@@ -613,6 +628,9 @@ class Adapter:
             return FunctionType.VECTOR
         else:
             raise Exception("Error determining function type")
+            
+    def _update_forces(self):
+        self.create_force_boundary_condition(self._function_space)
 
     def finalize(self):
         """Finalizes the coupling interface."""
