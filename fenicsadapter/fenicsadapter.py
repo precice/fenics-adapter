@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function, Measure, Expression, dot
+from dolfin import Point, UserExpression, SubDomain, Function, Measure, Expression, dot, PointSource
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -261,6 +261,14 @@ class Adapter:
         self._function_space = None
         self._dss = None  # measure for boundary integral
         
+        # Force-coupling
+        self._x_forces = None # list of PointSources for Forces
+        self._y_forces = None
+        self._force_boundary = None
+        
+        #Nodes with Dirichlet and Force-boundary
+        self._Dirichlet_Boundary = None
+        
     def _convert_fenics_to_precice(self, data):
         """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -330,12 +338,12 @@ class Adapter:
                                                        precice_data)
                 
                 precice_read_data = np.reshape(precice_data,(self._n_vertices, self._dimensions), 'C')
-
+                
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
-                # z is the dead direction so it is supposed that the data is close to zero
-                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]))
-                assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-8)
+                #z is the dead direction so it is supposed that the data is close to zero
+                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
+                assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-10)
             else: 
                 raise Exception("Dimensions don't match.")
         else:
@@ -435,6 +443,46 @@ class Adapter:
             # TODO: fix the problem here
             raise Exception("Boundary markers are not implemented yet")
             return dot(self._coupling_bc_expression, test_functions) * self.dss(boundary_marker)
+        
+    def create_force_boundary_condition(self, function_space):
+        """
+        Creates 2 lists of PointSources that can be applied to the assembled system. 
+        This is only implemented for 2D-pseudo3D coupling.
+        
+        :param function_space: The Function Space used for the Test and Trial functions
+        :param double_boundary_vertices: List of Points that are inside the Dirichlet Boundary but also on the Coupling Boundary. 
+        """
+        self._function_space = function_space
+        self._force_boundary = True
+
+        if self._can_apply_2d_3d_coupling():
+            self._x_forces = []
+            self._y_forces = []
+        
+            vertices_x = self._coupling_mesh_vertices[0, :]
+            vertices_y = self._coupling_mesh_vertices[1, :]
+               
+                    
+            for i in range(self._n_vertices):
+                # Filter double boundary points to avoid instabilities and create PointSource
+                    if not self._Dirichlet_Boundary.inside((vertices_x[i],vertices_y[i]),1):
+                        self._x_forces.append(PointSource(function_space.sub(0), 
+                                                          Point(vertices_x[i], 
+                                                                vertices_y[i]),
+                                                                self._read_data[i,0]))
+                        self._y_forces.append(PointSource(function_space.sub(1), 
+                                                          Point(vertices_x[i], 
+                                                                vertices_y[i]), 
+                                                                self._read_data[i,1]))
+                    else:
+                        print("Found a double-boundary point.")
+        
+        else:
+            raise Exception("Force-boundaries are only implemented for 2d-3d coupling. Same Code should be working for 2D Coupling but it is not tested so far.")
+            
+        return self._x_forces, self._y_forces
+
+
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
@@ -465,7 +513,10 @@ class Adapter:
         self._read_block_data()
         
         # update boundary condition with read data
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+        if self._force_boundary:
+            self._update_forces()
+        else:
+            self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
         precice_step_complete = False
 
@@ -489,7 +540,9 @@ class Adapter:
             self._n_cp = new_n
             self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
             precice_step_complete = True
-
+            
+        if self._force_boundary:
+            return t, n, precice_step_complete, max_dt, self._x_forces, self._y_forces
         return t, n, precice_step_complete, max_dt
 
     def _can_apply_2d_3d_coupling(self):
@@ -502,7 +555,7 @@ class Adapter:
         return self._fenics_dimensions == 2 and self._dimensions == 3
 
     def initialize(self, coupling_subdomain, mesh, read_field, write_field, 
-                   u_n, dimension=2, t=0, n=0, coupling_marker=0):
+                   u_n, dimension=2, t=0, n=0, dirichlet_boundary=None ):
         """Initializes remaining attributes. Called once, from the solver.
 
         :param coupling_subdomain: domain where coupling takes place
@@ -527,6 +580,8 @@ class Adapter:
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
                     self._fenics_dimensions,
                     self._dimensions))
+        if dirichlet_boundary is not None:
+            self._Dirichlet_Boundary=dirichlet_boundary
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._set_read_field(read_field)
@@ -550,7 +605,6 @@ class Adapter:
             self._n_cp = n
             self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
             
-        self._dss = Measure('ds', domain=mesh, subdomain_data=coupling_marker)
         return self._precice_tau
 
     def is_coupling_ongoing(self):
@@ -588,6 +642,9 @@ class Adapter:
             return FunctionType.VECTOR
         else:
             raise Exception("Error determining function type")
+            
+    def _update_forces(self):
+        self.create_force_boundary_condition(self._function_space)
 
     def finalize(self):
         """Finalizes the coupling interface."""
