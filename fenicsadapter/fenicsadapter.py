@@ -466,13 +466,19 @@ class Adapter:
             for i in range(self._n_vertices):
                 # Filter double boundary points to avoid instabilities and create PointSource
                     if not self._Dirichlet_Boundary.inside((vertices_x[i],vertices_y[i]),1):
-                        self._x_forces.append(PointSource(function_space.sub(0), Point(vertices_x[i], vertices_y[i]),self._read_data[i,0]))
-                        self._y_forces.append(PointSource(function_space.sub(1), Point(vertices_x[i], vertices_y[i]), self._read_data[i,1]))
+                        self._x_forces.append(PointSource(function_space.sub(0), 
+                                                          Point(vertices_x[i], 
+                                                                vertices_y[i]),
+                                                                self._read_data[i,0]))
+                        self._y_forces.append(PointSource(function_space.sub(1), 
+                                                          Point(vertices_x[i], 
+                                                                vertices_y[i]), 
+                                                                self._read_data[i,1]))
                     else:
                         print("Found a double-boundary point.")
         
         else:
-            raise Exception("Force-boundaries are only implemented for 2d-3d coupling.")
+            raise Exception("Force-boundaries are only implemented for 2d-3d coupling. Same Code should be working for 2D Coupling but it is not tested so far.")
             
         return self._x_forces, self._y_forces
 
