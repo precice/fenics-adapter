@@ -33,6 +33,39 @@ class FunctionType(Enum):
     VECTOR = 1  # vector valued function
 
 
+def determine_function_type(input_function):
+    """ Determines if the function is scalar- or vector-valued based on
+    rank evaluation.
+    """
+    if input_function.value_rank() == 0:  # scalar-valued functions have rank 0 is FEniCS
+        return FunctionType.SCALAR
+    elif input_function.value_rank() == 1:  # vector-valued functions have rank 1 in FEniCS
+        return FunctionType.VECTOR
+    else:
+        raise Exception("Error determining function type")
+
+
+def filter_point_sources(point_sources, filter_out):
+    """
+    Filter dictionary of PointSources (point_sources) with respect to a given domain (filter_out). If a PointSource
+    is applied at a point inside of the given domain (filter_out), this PointSource will be removed from dictionary.
+    :param point_sources: dictionary containing coordinates and associated PointSources;
+      {(point_x, point_y): PointSource, ...}
+    :param filter_out: defines the domain where PointSources should be filtered out
+    :return: A dictionary with the filtered PointSources
+    """
+
+    filtered_point_sources = dict()
+
+    for point in point_sources.keys():
+        # Filter double boundary points to avoid instabilities and create PointSource
+        if filter_out.inside(point, 1):
+            print("Found a double-boundary point at {location}.".format(location=point))
+        else:
+            filtered_point_sources[point] = point_sources[point]
+
+    return filtered_point_sources
+
 class CustomExpression(UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
     provided by preCICE.
@@ -260,16 +293,10 @@ class Adapter:
         # function space
         self._function_space = None
         self._dss = None  # measure for boundary integral
-        
-        # Force-coupling via PointSource
-        # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
-        # TODO: a vector valued PointSource would be more straigthforward, but does not exist (as far as I know)
-        self._x_forces = None # list of PointSources for Forces in x direction
-        self._y_forces = None # list of PointSources for Forces in y direction
-        self._force_boundary = None
-        
-        #Nodes with Dirichlet and Force-boundary
-        self._Dirichlet_Boundary = None
+
+        # Nodes with Dirichlet and Force-boundary
+        self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
+        self._has_force_boundary = None  # stores whether force_boundary exists
         
     def _convert_fenics_to_precice(self, data):
         """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
@@ -397,7 +424,7 @@ class Adapter:
 
         :param write_function_init: function on the write field
         """
-        self._write_function_type = self._determine_function_type(write_function_init)
+        self._write_function_type = determine_function_type(write_function_init)
         self._write_data = self._convert_fenics_to_precice(write_function_init)
 
     def _set_read_field(self, read_function_init):
@@ -406,7 +433,7 @@ class Adapter:
 
         :param read_function_init: function on the read field
         """
-        self._read_function_type = self._determine_function_type(read_function_init)
+        self._read_function_type = determine_function_type(read_function_init)
         self._read_data = self._convert_fenics_to_precice(read_function_init)
 
     def _create_coupling_boundary_condition(self):
@@ -448,43 +475,52 @@ class Adapter:
         
     def create_force_boundary_condition(self, function_space):
         """
-        Creates 2 lists of PointSources that can be applied to the assembled system. 
-        This is only implemented for 2D-pseudo3D coupling.
+        Initializes force-coupling via PointSource.
+
+        This function only works for 2D-pseudo3D coupling.
         
         :param function_space: The Function Space used for the Test and Trial functions
-        :param double_boundary_vertices: List of Points that are inside the Dirichlet Boundary but also on the Coupling Boundary. 
         """
         self._function_space = function_space
-        self._force_boundary = True
+        self._has_force_boundary = True
 
+        return self._get_forces_as_point_sources()
+
+    def _get_forces_as_point_sources(self):
+        """
+        Creates 2 dicts of PointSources that can be applied to the assembled system.
+        Applies filter_point_source to avoid forces being applied to already existing Dirichlet BC, since this would
+        lead to an overdetermined system that cannot be solved.
+        :return: Returns lists of PointSources TODO: get rid of this legacy code, dicts should be used for a PointSource, since they can provide the location of the PointSouce, as well. Even, inside the FEniCS user code.
+        """
         if self._can_apply_2d_3d_coupling():
-            self._x_forces = []
-            self._y_forces = []
-        
+            # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
+            # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
+
+            x_forces = dict()  # dict of PointSources for Forces in x direction
+            y_forces = dict()  # dict of PointSources for Forces in y direction
+
             vertices_x = self._coupling_mesh_vertices[0, :]
             vertices_y = self._coupling_mesh_vertices[1, :]
-               
-                    
+
             for i in range(self._n_vertices):
-                # Filter double boundary points to avoid instabilities and create PointSource
-                    if not self._Dirichlet_Boundary.inside((vertices_x[i],vertices_y[i]),1):
-                        self._x_forces.append(PointSource(function_space.sub(0), 
-                                                          Point(vertices_x[i], 
-                                                                vertices_y[i]),
-                                                                self._read_data[i,0]))
-                        self._y_forces.append(PointSource(function_space.sub(1), 
-                                                          Point(vertices_x[i], 
-                                                                vertices_y[i]), 
-                                                                self._read_data[i,1]))
-                    else:
-                        print("Found a double-boundary point.")
-        
+                px, py = vertices_x[i], vertices_y[i]
+                key = (px, py)
+                x_forces[key] = PointSource(self._function_space.sub(0),
+                                            Point(px, py),
+                                            self._read_data[i, 0])
+                y_forces[key] = PointSource(self._function_space.sub(1),
+                                            Point(px, py),
+                                            self._read_data[i, 1])
+
+            # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
+            x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
+            y_forces = filter_point_sources(y_forces, self._Dirichlet_Boundary)
         else:
-            raise Exception("Force-boundaries are only implemented for 2d-3d coupling. Same Code should be working for 2D Coupling but it is not tested so far.")
-            
-        return self._x_forces, self._y_forces
+            raise Exception("Force-boundaries are only implemented for 2d-3d coupling. "
+                            "Same Code should be working for 2D Coupling but it is not tested so far.")
 
-
+        return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
@@ -515,8 +551,8 @@ class Adapter:
         self._read_block_data()
         
         # update boundary condition with read data
-        if self._force_boundary:
-            self._update_forces()
+        if self._has_force_boundary:
+            x_forces, y_forces = self._get_forces_as_point_sources()
         else:
             self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
@@ -542,10 +578,12 @@ class Adapter:
             self._n_cp = new_n
             self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
             precice_step_complete = True
-            
-        if self._force_boundary:
-            return t, n, precice_step_complete, max_dt, self._x_forces, self._y_forces
-        return t, n, precice_step_complete, max_dt
+
+        # TODO: this if-else statement smells.
+        if self._has_force_boundary:
+            return t, n, precice_step_complete, max_dt, x_forces, y_forces
+        else:
+            return t, n, precice_step_complete, max_dt
 
     def _can_apply_2d_3d_coupling(self):
         """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
@@ -633,20 +671,6 @@ class Adapter:
             return vertices_x, vertices_y
         else:
             raise Exception("Error: These Dimensions are not supported by the adapter.")
-
-    def _determine_function_type(self, function):
-        """ Determines if the function is scalar- or vector-valued based on
-        rank evaluation.
-        """
-        if function.value_rank() == 0:  # scalar-valued functions have rank 0 is FEniCS
-            return FunctionType.SCALAR
-        elif function.value_rank() == 1:  # vector-valued functions have rank 1 in FEniCS
-            return FunctionType.VECTOR
-        else:
-            raise Exception("Error determining function type")
-            
-    def _update_forces(self):
-        self.create_force_boundary_condition(self._function_space)
 
     def finalize(self):
         """Finalizes the coupling interface."""
