@@ -261,9 +261,11 @@ class Adapter:
         self._function_space = None
         self._dss = None  # measure for boundary integral
         
-        # Force-coupling
-        self._x_forces = None # list of PointSources for Forces
-        self._y_forces = None
+        # Force-coupling via PointSource
+        # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
+        # TODO: a vector valued PointSource would be more straigthforward, but does not exist (as far as I know)
+        self._x_forces = None # list of PointSources for Forces in x direction
+        self._y_forces = None # list of PointSources for Forces in y direction
         self._force_boundary = None
         
         #Nodes with Dirichlet and Force-boundary
