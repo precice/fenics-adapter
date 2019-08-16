@@ -1,16 +1,18 @@
 matrix: 
   include: 
   - os: linux  
+    dist: bionic
     language: python
     python: "3.5" 
     env: PY=python3
+    virtualenv:
+      system_site_packages: true
     install:
     - pip3 install scipy
     - sudo apt-get install software-properties-common
     - sudo add-apt-repository -y ppa:fenics-packages/fenics
     - sudo apt-get update
     - sudo apt-get install -y --no-install-recommends fenics
-    - pip3 install fenics-ffc --upgrade
 
 script: 
   - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='precice')" > precice/setup.py
