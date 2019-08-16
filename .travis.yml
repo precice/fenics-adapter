@@ -1,6 +1,7 @@
 matrix: 
   include: 
   - os: linux  
+    name: "Full tests [Linux]"
     language: python
     dist: bionic
     virtualenv:
@@ -15,7 +16,27 @@ matrix:
     install: 
     - pip install scipy
 
+  - os: windows 
+    name: "Mock tests [Windows]"
+    # does not support python 
+    language: bash 
+    env: PY=py
+    python: "3.5"
+    before_install: choco install python --version 3.5.4 
+    install: 
+      - $PY -m pip install --upgrade pip
+      - $PY -m pip install scipy 
+      - $PY -m pip install --upgrade setuptools
+
+  - os: osx
+    name: "Mock tests [OSx]"
+    # does not support python
+    language: generic 
+    env: PY=python3
+    install: 
+      - pip3 install scipy
+
 script: 
   - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='precice')" > precice/setup.py
   - $PY -m pip install ./precice/
-  - $PY setup.py test 
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then  $PY setup.py test ; else python3 setup.py test -s tests.test_fenicsadapter ; fi
