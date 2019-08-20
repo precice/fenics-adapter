@@ -27,6 +27,12 @@ matrix:
       - $PY -m pip install --upgrade pip
       - $PY -m pip install scipy 
       - $PY -m pip install --upgrade setuptools
+  - os: linux
+    name: "Systemtests"
+    if: fork = false AND ( branch = master OR branch = develop )
+    script:
+    - curl -LO --retry 3 https://raw.githubusercontent.com/precice/systemtests/master/trigger_systemtests.py
+    - travis_wait 60 python trigger_systemtests.py --adapter fenics --wait
 
   - os: osx
     name: "Mock tests [OSx]"
