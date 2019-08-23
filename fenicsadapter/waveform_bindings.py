@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.DEBUG)
 
 
 try:
@@ -39,7 +39,7 @@ class WaveformBindings(precice.Interface):
         self._current_window_start = 0  # defines start of window
         self._window_time = self._current_window_start  # keeps track of window time
 
-    def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name):
+    def initialize_waveforms(self, mesh_id, n_vertices, vertex_ids, write_data_name, read_data_name, write_data_dimension, read_data_dimension):
         logging.debug("Calling initialize_waveforms")
         logging.debug("Initializing waveforms.")
         # constant information of mesh
@@ -47,16 +47,17 @@ class WaveformBindings(precice.Interface):
         self._n_vertices = n_vertices
         self._vertex_ids = vertex_ids
 
-        logging.debug("Creating write_data_buffer")
         self._write_data_name = write_data_name
-        self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+        self._write_data_dimension = write_data_dimension
+        logging.debug("Creating write_data_buffer: data_dimension = {}".format(self._write_data_dimension))
+        self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices, self._write_data_dimension)
 
-        logging.debug("Creating read_data_buffer")
         self._read_data_name = read_data_name
-        self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+        self._read_data_dimension = read_data_dimension
+        logging.debug("Creating read_data_buffer: data_dimension = {}".format(self._read_data_dimension))
+        self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices, self._read_data_dimension)
 
-    def write_block_scalar_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
-        logging.debug("calling write_block_scalar_data for time {time}".format(time=time))
+    def perform_write_checks_and_append(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
         assert(self._config.get_write_data_name() == write_data_name)
         assert(self._is_inside_current_window(time))
         # we put the data into a buffer. Data will be send to other participant via preCICE in advance
@@ -69,19 +70,35 @@ class WaveformBindings(precice.Interface):
         assert ((self._vertex_ids == vertex_ids).all())
         assert (self._write_data_name == write_data_name)
 
-    def read_block_scalar_data(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
-        logging.debug("calling read_block_scalar_data for time {time}".format(time=time))
-        assert(self._config.get_read_data_name() == read_data_name)
-        assert(self._is_inside_current_window(time))
+    def write_block_scalar_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
+        logging.debug("calling write_block_scalar_data for time {time}".format(time=time))
+        self.perform_write_checks_and_append(write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time)
+
+    def write_block_vector_data(self, write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time):
+        logging.debug("calling write_block_vector_data for time {time}".format(time=time))
+        self.perform_write_checks_and_append(write_data_name, mesh_id, n_vertices, vertex_ids, write_data, time)
+
+    def perform_read_checks_and_sample(self, read_data_name, mesh_id, n_vertices, vertex_ids, time):
+        assert (self._config.get_read_data_name() == read_data_name)
+        assert (self._is_inside_current_window(time))
         # we get the data from the interpolant. New data will be obtained from the other participant via preCICE in advance
         logging.debug("read at time {time}".format(time=time))
-        read_data[:] = self._read_data_buffer.sample(time)[:].copy()
+        read_data = self._read_data_buffer.sample(time)[:].copy()
         logging.debug("read_data is {read_data}".format(read_data=read_data))
         # we assert that the preCICE specific write parameters did not change since configure_waveform_relaxation
         assert (self._mesh_id == mesh_id)
         assert (self._n_vertices == n_vertices)
         assert ((self._vertex_ids == vertex_ids).all())
         assert (self._read_data_name == read_data_name)
+        return read_data
+
+    def read_block_scalar_data(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
+        logging.debug("calling read_block_scalar_data for time {time}".format(time=time))
+        read_data[:] = self.perform_read_checks_and_sample(read_data_name, mesh_id, n_vertices, vertex_ids, time)
+
+    def read_block_vector_data(self, read_data_name, mesh_id, n_vertices, vertex_ids, read_data, time):
+        logging.debug("calling read_block_vector_data for time {time}".format(time=time))
+        read_data[:] = self.perform_read_checks_and_sample(read_data_name, mesh_id, n_vertices, vertex_ids, time)
 
     def _write_all_window_data_to_precice(self):
         logging.debug("Calling _write_all_window_data_to_precice")
@@ -94,7 +111,10 @@ class WaveformBindings(precice.Interface):
             write_data_id = self.get_data_id(write_data_name, self._mesh_id)
             substep_time = write_waveform._temporal_grid[substep]
             write_data = write_waveform._samples_in_time[:, substep]
-            super().write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
+            if self._write_data_dimension == 1:
+                super().write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
+            elif self._write_data_dimension == self.get_dimensions():
+                super().write_block_vector_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
             logging.debug("write data called {name}:{write_data} @ time = {time}".format(name=write_data_name,
                                                                                          write_data=write_data,
                                                                                          time=substep_time))
@@ -115,7 +135,10 @@ class WaveformBindings(precice.Interface):
             read_data_id = self.get_data_id(read_data_name, self._mesh_id)
             read_data = np.copy(read_ndarray)
             substep_time = read_times[substep]
-            super().read_block_scalar_data(read_data_id, self._n_vertices, self._vertex_ids, read_data)
+            if self._read_data_dimension == 1:
+                super().read_block_scalar_data(read_data_id, self._n_vertices, self._vertex_ids, read_data)
+            elif self._read_data_dimension == self.get_dimensions():
+                super().read_block_vector_data(read_data_id, self._n_vertices, self._vertex_ids, read_data)
             logging.debug("reading at time {time}".format(time=substep_time))
             logging.debug("read_data called {name}:{read_data} @ time = {time}".format(name=read_data_name,
                                                                                        read_data=read_data,
@@ -137,7 +160,7 @@ class WaveformBindings(precice.Interface):
             write_data_last = self._write_data_buffer.sample(self._current_window_end()).copy()  # store last write data before advance, otherwise it might be lost if window is finished
             max_dt = super().advance(self._window_time)  # = time given by preCICE
 
-            if self.is_action_required(action_read_iteration_checkpoint()):  # repeat window
+            if self.reading_checkpoint_is_required():  # repeat window
                 # repeat window
                 logging.info("Repeat window.")
                 self._rollback_write_data_buffer()
@@ -156,12 +179,12 @@ class WaveformBindings(precice.Interface):
                 self._window_time = 0
                 # initialize window start of new window with data from window end of old window
                 logging.debug("create new write data buffer")
-                self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+                self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices, self._write_data_dimension)
                 self._write_data_buffer.append(write_data_init, self._current_window_start)
                 # use constant extrapolation as initial guess for read data
                 self._read_all_window_data_from_precice()  # this read buffer will be overwritten anyway. todo: initial guess is currently not treated properly!
                 logging.debug("create new read data buffer with initial guess")
-                self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices)
+                self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices, self._read_data_dimension)
                 for dt_extrapolate in np.linspace(0, self._window_size(), num=self._n_this+1, endpoint=True):
                     self._read_data_buffer.append(read_data_init, 
                                                   self._current_window_start + dt_extrapolate)  # create initial guess (linear in time)
@@ -209,7 +232,21 @@ class WaveformBindings(precice.Interface):
         self._precice_tau = super().initialize()
         return np.max([self._precice_tau, self._remaining_window_time()])
 
+    def writing_checkpoint_is_required(self):
+        return self._is_action_required(precice.action_write_iteration_checkpoint())
+
+    def reading_checkpoint_is_required(self):
+        return self._is_action_required(precice.action_read_iteration_checkpoint())
+
+    def writing_initial_data_is_required(self):
+        return self._is_action_required(precice.action_write_initial_data())
+
     def is_action_required(self, action):
+        raise Exception("Don't use is_action_required({action}). Use the corresponding function call "
+                        "writing_checkpoint_is_required(), reading_checkpoint_is_required() or "
+                        "writing_initial_data_is_required() instead.".format(action=action))
+
+    def _is_action_required(self, action):
         if action == precice.action_write_initial_data():
             return True  # if we use waveform relaxation, we require initial data for both participants to be able to fill the write buffers correctly
         elif action == precice.action_write_iteration_checkpoint() or action == precice.action_read_iteration_checkpoint():
@@ -234,7 +271,7 @@ class WaveformBindings(precice.Interface):
         :return:
         """
         logging.debug("Calling initialize_data")
-        if super().is_action_required(precice.action_write_initial_data()):
+        if self.writing_initial_data_is_required():
             logging.info("writing in initialize_data()")
             for substep in range(1, self._n_this + 1):
                 time = substep * self._precice_tau / self._n_this
@@ -275,7 +312,7 @@ class NoDataError(Exception):
 
 
 class Waveform:
-    def __init__(self, window_start, window_size, n_datapoints):
+    def __init__(self, window_start, window_size, n_datapoints, dimension):
         """
         :param window_start: starting time of the window
         :param window_size: size of window
@@ -287,6 +324,7 @@ class Waveform:
         self._window_size = window_size
         self._window_start = window_start
         self._n_datapoints = n_datapoints
+        self._data_dimension = dimension
         self._samples_in_time = None
         self._temporal_grid = None
         self.empty_data()
@@ -302,6 +340,8 @@ class Waveform:
         :return:
         """
         data = data.reshape((data.size, 1))
+        print("from {}".format(self))
+        print("appending {} to {}. Shapes {} and {}".format(data, self._samples_in_time, data.shape, self._samples_in_time.shape))
         self._samples_in_time = np.append(self._samples_in_time, data, axis=1)
         self._temporal_grid.append(time)
 
@@ -317,6 +357,7 @@ class Waveform:
         logging.debug("sample Waveform at %f" % time)
 
         if not self._temporal_grid:
+            logging.error("Waveform does not hold any data. self_temporal_grid = {}".format(self._temporal_grid))
             raise NoDataError
 
         atol = 1e-08  # todo: this is equal to atol used by default in np.isclose. Is there a nicer way to implement the check below?
@@ -326,8 +367,8 @@ class Waveform:
                 grid=self._temporal_grid)
             raise OutOfLocalWindowError(msg)
 
-        return_value = np.zeros(self._n_datapoints)
-        for i in range(self._n_datapoints):
+        return_value = np.zeros(self._n_datapoints * self._data_dimension)
+        for i in range(self._n_datapoints * self._data_dimension):
             values_along_time = dict()
             for j in range(len(self._temporal_grid)):
                 t = self._temporal_grid[j]
@@ -353,16 +394,24 @@ class Waveform:
         return return_value
 
     def append(self, data, time):
-        assert (data.shape[0] == self._n_datapoints)
+        try:
+            assert (data.shape[0] == self._n_datapoints * self._data_dimension)
+        except AssertionError:
+            raise Exception("Data shape does NOT fit: shape expected = {}, shape retreived = {}".format(data.shape[0], self._n_datapoints * self._data_dimension))
+
         if time in self._temporal_grid or (self._temporal_grid and time <= self._temporal_grid[-1]):
             raise Exception("It is only allowed to append data associated with time that is larger than the already existing time. Trying to append invalid time = {time} to temporal grid = {temporal_grid}".format(time=time, temporal_grid=self._temporal_grid))
+        logging.debug("Append data of shape {}".format(data.shape))
+        logging.debug("n_datapoints = {}, data_dimensions = {}".format(self._n_datapoints, self._data_dimension))
         self._append_sample(data, time)
 
     def empty_data(self, keep_first_sample=False):
         if keep_first_sample:
             first_sample, first_time = self.get_init()
             assert(first_time == self._window_start)
-        self._samples_in_time = np.empty(shape=(self._n_datapoints, 0))  # store samples in time in this data structure. Number of rows = number of gridpoints per sample; number of columns = number of sampls in time
+        print("from {}".format(self))
+        print("init self._samples_in_time with shape={}; datapoints={}, dimensions={}".format(self._n_datapoints * self._data_dimension, self._n_datapoints, self._data_dimension))
+        self._samples_in_time = np.empty(shape=(self._n_datapoints * self._data_dimension, 0))  # store samples in time in this data structure. Number of rows = number of gridpoints per sample; number of columns = number of sampls in time
         self._temporal_grid = list()  # store time associated to samples in this datastructure
         if keep_first_sample:
             self._append_sample(first_sample, first_time)
@@ -371,7 +420,7 @@ class Waveform:
         return self._samples_in_time[:, 0], self._temporal_grid[0]
 
     def get_empty_ndarray(self):
-        return np.empty(self._n_datapoints)
+        return np.empty(self._n_datapoints * self._data_dimension)
 
     def copy_second_to_first(self):
         self._samples_in_time[:, 0] = self._samples_in_time[:, 1]

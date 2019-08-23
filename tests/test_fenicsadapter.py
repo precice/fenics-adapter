@@ -30,6 +30,9 @@ class MockedArray:
         returned_array.value = self.value
         return returned_array
 
+    def value_rank(self):
+        return 0
+
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
@@ -44,6 +47,7 @@ class TestCheckpointing(TestCase):
     n_vertices = 10
     u_n_mocked = MockedArray()  # result at the beginning of the timestep
     u_np1_mocked = MockedArray()  # newly computed result
+    write_function_mocked = MockedArray()
     u_cp_mocked = MockedArray()  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
@@ -52,26 +56,27 @@ class TestCheckpointing(TestCase):
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
+    data_id = MagicMock()
     mesh_id = MagicMock()
-    vertex_ids = np.random.rand(10)
+    vertex_ids = MagicMock()
     write_data_name = "Dummy-Write"
     read_data_name = "Dummy-Read"
-    n_substeps = 5
-    data_id = MagicMock()
+    n_data = 10
 
     def setUp(self):
         warnings.simplefilter('ignore', category=ImportWarning)
 
     def mock_the_adapter(self, precice):
         from fenicsadapter.solverstate import SolverState
+        from fenicsadapter import FunctionType
         """
         We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
         necessary to test checkpointing.
         :param precice: the fenicsadapter
         """
         # define functions that are called by advance, but not necessary for the test
-        precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice.convert_fenics_to_precice = MagicMock(return_value=np.zeros(self.n_vertices))
+        precice._extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
+        precice._convert_fenics_to_precice = MagicMock(return_value=np.zeros(self.n_vertices))
         precice._interface._precice_tau = self.dt
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
@@ -85,27 +90,23 @@ class TestCheckpointing(TestCase):
         precice._write_data = np.zeros(self.n_vertices)
         precice._read_data_name = self.read_data_name
         precice._read_data = np.zeros(self.n_vertices)
+        precice._write_function_type = FunctionType.SCALAR
+        precice._read_function_type = FunctionType.SCALAR
 
         from fenicsadapter.waveform_bindings import WaveformBindings
 
         if type(precice._interface) is WaveformBindings:
-            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name)
+            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, 1, 1)
 
     def test_advance_success(self):
         """
         Test correct checkpointing, if advance succeeded
         """
         import fenicsadapter
-        from precice import Interface, action_read_iteration_checkpoint, \
-            action_write_iteration_checkpoint
+        from precice import Interface
 
-        def is_action_required_behavior(py_action):
-            if py_action == action_read_iteration_checkpoint():
-                return False
-            elif py_action == action_write_iteration_checkpoint():
-                return True
-
-        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
+        Interface.reading_checkpoint_is_required = MagicMock(return_value=False)
+        Interface.writing_checkpoint_is_required = MagicMock(return_value=True)
         Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock(return_value=self.mesh_id)
@@ -128,6 +129,7 @@ class TestCheckpointing(TestCase):
         desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
         self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
                          desired_output)
+
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
@@ -139,16 +141,10 @@ class TestCheckpointing(TestCase):
         Test correct checkpointing, if advance did not succeed and we have to rollback
         """
         import fenicsadapter
-        from precice import Interface, action_write_iteration_checkpoint, \
-            action_read_iteration_checkpoint
+        from precice import Interface
 
-        def is_action_required_behavior(py_action):
-            if py_action == action_read_iteration_checkpoint():
-                return True
-            elif py_action == action_write_iteration_checkpoint():
-                return False
-
-        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
+        Interface.reading_checkpoint_is_required = MagicMock(return_value=True)
+        Interface.writing_checkpoint_is_required = MagicMock(return_value=False)
         Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock(return_value=self.mesh_id)
@@ -179,18 +175,13 @@ class TestCheckpointing(TestCase):
     def test_advance_continue(self):
         """
         Test correct checkpointing, if advance did succeed, but we do not write a checkpoint (for example, if we do subcycling)
+        :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
         """
         import fenicsadapter
-        from precice import Interface, action_read_iteration_checkpoint, \
-            action_write_iteration_checkpoint
+        from precice import Interface
 
-        def is_action_required_behavior(py_action):
-            if py_action == action_read_iteration_checkpoint():
-                return False
-            elif py_action == action_write_iteration_checkpoint():
-                return False
-
-        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
+        Interface.reading_checkpoint_is_required = MagicMock(return_value=False)
+        Interface.writing_checkpoint_is_required = MagicMock(return_value=False)
         Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock(return_value=self.mesh_id)

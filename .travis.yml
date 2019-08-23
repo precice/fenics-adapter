@@ -1,12 +1,23 @@
 matrix: 
   include: 
   - os: linux  
-    language: python 
-    python: "3.5" 
-    env: PY=python
+    name: "Full tests [Linux]"
+    language: python
+    dist: bionic
+    virtualenv:
+      system_site_packages: true
+    python: "3.6" 
+    env: PY=python3
+    before_install:
+    - sudo apt-get install software-properties-common
+    - sudo add-apt-repository -y ppa:fenics-packages/fenics
+    - sudo apt-get update
+    - sudo apt-get install -y --no-install-recommends fenics
     install: 
     - pip install scipy
+
   - os: windows 
+    name: "Mock tests [Windows]"
     # does not support python 
     language: bash 
     env: PY=py
@@ -16,8 +27,15 @@ matrix:
       - $PY -m pip install --upgrade pip
       - $PY -m pip install scipy 
       - $PY -m pip install --upgrade setuptools
+  - os: linux
+    name: "Systemtests"
+    if: fork = false AND ( branch = master OR branch = develop )
+    script:
+    - curl -LO --retry 3 https://raw.githubusercontent.com/precice/systemtests/master/trigger_systemtests.py
+    - travis_wait 60 python trigger_systemtests.py --adapter fenics --wait
 
   - os: osx
+    name: "Mock tests [OSx]"
     # does not support python
     language: generic 
     env: PY=python3
@@ -27,4 +45,4 @@ matrix:
 script: 
   - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='precice')" > precice/setup.py
   - $PY -m pip install ./precice/
-  - $PY setup.py test 
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then  $PY setup.py test ; else $PY setup.py test -s tests.test_fenicsadapter ; fi

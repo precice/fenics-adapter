@@ -26,12 +26,12 @@ class TestWaveform(TestCase):
 
     def test_initialize_data(self):
         from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.window_start, self.window_size, self.n_datapoints)
+        self.waveform = Waveform(self.window_start, self.window_size, self.n_datapoints, 1)
         self.waveform.initialize_constant(self.input_data)
 
     def test_sample_data(self):
         from fenicsadapter.waveform_bindings import Waveform
-        self.waveform = Waveform(self.window_start, self.window_size, self.n_datapoints)
+        self.waveform = Waveform(self.window_start, self.window_size, self.n_datapoints, 1)
         from fenicsadapter.waveform_bindings import OutOfLocalWindowError, NoDataError
 
         with self.assertRaises(NoDataError):
