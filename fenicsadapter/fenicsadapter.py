@@ -637,8 +637,6 @@ class Adapter:
         if self._interface.is_read_data_available():
             self._read_block_data()
 
-        self._interface.initialize_data()
-
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             self._u_cp = u_n.copy(deepcopy=True)
             self._t_cp = t
