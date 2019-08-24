@@ -14,7 +14,7 @@ from .solverstate import SolverState
 from enum import Enum
 import logging
 import fenicsadapter.waveform_bindings
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 
 class FunctionType(Enum):
@@ -380,7 +380,7 @@ class Adapter:
                 self._read_data[:, 1] = precice_read_data[:, 1]
                 #z is the dead direction so it is supposed that the data is close to zero
                 np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
-                assert(np.sum(np.abs(precice_read_data[:, 2]))< 1e-10)
+                assert(np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
@@ -530,6 +530,7 @@ class Adapter:
                 y_forces[key] = PointSource(self._function_space.sub(1),
                                             Point(px, py),
                                             self._read_data[i, 1])
+                print("Force at (x,y) = {} is (Fx, Fy) = {}".format((px,py), (self._read_data[i, 0], self._read_data[i, 1])))
 
             # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
             x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
@@ -616,7 +617,10 @@ class Adapter:
             self._read_block_data(t + dt)  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
 
         # update boundary condition with read data
-        self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+        if self._has_force_boundary:
+            x_forces, y_forces = self._get_forces_as_point_sources()
+        else:
+            self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
         # TODO: this if-else statement smells.
         if self._has_force_boundary:

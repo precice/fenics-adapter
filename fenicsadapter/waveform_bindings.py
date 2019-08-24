@@ -182,12 +182,12 @@ class WaveformBindings(precice.Interface):
                 self._write_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices, self._write_data_dimension)
                 self._write_data_buffer.append(write_data_init, self._current_window_start)
                 # use constant extrapolation as initial guess for read data
-                self._read_all_window_data_from_precice()  # this read buffer will be overwritten anyway. todo: initial guess is currently not treated properly!
                 logging.debug("create new read data buffer with initial guess")
-                self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices, self._read_data_dimension)
-                for dt_extrapolate in np.linspace(0, self._window_size(), num=self._n_this+1, endpoint=True):
-                    self._read_data_buffer.append(read_data_init, 
-                                                  self._current_window_start + dt_extrapolate)  # create initial guess (linear in time)
+                self._read_data_buffer = Waveform(self._current_window_start, self._precice_tau, self._n_vertices,
+                                                  self._read_data_dimension)
+                self._read_data_buffer.append(read_data_init,
+                                              self._current_window_start)
+                self._read_all_window_data_from_precice()  # this read buffer will be overwritten anyway. todo: initial guess is currently not treated properly!
                 self._print_window_status()
 
             logging.debug("print read waveform")
@@ -340,8 +340,6 @@ class Waveform:
         :return:
         """
         data = data.reshape((data.size, 1))
-        print("from {}".format(self))
-        print("appending {} to {}. Shapes {} and {}".format(data, self._samples_in_time, data.shape, self._samples_in_time.shape))
         self._samples_in_time = np.append(self._samples_in_time, data, axis=1)
         self._temporal_grid.append(time)
 
@@ -409,8 +407,6 @@ class Waveform:
         if keep_first_sample:
             first_sample, first_time = self.get_init()
             assert(first_time == self._window_start)
-        print("from {}".format(self))
-        print("init self._samples_in_time with shape={}; datapoints={}, dimensions={}".format(self._n_datapoints * self._data_dimension, self._n_datapoints, self._data_dimension))
         self._samples_in_time = np.empty(shape=(self._n_datapoints * self._data_dimension, 0))  # store samples in time in this data structure. Number of rows = number of gridpoints per sample; number of columns = number of sampls in time
         self._temporal_grid = list()  # store time associated to samples in this datastructure
         if keep_first_sample:
