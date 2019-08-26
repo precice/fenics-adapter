@@ -24,6 +24,7 @@ Make sure to install
 * preCICE (https://github.com/precice/precice/wiki)
 * python3 (this adapter **only supports python3**)
 * the python language bindings for preCICE (https://github.com/precice/precice/blob/develop/src/precice/bindings/python/README.md)
+* waveform bindings for preCICE (https://github.com/BenjaminRueth/waveform-bindings)
 * fenics (https://fenicsproject.org/)
 * and scipy (`pip3 install scipy`)
 

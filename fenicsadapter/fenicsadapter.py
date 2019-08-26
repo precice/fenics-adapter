@@ -13,7 +13,7 @@ from .checkpointing import Checkpoint
 from .solverstate import SolverState
 from enum import Enum
 import logging
-import fenicsadapter.waveform_bindings
+from waveformbindings import WaveformBindings, action_read_iteration_checkpoint, action_write_iteration_checkpoint, action_write_initial_data
 logging.basicConfig(level=logging.WARNING)
 
 
@@ -244,8 +244,11 @@ class Adapter:
 
         self._solver_name = self._config.get_solver_name()
 
-        self._interface = fenicsadapter.waveform_bindings.WaveformBindings(self._solver_name, 0, 1)
-        self._interface.configure_waveform_relaxation(adapter_config_filename, other_adapter_config_filename)
+        self._interface = WaveformBindings(self._solver_name, 0, 1)
+
+        n_this = Config(adapter_config_filename).get_n_substeps()  # number of timesteps in this window, by default: no WR
+        n_other = Config(other_adapter_config_filename).get_n_substeps()  # number of timesteps in other window, todo: in the end we don't want
+        self._interface.configure_waveform_relaxation(n_this, n_other)
         self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.get_dimensions()
 
@@ -547,7 +550,7 @@ class Adapter:
         """
         logging.debug("Restore solver state")
         state.update(self._checkpoint.get_state())
-        self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_read_iteration_checkpoint())
+        self._interface.fulfilled_action(action_read_iteration_checkpoint())
 
     def _advance_solver_state(self, state, u_np1, dt):
         """Advances the solver's state by one timestep.
@@ -567,7 +570,7 @@ class Adapter:
         """
         logging.debug("Save solver state")
         self._checkpoint.write(state)
-        self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_iteration_checkpoint())
+        self._interface.fulfilled_action(action_write_iteration_checkpoint())
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
@@ -678,7 +681,7 @@ class Adapter:
 
         if self._interface.writing_initial_data_is_required():
             self._write_block_data(t)
-            self._interface.fulfilled_action(fenicsadapter.waveform_bindings.action_write_initial_data())
+            self._interface.fulfilled_action(action_write_initial_data())
 
         precice_write_data = self._convert_to_linear_write_data(self._write_data, self._write_function_type)
         precice_read_data = self._convert_to_linear_read_data(self._read_data, self._read_function_type)

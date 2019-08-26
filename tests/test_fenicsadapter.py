@@ -93,7 +93,7 @@ class TestCheckpointing(TestCase):
         precice._write_function_type = FunctionType.SCALAR
         precice._read_function_type = FunctionType.SCALAR
 
-        from fenicsadapter.waveform_bindings import WaveformBindings
+        from waveformbindings import WaveformBindings
 
         if type(precice._interface) is WaveformBindings:
             precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, 1, 1)
