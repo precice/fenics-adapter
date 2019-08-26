@@ -333,10 +333,10 @@ class Adapter:
 
         if self._write_function_type is FunctionType.SCALAR:
             print("write SCALAR")
-            self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, precice_write_data, time)
+            self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._vertex_ids, precice_write_data, time)
         elif self._write_function_type is FunctionType.VECTOR:
             print("write VECTOR")
-            self._interface.write_block_vector_data(self._write_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, precice_write_data, time)
+            self._interface.write_block_vector_data(self._write_data_name, self._mesh_id, self._vertex_ids, precice_write_data, time)
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
@@ -368,16 +368,14 @@ class Adapter:
 
         assert(self._read_function_type in list(FunctionType))
 
-        precice_read_data = self._convert_to_linear_read_data(self._read_data, self._read_function_type)
-        
         if self._read_function_type is FunctionType.SCALAR:
-            self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._n_vertices, self._vertex_ids, precice_read_data, time)
-        
+            self._read_data = self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
+
         elif self._read_function_type is FunctionType.VECTOR:
-            self._interface.read_block_vector_data(self._read_data_name, self._mesh_id, self._n_vertices,
-                                                   self._vertex_ids, precice_read_data, time)
+            precice_read_data = self._interface.read_block_vector_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
             if self._can_apply_2d_3d_coupling():
                 precice_read_data = np.reshape(precice_read_data, (self._n_vertices, self._dimensions), 'C')
+                assert(precice_read_data.shape[1] == 3)
 
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
@@ -424,8 +422,7 @@ class Adapter:
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
-        self._vertex_ids = np.zeros(self._n_vertices)
-        self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices.flatten('F'))
 
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the

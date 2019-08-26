@@ -34,7 +34,7 @@ class MockedArray:
         return 0
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice_future': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
     """
     Test suite to check whether checkpointing is done correctly, if the advance function is called. We use the mock
@@ -103,7 +103,7 @@ class TestCheckpointing(TestCase):
         Test correct checkpointing, if advance succeeded
         """
         import fenicsadapter
-        from precice import Interface
+        from precice_future import Interface
 
         Interface.reading_checkpoint_is_required = MagicMock(return_value=False)
         Interface.writing_checkpoint_is_required = MagicMock(return_value=True)
@@ -120,7 +120,6 @@ class TestCheckpointing(TestCase):
 
         precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
-        precice._interface = Interface  # mock away waveform bindings
 
         value_u_np1 = self.u_np1_mocked.value
 
@@ -141,7 +140,7 @@ class TestCheckpointing(TestCase):
         Test correct checkpointing, if advance did not succeed and we have to rollback
         """
         import fenicsadapter
-        from precice import Interface
+        from precice_future import Interface
 
         Interface.reading_checkpoint_is_required = MagicMock(return_value=True)
         Interface.writing_checkpoint_is_required = MagicMock(return_value=False)
@@ -158,7 +157,6 @@ class TestCheckpointing(TestCase):
 
         precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
         self.mock_the_adapter(precice)
-        precice._interface = Interface  # mock away waveform bindings
 
         precice_step_complete = False
         # time and iteration count should be rolled back by a not successful call of advance
@@ -178,25 +176,22 @@ class TestCheckpointing(TestCase):
         :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
         """
         import fenicsadapter
-        from precice import Interface
-
+        from precice_future import Interface
+        print("__INIT__ ADAPTER")
         Interface.reading_checkpoint_is_required = MagicMock(return_value=False)
         Interface.writing_checkpoint_is_required = MagicMock(return_value=False)
         Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock(return_value=self.mesh_id)
         Interface.get_data_id = MagicMock(return_value=self.data_id)
-        Interface.write_block_scalar_data = MagicMock()  # todo: if we use the check is_write_data_required from below, this line can be removed
-        Interface.read_block_scalar_data = MagicMock()  # todo: if we use the check is_read_data_available from below, this line can be removed
         Interface.is_read_data_available = MagicMock(return_value=False)  # inside subcycling we do not write or read data
         Interface.is_write_data_required = MagicMock(return_value=False)
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
-
+        print("__INIT__ ADAPTER")
         precice = fenicsadapter.Adapter(self.dummy_config, self.dummy_config)  # todo: how can we avoid requiring both configs, if we do not use waveform relaxation?
+        print("__INIT__ ADAPTER DONE")
         self.mock_the_adapter(precice)
-        precice._interface = Interface  # mock away waveform bindings
-
         precice_step_complete = False
         # time and iteration count should be rolled back by a not successful call of advance
         desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
@@ -219,7 +214,7 @@ class TestIsCouplingOngoing(TestCase):
 
     def test_isCouplingOngoing(self):
         import fenicsadapter
-        from precice import Interface
+        from precice_future import Interface
         Interface.is_coupling_ongoing = MagicMock(return_value=True)
         Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock()
