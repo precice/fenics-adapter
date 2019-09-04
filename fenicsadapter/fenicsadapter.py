@@ -71,6 +71,13 @@ class CustomExpression(UserExpression):
         """
         self.update_boundary_data(vals, coords_x, coords_y, coords_z)
 
+    def set_dt(self, time):
+        print("set time {}".format(time(0)))
+        self._time = time
+
+    def get_dt(self):
+        return self._time
+
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         """ update the data stored by expression.
 
@@ -254,7 +261,7 @@ class Adapter:
 
         self._coupling_subdomain = None  # initialized later
         self._mesh_fenics = None  # initialized later
-        self._coupling_bc_expression = None  # initialized later
+        self._coupling_bc_expressions = [] # initialized later
 
         self._fenics_dimensions = None  # initialized later
 
@@ -267,12 +274,10 @@ class Adapter:
 
         # write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
-        self._write_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
         self._write_function_type = None  # stores whether write function is scalar or vector valued
 
         # read data related quantities (read data is read by this solver from preCICE)
         self._read_data_name = self._config.get_read_data_name()
-        self._read_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
         self._write_function_type = None  # stores whether read function is scalar or vector valued
 
         # numerics
@@ -322,14 +327,14 @@ class Adapter:
             else:
                 raise Exception("Dimensions don't match.")
 
-    def _write_block_data(self, time):
+    def _write_block_data(self, write_data, time):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted.
         """
 
         assert (self._write_function_type in list(FunctionType))
 
-        precice_write_data = self._convert_to_linear_write_data(self._write_data, self._write_function_type)
+        precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
 
         if self._write_function_type is FunctionType.SCALAR:
             print("write SCALAR")
@@ -369,21 +374,22 @@ class Adapter:
         assert(self._read_function_type in list(FunctionType))
 
         if self._read_function_type is FunctionType.SCALAR:
-            self._read_data = self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
-
+            read_data = self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
         elif self._read_function_type is FunctionType.VECTOR:
             precice_read_data = self._interface.read_block_vector_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
             if self._can_apply_2d_3d_coupling():
                 precice_read_data = np.reshape(precice_read_data, (self._n_vertices, self._dimensions), 'C')
                 assert(precice_read_data.shape[1] == 3)
 
-                self._read_data[:, 0] = precice_read_data[:, 0]
-                self._read_data[:, 1] = precice_read_data[:, 1]
+                read_data = precice_read_data[:, 0:2]
                 #z is the dead direction so it is supposed that the data is close to zero
                 np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
                 assert(np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
+            else:
+                read_data = precice_read_data
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
+        return read_data
 
     def _extract_coupling_boundary_vertices(self):
         """Extracts vertices which lie on the boundary.
@@ -437,7 +443,9 @@ class Adapter:
         elif self._write_function_type is FunctionType.VECTOR:
             self._write_data_dimension = self._dimensions
             assert (self._write_data_dimension > 1)
-        self._write_data = self._convert_fenics_to_precice(write_function_init)
+        write_data = self._convert_fenics_to_precice(write_function_init)
+
+        return write_data
 
     def _set_read_field(self, read_function_init):
         """Sets the read field. Called by initalize() function at the
@@ -452,29 +460,33 @@ class Adapter:
         elif self._read_function_type is FunctionType.VECTOR:
             self._read_data_dimension = self._dimensions
             assert (self._read_data_dimension > 1)
-        self._read_data = self._convert_fenics_to_precice(read_function_init)
+        read_data = self._convert_fenics_to_precice(read_function_init)
 
-    def _create_coupling_boundary_condition(self):
+        return read_data
+
+    def _create_coupling_boundary_condition(self, dt):
         """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
         x_vert, y_vert = self._extract_coupling_boundary_coordinates()
-
         try:  # works with dolfin 1.6.0
-            self._coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element()) # elemnt information must be provided, else DOLFIN assumes scalar function
+            expression = self._my_expression(element=self._function_space.ufl_element()) # element information must be provided, else DOLFIN assumes scalar function
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            self._coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
-        self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
+            expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
+        expression.set_dt(dt)
+        expression.set_boundary_data(self._initial_read_data, x_vert, y_vert)
+        return expression
 
-    def create_coupling_dirichlet_boundary_condition(self, function_space):
+    def create_coupling_dirichlet_boundary_condition(self, function_space, dt):
         """Creates the coupling Dirichlet boundary conditions using
         create_coupling_boundary_condition() method.
 
         :return: dolfin.DirichletBC()
         """
         self._function_space = function_space
-        self._create_coupling_boundary_condition()
-        return dolfin.DirichletBC(self._function_space, self._coupling_bc_expression, self._coupling_subdomain)
+        expression = self._create_coupling_boundary_condition(dt)
+        self._coupling_bc_expressions.append(expression)
+        return dolfin.DirichletBC(self._function_space, expression, self._coupling_subdomain)
 
-    def create_coupling_neumann_boundary_condition(self, test_functions, boundary_marker=None):
+    def create_coupling_neumann_boundary_condition(self, test_functions, dt, boundary_marker=None):
         """Creates the coupling Neumann boundary conditions using
         create_coupling_boundary_condition() method.
 
@@ -483,13 +495,14 @@ class Adapter:
          FEniCS Tutorial Volume I." (2016).)
         """
         self._function_space = test_functions.function_space()
-        self._create_coupling_boundary_condition()
+        expression = self._create_coupling_boundary_condition(dt)
+        self._coupling_bc_expressions.append(expression)
         if not boundary_marker: # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
-            return dot(test_functions, self._coupling_bc_expression) * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
+            return dot(test_functions, expression) * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
         else: # For multiple Neumann BCs integration should only be performed over the respective domain.
             # TODO: fix the problem here
             raise Exception("Boundary markers are not implemented yet")
-            return dot(self._coupling_bc_expression, test_functions) * self.dss(boundary_marker)
+            return dot(expression, test_functions) * self.dss(boundary_marker)
         
     def create_force_boundary_condition(self, function_space):
         """
@@ -502,9 +515,9 @@ class Adapter:
         self._function_space = function_space
         self._has_force_boundary = True
 
-        return self._get_forces_as_point_sources()
+        return self._get_forces_as_point_sources(self._initial_read_data)
 
-    def _get_forces_as_point_sources(self):
+    def _get_forces_as_point_sources(self, read_data):
         """
         Creates 2 dicts of PointSources that can be applied to the assembled system.
         Applies filter_point_source to avoid forces being applied to already existing Dirichlet BC, since this would
@@ -526,11 +539,11 @@ class Adapter:
                 key = (px, py)
                 x_forces[key] = PointSource(self._function_space.sub(0),
                                             Point(px, py),
-                                            self._read_data[i, 0])
+                                            read_data[i, 0])
                 y_forces[key] = PointSource(self._function_space.sub(1),
                                             Point(px, py),
-                                            self._read_data[i, 1])
-                print("Force at (x,y) = {} is (Fx, Fy) = {}".format((px,py), (self._read_data[i, 0], self._read_data[i, 1])))
+                                            read_data[i, 1])
+                print("Force at (x,y) = {} is (Fx, Fy) = {}".format((px, py), (read_data[i, 0], read_data[i, 1])))
 
             # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
             x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
@@ -590,10 +603,11 @@ class Adapter:
 
         # sample write data at interface
         x_vert, y_vert = self._extract_coupling_boundary_coordinates()
-        self._write_data = self._convert_fenics_to_precice(write_function)
+        write_data = self._convert_fenics_to_precice(write_function)
         # communication
         if True:  # todo: add self._interface.is_write_data_required(dt). We should add this check. However, it is currently not properly implemented for waveform relaxation
-            self._write_block_data(t + dt)
+            logging.debug("writing in fenicsadapter.advance")
+            self._write_block_data(write_data, t + dt)
         max_dt = self._interface.advance(dt)
 
         precice_step_complete = False
@@ -614,13 +628,17 @@ class Adapter:
         _, t, n = state.get_state()
 
         if True:  # todo: add self._interface.is_read_data_available().  We should add this check. However, it is currently not properly implemented for waveform relaxation
-            self._read_block_data(t + dt)  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
+            for expression in self._coupling_bc_expressions:
+                logging.debug("reading in fenicsadapter.advance:")
+                expr_dt = expression.get_dt()
+                read_data = self._read_block_data(t + expr_dt(0))  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
+                expression.update_boundary_data(read_data, x_vert, y_vert)
 
         # update boundary condition with read data
         if self._has_force_boundary:
-            x_forces, y_forces = self._get_forces_as_point_sources()
-        else:
-            self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
+            read_data = self._read_block_data(t + dt)  # if precice_step_complete, we have to already use the new t for reading. Otherwise, we get a lag. Therefore, this command has to be called AFTER the state has been updated/recovered.
+            x_forces, y_forces = self._get_forces_as_point_sources(read_data)
+
 
         # TODO: this if-else statement smells.
         if self._has_force_boundary:
@@ -666,8 +684,8 @@ class Adapter:
             self._Dirichlet_Boundary=dirichlet_boundary
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
-        self._set_read_field(read_field)
-        self._set_write_field(write_field)
+        read_data = self._set_read_field(read_field)
+        write_data = self._set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
         dt = Constant(0)
@@ -677,16 +695,17 @@ class Adapter:
         self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name, self._read_data_name, self._write_data_dimension, self._read_data_dimension)
 
         if self._interface.writing_initial_data_is_required():
-            self._write_block_data(t)
+            self._write_block_data(write_data, t)
             self._interface.fulfilled_action(action_write_initial_data())
 
-        precice_write_data = self._convert_to_linear_write_data(self._write_data, self._write_function_type)
-        precice_read_data = self._convert_to_linear_read_data(self._read_data, self._read_function_type)
-
+        precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
+        precice_read_data = self._convert_to_linear_read_data(read_data, self._read_function_type)
+        logging.info("fenicsadapter enters initialize_data")
         self._interface.initialize_data(read_zero=precice_read_data, write_zero=precice_write_data)
+        logging.info("fenicsadapter exits initialize_data")
 
         if self._interface.is_read_data_available():
-            self._read_block_data(t + dt(0))
+            self._initial_read_data = self._read_block_data(t + float(dt))
     
         if self._interface.writing_initial_data_is_required():
             initial_state = SolverState(u_n, t, n)
