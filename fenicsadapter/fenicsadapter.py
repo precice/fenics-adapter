@@ -22,7 +22,7 @@ except ImportError:
        raise Exception("ERROR: PRECICE_ROOT not defined!")
 
     precice_root = os.getenv('PRECICE_ROOT')
-    precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
+    precice_python_adapter_root = precice_root+"/src/precice/bindings/python_future"
     sys.path.insert(0, precice_python_adapter_root)
     import precice
 
@@ -420,10 +420,10 @@ class Adapter:
         vertices_2 = []
 
         for v1 in dolfin.vertices(self._mesh_fenics):
-            if self._coupling_subdomain.inside(v1.point, True):
+            if self._coupling_subdomain.inside(v1.point(), True):
 
                 for v2 in dolfin.vertices(self._mesh_fenics):
-                    if self._coupling_subdomain.inside(v2.point, True):
+                    if self._coupling_subdomain.inside(v2.point(), True):
 
                         for edge1 in dolfin.edges(v1):
                             for edge2 in dolfin.edges(v2):
@@ -435,8 +435,10 @@ class Adapter:
                                     vertices_2.append(v2.x(0))
                                     vertices_2.append(v2.x(1))
 
-        vertices1_ids = self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, vertices_1)
-        vertices2_ids = self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, vertices_2)
+        vertices1_ids = []
+        vertices2_ids = []
+        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1, vertices1_ids)
+        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2, vertices2_ids)
 
         return vertices1_ids, vertices2_ids
 
