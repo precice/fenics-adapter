@@ -412,9 +412,10 @@ class Adapter:
         """Returns true if both vertices are connected by an edge. """
         for edge1 in dolfin.edges(v1):
             for edge2 in dolfin.edges(v2):
-                if edge1 == edge2:  # Vertices are connected by edge
+                print(edge1, edge2)
+                if edge1 is edge2:  # Vertices are connected by edge
+                    print("Returning true")
                     return True
-
         return False
 
     def _extract_coupling_boundary_edges(self):
@@ -435,12 +436,17 @@ class Adapter:
         for v1 in vertices.keys():
             for v2 in vertices.keys():
                 if self._are_connected_by_edge(v1, v2):
-                    vertices[v1].append(v2)
-                    vertices[v2].append(v1)
+                    print(v1, v2)
+                    vertices[v1] = v2
+                    vertices[v2] = v1
 
         vertices_1 = []
         vertices_2 = []
 
+        """
+        for v1 in vertices:
+            print(v1, vertices[v1])
+        """
         for v1, v2 in vertices.items():
             vertices_1.append(v1.x(0))
             vertices_1.append(v1.x(1))
@@ -469,13 +475,6 @@ class Adapter:
 
         for i in edge_vertex_ids1:
             self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
-
-        """
-        for vert in dolfin.vertices(self._mesh_fenics):
-            print("\nvert", vert.index())
-            for edge in dolfin.edges(vert):
-                print("   edge", edge.index())
-        """
 
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
