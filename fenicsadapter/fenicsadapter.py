@@ -408,6 +408,15 @@ class Adapter:
         elif self._dimensions == 3:
             return np.stack([vertices_x, vertices_y, vertices_z]), n
 
+    def _are_connected_by_edge(self, v1, v2):
+        """Returns true if both vertices are connected by an edge. """
+        for edge1 in dolfin.edges(v1):
+            for edge2 in dolfin.edges(v2):
+                if edge1 == edge2:  # Vertices are connected by edge
+                    return True
+
+        return False
+
     def _extract_coupling_boundary_edges(self):
         """Extracts edges of mesh which lie on the boundary.
         :return: list of vertex pair IDs showing edges
@@ -416,27 +425,32 @@ class Adapter:
         """
 
         n = 0
-        vertices_1 = []
-        vertices_2 = []
+        vertices = dict()
 
         for v1 in dolfin.vertices(self._mesh_fenics):
             if self._coupling_subdomain.inside(v1.point(), True):
+                vertices[v1] = []
+                n += 1
 
-                for v2 in dolfin.vertices(self._mesh_fenics):
-                    if self._coupling_subdomain.inside(v2.point(), True):
+        for v1 in vertices.keys():
+            for v2 in vertices.keys():
+                if self._are_connected_by_edge(v1, v2):
+                    vertices[v1].append(v2)
+                    vertices[v2].append(v1)
 
-                        for edge1 in dolfin.edges(v1):
-                            for edge2 in dolfin.edges(v2):
+        vertices_1 = []
+        vertices_2 = []
 
-                                if edge1 == edge2:
-                                    n += 1
-                                    vertices_1.append(v1.x(0))
-                                    vertices_1.append(v1.x(1))
-                                    vertices_2.append(v2.x(0))
-                                    vertices_2.append(v2.x(1))
+        for v1, v2 in vertices.items():
+            vertices_1.append(v1.x(0))
+            vertices_1.append(v1.x(1))
+            vertices_2.append(v2.x(0))
+            vertices_2.append(v2.x(1))
 
-        vertices1_ids = []
-        vertices2_ids = []
+        vertices_1 = np.array(vertices_1)
+        vertices_2 = np.array(vertices_2)
+        vertices1_ids = np.zeros(n)
+        vertices2_ids = np.zeros(n)
         self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1, vertices1_ids)
         self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2, vertices2_ids)
 
