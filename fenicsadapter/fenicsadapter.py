@@ -412,9 +412,7 @@ class Adapter:
         """Returns true if both vertices are connected by an edge. """
         for edge1 in dolfin.edges(v1):
             for edge2 in dolfin.edges(v2):
-                print(edge1, edge2)
-                if edge1 is edge2:  # Vertices are connected by edge
-                    print("Returning true")
+                if edge1.index() == edge2.index():  # Vertices are connected by edge
                     return True
         return False
 
@@ -436,17 +434,12 @@ class Adapter:
         for v1 in vertices.keys():
             for v2 in vertices.keys():
                 if self._are_connected_by_edge(v1, v2):
-                    print(v1, v2)
                     vertices[v1] = v2
                     vertices[v2] = v1
 
         vertices_1 = []
         vertices_2 = []
 
-        """
-        for v1 in vertices:
-            print(v1, vertices[v1])
-        """
         for v1, v2 in vertices.items():
             vertices_1.append(v1.x(0))
             vertices_1.append(v1.x(1))
@@ -471,10 +464,11 @@ class Adapter:
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
-        edge_vertex_ids1, edge_vertex_ids2 = self._extract_coupling_boundary_edges()
+        self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
 
-        for i in edge_vertex_ids1:
-            self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
+        for i in range(len(self._edge_vertex_ids1)):
+            print(self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
+            self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
