@@ -245,7 +245,7 @@ class Adapter:
 
     :ivar _config: object of class Config, which stores data from the JSON config file
     """
-    def __init__(self, adapter_config_filename='precice-adapter-config.json', other_adapter_config_filename='precice-adapter-config.json', interpolation_strategy=GeneralInterpolationExpression):
+    def __init__(self, adapter_config_filename='precice-adapter-config.json', other_adapter_config_filename='precice-adapter-config.json', interpolation_strategy=GeneralInterpolationExpression, wr_interpolation_strategy='linear'):
 
         self._config = Config(adapter_config_filename)
 
@@ -255,7 +255,7 @@ class Adapter:
 
         n_this = Config(adapter_config_filename).get_n_substeps()  # number of timesteps in this window, by default: no WR
         n_other = Config(other_adapter_config_filename).get_n_substeps()  # number of timesteps in other window, todo: in the end we don't want
-        self._interface.configure_waveform_relaxation(n_this, n_other)
+        self._interface.configure_waveform_relaxation(n_this, n_other, wr_interpolation_strategy)
         self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.get_dimensions()
 
