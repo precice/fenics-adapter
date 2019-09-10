@@ -470,6 +470,7 @@ class Adapter:
             print(self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
+
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
         beginning of the simulation.
