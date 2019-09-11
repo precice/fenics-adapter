@@ -418,7 +418,8 @@ class Adapter:
 
     def _extract_coupling_boundary_edges(self):
         """Extracts edges of mesh which lie on the boundary.
-        :return: list of vertex pair IDs showing edges
+        :return: two arrays of vertex IDs. Array 1 consists of first points of all edges
+        and Array 2 consists of second points of all edges
 
         NOTE: Edge calculation is only relevant in 2D cases.
         """
@@ -453,9 +454,6 @@ class Adapter:
 
         self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1, vertices1_ids)
         self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2, vertices2_ids)
-
-        for i in range(len(vertices1_ids)):
-            print(vertices1_ids[i], vertices2_ids[i])
 
         return vertices1_ids, vertices2_ids
 
