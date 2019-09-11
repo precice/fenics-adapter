@@ -22,7 +22,7 @@ except ImportError:
        raise Exception("ERROR: PRECICE_ROOT not defined!")
 
     precice_root = os.getenv('PRECICE_ROOT')
-    precice_python_adapter_root = precice_root+"/src/precice/bindings/python_future"
+    precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
     import precice
 
