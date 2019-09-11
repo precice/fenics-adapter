@@ -450,8 +450,12 @@ class Adapter:
         vertices_2 = np.array(vertices_2)
         vertices1_ids = np.zeros(n)
         vertices2_ids = np.zeros(n)
+
         self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1, vertices1_ids)
         self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2, vertices2_ids)
+
+        for i in range(len(vertices1_ids)):
+            print(vertices1_ids[i], vertices2_ids[i])
 
         return vertices1_ids, vertices2_ids
 
@@ -459,6 +463,7 @@ class Adapter:
         """Sets the coupling mesh. Called by initalize() function at the
         beginning of the simulation.
         """
+
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
@@ -467,9 +472,7 @@ class Adapter:
         self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
 
         for i in range(len(self._edge_vertex_ids1)):
-            print(self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
-
 
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
