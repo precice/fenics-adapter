@@ -51,6 +51,7 @@ class TestWriteData(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
+        Interface.get_mesh_vertex_ids_from_positions = MagicMock()
 
         write_u = self.scalar_function
         read_u = self.vector_function
@@ -90,6 +91,7 @@ class TestWriteData(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
+        Interface.get_mesh_vertex_ids_from_positions = MagicMock()
 
         write_u = self.vector_function
         read_u = self.scalar_function
@@ -136,6 +138,7 @@ class TestWriteData(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
+        Interface.get_mesh_vertex_ids_from_positions = MagicMock()
 
         write_u = self.vector_function
         read_u = self.scalar_function
@@ -180,6 +183,7 @@ class TestWriteData(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
+        Interface.get_mesh_vertex_ids_from_positions = MagicMock()
 
         write_u = self.scalar_function
         read_u = self.vector_function
