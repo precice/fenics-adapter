@@ -417,9 +417,9 @@ class Adapter:
                     raise Exception("Dimensions do not match!")
 
         if self._dimensions == 2:
-            return np.stack([vertices_x, vertices_y]), n
+            return np.column_stack([vertices_x, vertices_y]), n
         elif self._dimensions == 3:
-            return np.stack([vertices_x, vertices_y, vertices_z]), n
+            return np.column_stack([vertices_x, vertices_y, vertices_z]), n
 
     def set_coupling_mesh(self, mesh, subdomain):
         """Sets the coupling mesh. Called by initalize() function at the
@@ -428,7 +428,7 @@ class Adapter:
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
-        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices.flatten('F'))
+        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
@@ -728,10 +728,10 @@ class Adapter:
         :return: x and y cooridinates.
         """
         vertices, _ = self._extract_coupling_boundary_vertices()
-        vertices_x = vertices[0, :]
-        vertices_y = vertices[1, :]
+        vertices_x = vertices[:, 0]
+        vertices_y = vertices[:, 1]
         if self._dimensions == 3:
-            vertices_z = vertices[2, :]
+            vertices_z = vertices[:, 2]
 
         if self._dimensions == 2 or self._can_apply_2d_3d_coupling():
             return vertices_x, vertices_y
