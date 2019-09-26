@@ -279,7 +279,7 @@ class Adapter:
         self._read_data_name = self._config.get_read_data_name()
         self._read_data_id = self._interface.get_data_id(self._read_data_name, self._mesh_id)
         self._read_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
-        self._write_function_type = None  # stores whether read function is scalar or vector valued
+        self._read_function_type = None  # stores whether read function is scalar or vector valued
 
         # numerics
         self._precice_tau = None
