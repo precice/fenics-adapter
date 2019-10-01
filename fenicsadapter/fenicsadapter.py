@@ -471,8 +471,6 @@ class Adapter:
         self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
 
         for i in range(len(self._edge_vertex_ids1)):
-            # print("edge vertex ids1 = {}".format(self._edge_vertex_ids1[i]))
-            # print("edge vertex ids2 = {}".format(self._edge_vertex_ids2[i]))
             self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
     def _set_write_field(self, write_function_init):
