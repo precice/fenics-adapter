@@ -215,7 +215,7 @@ class GeneralInterpolationExpression(CustomExpression):
 
 
 class ExactInterpolationExpression(CustomExpression):
-    """Uses cubic spline interpolation for implementation of CustomExpression.interpolate. Only allows intepolation on
+    """Uses cubic spline interpolation for implementation of CustomExpression.interpolate. Only allows interpolation on
     coupling that are parallel to the y axis, and if the coordinates in self._coords_y are ordered such that the nodes
     on the coupling mesh are traversed w.r.t their connectivity.
     However, this method allows to exactly recover the solution at the coupling interface, if it is a polynomial of
@@ -403,10 +403,61 @@ class Adapter:
                 else:
                     raise Exception("Dimensions do not match!")
 
+        assert(n != 0), "No coupling boundary vertices detected"
+
         if self._dimensions == 2:
             return np.stack([vertices_x, vertices_y]), n
         elif self._dimensions == 3:
             return np.stack([vertices_x, vertices_y, vertices_z]), n
+
+    def _are_connected_by_edge(self, v1, v2):
+        """Returns true if both vertices are connected by an edge. """
+        for edge1 in dolfin.edges(v1):
+            for edge2 in dolfin.edges(v2):
+                if edge1.index() == edge2.index():  # Vertices are connected by edge
+                    return True
+        return False
+
+    def _extract_coupling_boundary_edges(self):
+        """Extracts edges of mesh which lie on the boundary.
+        :return: two arrays of vertex IDs. Array 1 consists of first points of all edges
+        and Array 2 consists of second points of all edges
+
+        NOTE: Edge calculation is only relevant in 2D cases.
+        """
+
+        n = 0
+        vertices = dict()
+
+        for v1 in dolfin.vertices(self._mesh_fenics):
+            if self._coupling_subdomain.inside(v1.point(), True):
+                vertices[v1] = []
+                n += 1
+
+        for v1 in vertices.keys():
+            for v2 in vertices.keys():
+                if self._are_connected_by_edge(v1, v2):
+                    vertices[v1] = v2
+                    vertices[v2] = v1
+
+        vertices_1 = []
+        vertices_2 = []
+
+        for v1, v2 in vertices.items():
+            vertices_1.append(v1.x(0))
+            vertices_1.append(v1.x(1))
+            vertices_2.append(v2.x(0))
+            vertices_2.append(v2.x(1))
+
+        vertices_1 = np.array(vertices_1)
+        vertices_2 = np.array(vertices_2)
+        vertices1_ids = np.zeros(n)
+        vertices2_ids = np.zeros(n)
+
+        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1, vertices1_ids)
+        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2, vertices2_ids)
+
+        return vertices1_ids, vertices2_ids
 
     def set_coupling_mesh(self, mesh, subdomain):
         """Sets the coupling mesh. Called by initalize() function at the
@@ -417,6 +468,10 @@ class Adapter:
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+        self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
+
+        for i in range(len(self._edge_vertex_ids1)):
+            self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
