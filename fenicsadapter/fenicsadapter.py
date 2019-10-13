@@ -692,7 +692,11 @@ class Adapter:
         self.fenics_dt = self._precice_tau / self._config.get_n_substeps()
         dt.assign(np.min([self.fenics_dt, self._precice_tau]))
 
-        self._interface.initialize_waveforms(self._mesh_id, self._n_vertices, self._vertex_ids, self._write_data_name, self._read_data_name, self._write_data_dimension, self._read_data_dimension)
+        write_info = {"mesh_id": self._mesh_id, "n_vertices": self._n_vertices, "vertex_ids": self._vertex_ids,
+                      "data_name": self._write_data_name, "data_dimension": self._write_data_dimension}
+        read_info = {"mesh_id": self._mesh_id, "n_vertices": self._n_vertices, "vertex_ids": self._vertex_ids,
+                     "data_name": self._read_data_name, "data_dimension": self._read_data_dimension}
+        self._interface.initialize_waveforms(write_info, read_info)
 
         if self._interface.writing_initial_data_is_required():
             self._write_block_data(write_data, t)
