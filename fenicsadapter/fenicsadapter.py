@@ -225,19 +225,30 @@ class ExactInterpolationExpression(CustomExpression):
     def create_interpolant(self):
         interpolant = []
         if self._dimension == 2:
-            assert(self.is_scalar_valued())  # for 1D only R->R mapping is allowed by preCICE, no need to implement Vector case
-            interpolant.append(interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind="cubic"))
-        elif self.is_vector_valued():
-            raise Exception("Vector valued functions are not supported by ExactInterpolationExpression. "
-                            "Use GeneralInterpolationExpression.")
+            if self.is_scalar_valued():  # check if scalar or vector-valued
+                interpolant.append(interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind="cubic"))
+            elif self.is_vector_valued():
+                interpolant.append(interp1d(self._coords_y, self._vals[:, 0].flatten(), bounds_error=False, fill_value="extrapolate", kind="cubic"))
+                interpolant.append(interp1d(self._coords_y, self._vals[:, 1].flatten(), bounds_error=False, fill_value="extrapolate", kind="cubic"))
+            else:
+                raise Exception("Problem dimension and data dimension not matching.")
         else:
             raise Exception("Dimension of the function is invalid/not supported.")
 
         return interpolant
 
     def interpolate(self, x):
-        assert (self.is_scalar_valued() and self._vals.ndim == 1)
-        return [self._f[0](x[1])]
+        assert ((self.is_scalar_valued() and self._vals.ndim == 1) or
+                (self.is_vector_valued() and self._vals.ndim == self._dimension))
+
+        return_value = self._vals.ndim * [None]
+
+        if self._dimension == 2:
+            for i in range(self._vals.ndim):
+                return_value[i] = self._f[i](x[1])
+        else:
+            raise Exception("invalid dimensionality!")
+        return return_value
 
 
 class Adapter:
