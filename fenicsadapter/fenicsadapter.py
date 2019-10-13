@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import Point, UserExpression, SubDomain, Function, Measure, Expression, dot, PointSource
+from dolfin import Point, UserExpression, SubDomain, Function, Measure, Expression, dot, PointSource, FacetNormal
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -511,7 +511,7 @@ class Adapter:
         self._create_coupling_boundary_condition()
         return dolfin.DirichletBC(self._function_space, self._coupling_bc_expression, self._coupling_subdomain)
 
-    def create_coupling_neumann_boundary_condition(self, test_functions, boundary_marker=None):
+    def create_coupling_neumann_boundary_condition(self, test_functions, function_space=None, boundary_marker=None):
         """Creates the coupling Neumann boundary conditions using
         create_coupling_boundary_condition() method.
 
@@ -519,10 +519,19 @@ class Adapter:
          Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The
          FEniCS Tutorial Volume I." (2016).)
         """
-        self._function_space = test_functions.function_space()
+        if not function_space:
+            self._function_space = test_functions.function_space()
+        else:
+            self._function_space = function_space
         self._create_coupling_boundary_condition()
         if not boundary_marker: # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
-            return dot(test_functions, self._coupling_bc_expression) * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
+            if self._coupling_bc_expression.is_scalar_valued():
+                return test_functions * self._coupling_bc_expression * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
+            elif self._coupling_bc_expression.is_vector_valued():
+                n = FacetNormal(self._mesh_fenics)
+                return -test_functions * dot(n, self._coupling_bc_expression) * dolfin.ds
+            else:
+                raise Exception("invalid!")
         else: # For multiple Neumann BCs integration should only be performed over the respective domain.
             # TODO: fix the problem here
             raise Exception("Boundary markers are not implemented yet")
