@@ -568,32 +568,28 @@ class Adapter:
         lead to an overdetermined system that cannot be solved.
         :return: Returns lists of PointSources TODO: get rid of this legacy code, dicts should be used for a PointSource, since they can provide the location of the PointSouce, as well. Even, inside the FEniCS user code.
         """
-        if self._can_apply_2d_3d_coupling():
-            # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
-            # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
+        # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
+        # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
 
-            x_forces = dict()  # dict of PointSources for Forces in x direction
-            y_forces = dict()  # dict of PointSources for Forces in y direction
+        x_forces = dict()  # dict of PointSources for Forces in x direction
+        y_forces = dict()  # dict of PointSources for Forces in y direction
 
-            vertices_x = self._coupling_mesh_vertices[0, :]
-            vertices_y = self._coupling_mesh_vertices[1, :]
+        vertices_x = self._coupling_mesh_vertices[0, :]
+        vertices_y = self._coupling_mesh_vertices[1, :]
 
-            for i in range(self._n_vertices):
-                px, py = vertices_x[i], vertices_y[i]
-                key = (px, py)
-                x_forces[key] = PointSource(self._function_space.sub(0),
-                                            Point(px, py),
-                                            self._read_data[i, 0])
-                y_forces[key] = PointSource(self._function_space.sub(1),
-                                            Point(px, py),
-                                            self._read_data[i, 1])
+        for i in range(self._n_vertices):
+            px, py = vertices_x[i], vertices_y[i]
+            key = (px, py)
+            x_forces[key] = PointSource(self._function_space.sub(0),
+                                        Point(px, py),
+                                        self._read_data[i, 0])
+            y_forces[key] = PointSource(self._function_space.sub(1),
+                                        Point(px, py),
+                                        self._read_data[i, 1])
 
-            # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-            x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
-            y_forces = filter_point_sources(y_forces, self._Dirichlet_Boundary)
-        else:
-            raise Exception("Force-boundaries are only implemented for 2d-3d coupling. "
-                            "Same Code should be working for 2D Coupling but it is not tested so far.")
+        # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
+        x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
+        y_forces = filter_point_sources(y_forces, self._Dirichlet_Boundary)
 
         return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
