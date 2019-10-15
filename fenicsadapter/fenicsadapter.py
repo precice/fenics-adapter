@@ -308,24 +308,24 @@ class Adapter:
         else:
             raise Exception("Cannot handle data type %s" % type(data))
 
-    def _convert_to_linear_write_data(self, data, function_type):
-        if function_type is FunctionType.SCALAR:
-            return data
-        elif function_type is FunctionType.VECTOR:
-            if self._fenics_dimensions == self._dimensions:
-                return data.ravel()
-            elif self._can_apply_2d_3d_coupling():
-                # in 2d-3d coupling z dimension is set to zero
-                precice_write_data = np.column_stack((data[:, 0],
-                                                      data[:, 1],
-                                                      np.zeros(self._n_vertices)))
-
-                assert(precice_write_data.shape[0] == self._n_vertices and
-                       precice_write_data.shape[1] == self._dimensions)
-
-                return precice_write_data.ravel()
-            else:
-                raise Exception("Dimensions don't match.")
+#    def _convert_to_linear_write_data(self, data, function_type):
+#        if function_type is FunctionType.SCALAR:
+#            return data
+#        elif function_type is FunctionType.VECTOR:
+#            if self._fenics_dimensions == self._dimensions:
+#                return data.ravel()
+#            elif self._can_apply_2d_3d_coupling():
+#                # in 2d-3d coupling z dimension is set to zero
+#                precice_write_data = np.column_stack((data[:, 0],
+#                                                      data[:, 1],
+#                                                      np.zeros(self._n_vertices)))
+#
+#                assert(precice_write_data.shape[0] == self._n_vertices and
+#                       precice_write_data.shape[1] == self._dimensions)
+#
+#                return precice_write_data.ravel()
+#            else:
+#                raise Exception("Dimensions don't match.")
 
     def _write_block_data(self, write_data, time):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -334,7 +334,8 @@ class Adapter:
 
         assert (self._write_function_type in list(FunctionType))
 
-        precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
+        #precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
+        precice_write_data = write_data
 
         if self._write_function_type is FunctionType.SCALAR:
             print("write SCALAR")
@@ -345,24 +346,24 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def _convert_to_linear_read_data(self, data, function_type):
-        if function_type is FunctionType.SCALAR:
-            return data
-        elif function_type is FunctionType.VECTOR:
-            if self._fenics_dimensions == self._dimensions:
-                return data.ravel()
-            elif self._can_apply_2d_3d_coupling():
-                # in 2d-3d coupling z dimension is set to zero
-                precice_read_data = np.column_stack((np.zeros(self._n_vertices),
-                                                     np.zeros(self._n_vertices),
-                                                     np.zeros(self._n_vertices)))
-
-                assert(precice_read_data.shape[0] == self._n_vertices and
-                       precice_read_data.shape[1] == self._dimensions)
-
-                return precice_read_data.ravel()
-            else:
-                raise Exception("Dimensions don't match.")
+    #def _convert_to_linear_read_data(self, data, function_type):
+    #    if function_type is FunctionType.SCALAR:
+    #        return data
+    #    elif function_type is FunctionType.VECTOR:
+    #        if self._fenics_dimensions == self._dimensions:
+    #            return data.ravel()
+    #        elif self._can_apply_2d_3d_coupling():
+    #            # in 2d-3d coupling z dimension is set to zero
+    #            precice_read_data = np.column_stack((np.zeros(self._n_vertices),
+    #                                                 np.zeros(self._n_vertices),
+    #                                                 np.zeros(self._n_vertices)))
+    #
+    #            assert(precice_read_data.shape[0] == self._n_vertices and
+    #                   precice_read_data.shape[1] == self._dimensions)
+#
+#                return precice_read_data.ravel()
+#            else:
+#                raise Exception("Dimensions don't match.")
 
     def _read_block_data(self, time):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -377,16 +378,7 @@ class Adapter:
             read_data = self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
         elif self._read_function_type is FunctionType.VECTOR:
             precice_read_data = self._interface.read_block_vector_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
-            if self._can_apply_2d_3d_coupling():
-                precice_read_data = np.reshape(precice_read_data, (self._n_vertices, self._dimensions), 'C')
-                assert(precice_read_data.shape[1] == 3)
-
-                read_data = precice_read_data[:, 0:2]
-                #z is the dead direction so it is supposed that the data is close to zero
-                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
-                assert(np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
-            else:
-                read_data = precice_read_data
+            read_data = precice_read_data
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
         return read_data
@@ -524,33 +516,33 @@ class Adapter:
         lead to an overdetermined system that cannot be solved.
         :return: Returns lists of PointSources TODO: get rid of this legacy code, dicts should be used for a PointSource, since they can provide the location of the PointSouce, as well. Even, inside the FEniCS user code.
         """
-        if self._can_apply_2d_3d_coupling():
-            # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
-            # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
+        #if self._can_apply_2d_3d_coupling():
+        # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
+        # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
 
-            x_forces = dict()  # dict of PointSources for Forces in x direction
-            y_forces = dict()  # dict of PointSources for Forces in y direction
+        x_forces = dict()  # dict of PointSources for Forces in x direction
+        y_forces = dict()  # dict of PointSources for Forces in y direction
 
-            vertices_x = self._coupling_mesh_vertices[0, :]
-            vertices_y = self._coupling_mesh_vertices[1, :]
+        vertices_x = self._coupling_mesh_vertices[:, 0]
+        vertices_y = self._coupling_mesh_vertices[:, 1]
 
-            for i in range(self._n_vertices):
-                px, py = vertices_x[i], vertices_y[i]
-                key = (px, py)
-                x_forces[key] = PointSource(self._function_space.sub(0),
-                                            Point(px, py),
-                                            read_data[i, 0])
-                y_forces[key] = PointSource(self._function_space.sub(1),
-                                            Point(px, py),
-                                            read_data[i, 1])
-                print("Force at (x,y) = {} is (Fx, Fy) = {}".format((px, py), (read_data[i, 0], read_data[i, 1])))
+        for i in range(self._n_vertices):
+            px, py = vertices_x[i], vertices_y[i]
+            key = (px, py)
+            x_forces[key] = PointSource(self._function_space.sub(0),
+                                        Point(px, py),
+                                        read_data[i, 0])
+            y_forces[key] = PointSource(self._function_space.sub(1),
+                                        Point(px, py),
+                                        read_data[i, 1])
+            #print("Force at (x,y) = {} is (Fx, Fy) = {}".format((px, py), (read_data[i, 0], read_data[i, 1])))
 
-            # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-            x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
-            y_forces = filter_point_sources(y_forces, self._Dirichlet_Boundary)
-        else:
-            raise Exception("Force-boundaries are only implemented for 2d-3d coupling. "
-                            "Same Code should be working for 2D Coupling but it is not tested so far.")
+        # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
+        x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
+        y_forces = filter_point_sources(y_forces, self._Dirichlet_Boundary)
+        #else:
+        #    raise Exception("Force-boundaries are only implemented for 2d-3d coupling. "
+        #                    "Same Code should be working for 2D Coupling but it is not tested so far.")
 
         return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
@@ -702,8 +694,10 @@ class Adapter:
             self._write_block_data(write_data, t)
             self._interface.fulfilled_action(action_write_initial_data())
 
-        precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
-        precice_read_data = self._convert_to_linear_read_data(read_data, self._read_function_type)
+        #precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
+        #precice_read_data = self._convert_to_linear_read_data(read_data, self._read_function_type)
+        precice_write_data = write_data
+        precice_read_data = read_data
         logging.info("fenicsadapter enters initialize_data")
         self._interface.initialize_data(read_zero=precice_read_data, write_zero=precice_write_data)
         logging.info("fenicsadapter exits initialize_data")
