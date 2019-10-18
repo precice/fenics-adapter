@@ -61,7 +61,7 @@ class CustomExpression(UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
     provided by preCICE.
     """
-    def set_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
+    def set_boundary_data(self, vals, coords_x, coords_y=None):
         """ initialize data stored by expression.
 
         :param vals: data values on nodes
@@ -69,7 +69,7 @@ class CustomExpression(UserExpression):
         :param coords_y: y coordinates of nodes
         :param coords_z: z coordinates of nodes
         """
-        self.update_boundary_data(vals, coords_x, coords_y, coords_z)
+        self.update_boundary_data(vals, coords_x, coords_y)
 
     def set_dt(self, time):
         print("set time {}".format(time(0)))
@@ -78,16 +78,15 @@ class CustomExpression(UserExpression):
     def get_dt(self):
         return self._time
 
-    def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
+    def update_boundary_data(self, vals, coords_x, coords_y=None):
         """ update the data stored by expression.
 
         :param vals: data values on nodes
         :param coords_x: x coordinates of nodes
         :param coords_y: y coordinates of nodes
-        :param coords_z: z coordinates of nodes
         """
         self._coords_x = coords_x
-        self._dimension = 3
+        self._dimension = 2
         if coords_y is None:
             self._dimension -= 1
             coords_y = np.zeros(self._coords_x.shape)
