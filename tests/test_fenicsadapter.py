@@ -58,7 +58,7 @@ class TestCheckpointing(TestCase):
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
     data_id = MagicMock()
     mesh_id = MagicMock()
-    vertex_ids = MagicMock()
+    dummy_vertex_ids = np.arange(n_vertices)
     write_data_name = "Dummy-Write"
     read_data_name = "Dummy-Read"
     n_data = 10
@@ -85,7 +85,7 @@ class TestCheckpointing(TestCase):
         precice._checkpoint.write(mocked_state)
         precice._precice_tau = 1
         precice._n_vertices = self.n_vertices
-        precice._vertex_ids = self.vertex_ids
+        precice._vertex_ids = self.dummy_vertex_ids
         precice._write_data_name = self.write_data_name
         precice._write_data = np.zeros(self.n_vertices)
         precice._read_data_name = self.read_data_name
@@ -96,7 +96,11 @@ class TestCheckpointing(TestCase):
         from waveformbindings import WaveformBindings
 
         if type(precice._interface) is WaveformBindings:
-            precice._interface.initialize_waveforms(self.mesh_id, self.n_vertices, self.vertex_ids, self.write_data_name, self.read_data_name, 1, 1)
+            write_info = {"mesh_id": self.mesh_id, "n_vertices": self.n_vertices, "vertex_ids": self.dummy_vertex_ids,
+                          "data_name": self.write_data_name, "data_dimension": 1}
+            read_info = {"mesh_id": self.mesh_id, "n_vertices": self.n_vertices, "vertex_ids": self.dummy_vertex_ids,
+                         "data_name": self.read_data_name, "data_dimension": 1}
+            precice._interface.initialize_waveforms(write_info, read_info)
 
     def test_advance_success(self):
         """

@@ -21,8 +21,10 @@ class RightBoundary(SubDomain):
 @patch.dict('sys.modules', **{'precice_future': tests.MockedPrecice})
 class TestWriteData(TestCase):
     dummy_config = "tests/precice-adapter-config-WR1.json"
-
-    mesh = UnitSquareMesh(10, 10)
+    n_vertices = 11
+    n_cells = n_vertices - 1
+    mesh = UnitSquareMesh(n_cells, n_cells)
+    dummy_vertex_ids = np.arange(n_vertices)
 
     scalar_expr = Expression("x[0]*x[0] + x[1]*x[1]", degree=2)
     scalar_V = FunctionSpace(mesh, "P", 2)
@@ -45,7 +47,7 @@ class TestWriteData(TestCase):
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(return_value=self.dummy_vertex_ids)
         Interface.initialize = MagicMock(return_value=self.precice_dt)
         Interface.initialize_data = MagicMock()
         Interface.fulfilled_action = MagicMock()
@@ -86,7 +88,7 @@ class TestWriteData(TestCase):
         Interface.write_block_vector_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(return_value=self.dummy_vertex_ids)
         Interface.initialize = MagicMock(return_value=self.precice_dt)
         Interface.initialize_data = MagicMock()
         Interface.fulfilled_action = MagicMock()
@@ -108,7 +110,7 @@ class TestWriteData(TestCase):
         precice.advance(write_u, u_init, u_init, 0, self.fenics_dt, 0)
 
         expected_data_id = 15
-        expected_size = 11
+        expected_size = self.n_vertices
         expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
         expected_values_y = np.array([self.vector_expr(x_right, y)[1] for y in np.linspace(y_bottom, y_top, 11)])
         expected_values = np.stack([expected_values_x, expected_values_y]).T.ravel()
@@ -134,7 +136,7 @@ class TestWriteData(TestCase):
         Interface.write_block_vector_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock(side_effect=return_dummy_data)
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(return_value=self.dummy_vertex_ids)
         Interface.initialize = MagicMock(return_value=self.precice_dt)
         Interface.initialize_data = MagicMock()
         Interface.fulfilled_action = MagicMock()
@@ -180,7 +182,7 @@ class TestWriteData(TestCase):
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_vector_data = MagicMock(side_effect=return_dummy_data)
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(return_value=self.dummy_vertex_ids)
         Interface.initialize = MagicMock(return_value=self.precice_dt)
         Interface.initialize_data = MagicMock()
         Interface.fulfilled_action = MagicMock()
