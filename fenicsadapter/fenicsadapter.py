@@ -482,7 +482,7 @@ class Adapter:
         """
         logging.debug("Restore solver state")
         state.update(self._checkpoint.get_state())
-        #self._interface.fulfilled_action(action_read_iteration_checkpoint())
+        self._interface.fulfilled_action(action_read_iteration_checkpoint())
 
     def _advance_solver_state(self, state, u_np1, dt):
         """Advances the solver's state by one timestep.
@@ -502,7 +502,7 @@ class Adapter:
         """
         logging.debug("Save solver state")
         self._checkpoint.write(state)
-        #self._interface.fulfilled_action(action_write_iteration_checkpoint())
+        self._interface.fulfilled_action(action_write_iteration_checkpoint())
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
