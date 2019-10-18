@@ -531,7 +531,6 @@ class Adapter:
             self._write_block_data(write_data, t + dt)
         max_dt = self._interface.advance(dt)
 
-        precice_step_complete = False
         solver_state_has_been_restored = False
 
         # checkpointing
@@ -546,7 +545,8 @@ class Adapter:
             assert (not solver_state_has_been_restored)  # avoids invalid control flow
             assert (self._interface.is_timestep_complete())  # avoids invalid control flow
             self._save_solver_state_to_checkpoint(state)
-            precice_step_complete = self._interface.is_timestep_complete()
+
+        precice_step_complete = self._interface.is_timestep_complete()
 
         _, t, n = state.get_state()
 
