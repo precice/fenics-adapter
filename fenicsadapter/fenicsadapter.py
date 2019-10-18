@@ -92,15 +92,12 @@ class CustomExpression(UserExpression):
             self._dimension -= 1
             coords_y = np.zeros(self._coords_x.shape)
         self._coords_y = coords_y
-        if coords_z is None:
-            self._dimension -= 1
-            coords_z = np.zeros(self._coords_x.shape)
 
         self._coords_y = coords_y
-        self._coords_z = coords_z
         self._vals = vals
 
         assert (self._vals.shape == self._coords_x.shape)
+
         self._f = self.create_interpolant()
 
         if self.is_scalar_valued():
@@ -180,16 +177,6 @@ class GeneralInterpolationExpression(CustomExpression):
                 interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals[:, 1].flatten())) # extract dim_no element of each vector
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
-        elif self._dimension == 3:
-            logging.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
-            if self.is_scalar_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten()))
-            elif self.is_vector_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 0].flatten()))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 1].flatten()))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 2].flatten()))
-            else:
-                raise Exception("Problem dimension and data dimension not matching.")
         else:
             raise Exception("Dimension of the function invalid/not supported.")
 
@@ -207,9 +194,6 @@ class GeneralInterpolationExpression(CustomExpression):
         if self._dimension == 2:
             for i in range(self._vals.ndim):
                 return_value[i] = self._f[i](x[0], x[1])
-        if self._dimension == 3:
-            for i in range(self._vals.ndim):
-                return_value[i] = self._f[i](x[0], x[1], x[2])
         return return_value
 
 
@@ -308,25 +292,6 @@ class Adapter:
         else:
             raise Exception("Cannot handle data type %s" % type(data))
 
-#    def _convert_to_linear_write_data(self, data, function_type):
-#        if function_type is FunctionType.SCALAR:
-#            return data
-#        elif function_type is FunctionType.VECTOR:
-#            if self._fenics_dimensions == self._dimensions:
-#                return data.ravel()
-#            elif self._can_apply_2d_3d_coupling():
-#                # in 2d-3d coupling z dimension is set to zero
-#                precice_write_data = np.column_stack((data[:, 0],
-#                                                      data[:, 1],
-#                                                      np.zeros(self._n_vertices)))
-#
-#                assert(precice_write_data.shape[0] == self._n_vertices and
-#                       precice_write_data.shape[1] == self._dimensions)
-#
-#                return precice_write_data.ravel()
-#            else:
-#                raise Exception("Dimensions don't match.")
-
     def _write_block_data(self, write_data, time):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted.
@@ -334,36 +299,15 @@ class Adapter:
 
         assert (self._write_function_type in list(FunctionType))
 
-        #precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
-        precice_write_data = write_data
-
         if self._write_function_type is FunctionType.SCALAR:
             print("write SCALAR")
-            self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._vertex_ids, precice_write_data, time)
+            self._interface.write_block_scalar_data(self._write_data_name, self._mesh_id, self._vertex_ids, write_data, time)
         elif self._write_function_type is FunctionType.VECTOR:
             print("write VECTOR")
-            self._interface.write_block_vector_data(self._write_data_name, self._mesh_id, self._vertex_ids, precice_write_data, time)
+            assert(self._dimensions == self._write_data_dimension)
+            self._interface.write_block_vector_data(self._write_data_name, self._mesh_id, self._vertex_ids, write_data, time)
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
-
-    #def _convert_to_linear_read_data(self, data, function_type):
-    #    if function_type is FunctionType.SCALAR:
-    #        return data
-    #    elif function_type is FunctionType.VECTOR:
-    #        if self._fenics_dimensions == self._dimensions:
-    #            return data.ravel()
-    #        elif self._can_apply_2d_3d_coupling():
-    #            # in 2d-3d coupling z dimension is set to zero
-    #            precice_read_data = np.column_stack((np.zeros(self._n_vertices),
-    #                                                 np.zeros(self._n_vertices),
-    #                                                 np.zeros(self._n_vertices)))
-    #
-    #            assert(precice_read_data.shape[0] == self._n_vertices and
-    #                   precice_read_data.shape[1] == self._dimensions)
-#
-#                return precice_read_data.ravel()
-#            else:
-#                raise Exception("Dimensions don't match.")
 
     def _read_block_data(self, time):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -377,6 +321,7 @@ class Adapter:
         if self._read_function_type is FunctionType.SCALAR:
             read_data = self._interface.read_block_scalar_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
         elif self._read_function_type is FunctionType.VECTOR:
+            assert (self._dimensions == self._read_data_dimension)
             precice_read_data = self._interface.read_block_vector_data(self._read_data_name, self._mesh_id, self._vertex_ids, time)
             read_data = precice_read_data
         else:
@@ -390,8 +335,6 @@ class Adapter:
         n = 0
         vertices_x = []
         vertices_y = []
-        if self._dimensions == 3:
-            vertices_z = []
 
         if not issubclass(type(self._coupling_subdomain), SubDomain):
             raise Exception("no correct coupling interface defined!")
@@ -399,19 +342,11 @@ class Adapter:
         for v in dolfin.vertices(self._mesh_fenics):
             if self._coupling_subdomain.inside(v.point(), True):
                 n += 1
+                assert (self._dimensions == 2)
                 vertices_x.append(v.x(0))
-                if self._dimensions == 2:
-                    vertices_y.append(v.x(1))
-                elif self._can_apply_2d_3d_coupling():
-                    vertices_y.append(v.x(1))
-                    vertices_z.append(0)
-                else:
-                    raise Exception("Dimensions do not match!")
+                vertices_y.append(v.x(1))
 
-        if self._dimensions == 2:
-            return np.column_stack([vertices_x, vertices_y]), n
-        elif self._dimensions == 3:
-            return np.column_stack([vertices_x, vertices_y, vertices_z]), n
+        return np.column_stack([vertices_x, vertices_y]), n
 
     def set_coupling_mesh(self, mesh, subdomain):
         """Sets the coupling mesh. Called by initalize() function at the
@@ -516,7 +451,6 @@ class Adapter:
         lead to an overdetermined system that cannot be solved.
         :return: Returns lists of PointSources TODO: get rid of this legacy code, dicts should be used for a PointSource, since they can provide the location of the PointSouce, as well. Even, inside the FEniCS user code.
         """
-        #if self._can_apply_2d_3d_coupling():
         # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
         # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
 
@@ -535,14 +469,10 @@ class Adapter:
             y_forces[key] = PointSource(self._function_space.sub(1),
                                         Point(px, py),
                                         read_data[i, 1])
-            #print("Force at (x,y) = {} is (Fx, Fy) = {}".format((px, py), (read_data[i, 0], read_data[i, 1])))
 
         # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
         x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
         y_forces = filter_point_sources(y_forces, self._Dirichlet_Boundary)
-        #else:
-        #    raise Exception("Force-boundaries are only implemented for 2d-3d coupling. "
-        #                    "Same Code should be working for 2D Coupling but it is not tested so far.")
 
         return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
@@ -661,6 +591,7 @@ class Adapter:
         :param n: time step n
         :param coupling_marker: boundary marker, can be used for coupling, multiple Neumann boundary conditions are applied
         """
+        assert(dimension == 2)  # only 2d simulations are currently supported!
         self._fenics_dimensions = dimension
 
         if self._fenics_dimensions != self._dimensions:
@@ -694,8 +625,6 @@ class Adapter:
             self._write_block_data(write_data, t)
             self._interface.fulfilled_action(action_write_initial_data())
 
-        #precice_write_data = self._convert_to_linear_write_data(write_data, self._write_function_type)
-        #precice_read_data = self._convert_to_linear_read_data(read_data, self._read_function_type)
         precice_write_data = write_data
         precice_read_data = read_data
         logging.info("fenicsadapter enters initialize_data")
