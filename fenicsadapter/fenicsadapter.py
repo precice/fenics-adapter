@@ -536,6 +536,7 @@ class Adapter:
 
         # checkpointing
         if self._interface.reading_checkpoint_is_required():
+            assert (not self._interface.is_timestep_complete())  # avoids invalid control flow
             self._restore_solver_state_from_checkpoint(state)
             solver_state_has_been_restored = True
         else:
@@ -543,8 +544,9 @@ class Adapter:
 
         if self._interface.writing_checkpoint_is_required():
             assert (not solver_state_has_been_restored)  # avoids invalid control flow
+            assert (self._interface.is_timestep_complete())  # avoids invalid control flow
             self._save_solver_state_to_checkpoint(state)
-            precice_step_complete = True
+            precice_step_complete = self._interface.is_timestep_complete()
 
         _, t, n = state.get_state()
 

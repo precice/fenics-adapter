@@ -119,6 +119,7 @@ class TestCheckpointing(TestCase):
         Interface.read_block_scalar_data = MagicMock()
         Interface.is_read_data_available = MagicMock(return_value=True)
         Interface.is_write_data_required = MagicMock(return_value=True)
+        Interface.is_timestep_complete = MagicMock()
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
@@ -156,6 +157,7 @@ class TestCheckpointing(TestCase):
         Interface.read_block_scalar_data = MagicMock()
         Interface.is_read_data_available = MagicMock(return_value=True)
         Interface.is_write_data_required = MagicMock(return_value=True)
+        Interface.is_timestep_complete = MagicMock()
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
@@ -190,6 +192,7 @@ class TestCheckpointing(TestCase):
         Interface.get_data_id = MagicMock(return_value=self.data_id)
         Interface.is_read_data_available = MagicMock(return_value=False)  # inside subcycling we do not write or read data
         Interface.is_write_data_required = MagicMock(return_value=False)
+        Interface.is_timestep_complete = MagicMock()
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
         print("__INIT__ ADAPTER")
