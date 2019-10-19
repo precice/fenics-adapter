@@ -23,7 +23,12 @@ class SolverState:
         This may also have an effect outside of this object! Compare to SolverState.copy(other_state).
         :param other_state:
         """
-        self.u.assign(other_state.u)
+        if type(other_state.u) is tuple:
+            for elem, other_elem in zip(self.u, other_state.u):
+                elem.assign(other_elem)
+        else:
+            self.u.assign(other_state.u)
+
         self.t = other_state.t
         self.n = other_state.n
 
@@ -33,7 +38,11 @@ class SolverState:
         This does not have an effect outside of this object! Compare to SolverState.update(other_state).
         :param other_state:
         """
-        self.u = other_state.u.copy()
+        if type(other_state.u) is tuple:
+            self.u = (other_elem.copy() for other_elem in other_state.u)
+        else:
+            self.u = other_state.u.copy()
+
         self.t = other_state.t
         self.n = other_state.n
 
