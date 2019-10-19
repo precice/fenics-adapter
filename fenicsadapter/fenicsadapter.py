@@ -245,7 +245,7 @@ class Adapter:
         The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
 
         This means:
-        * either, the olf value of the checkpoint is assigned to u_n to repeat the iteration,
+        * either, the old value of the checkpoint is assigned to u_n to repeat the iteration,
         * or u_n+1 is assigned to u_n and the checkpoint is updated correspondingly.
 
         :param write_function: a FEniCS function being sent to the other participant as boundary condition at the coupling interface
