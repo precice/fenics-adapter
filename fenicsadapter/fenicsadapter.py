@@ -13,7 +13,7 @@ from enum import Enum
 import logging
 
 try:
-    import precice
+    import precice_future as precice
 except ImportError:
     import os
     import sys
@@ -24,7 +24,7 @@ except ImportError:
     precice_root = os.getenv('PRECICE_ROOT')
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
-    import precice
+    import precice_future as precice
 
 
 class FunctionType(Enum):
@@ -330,8 +330,7 @@ class Adapter:
         assert (self._write_function_type in list(FunctionType))
 
         if self._write_function_type is FunctionType.SCALAR:
-                self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids,
-                                                        self._write_data)
+                self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, self._write_data)
         elif self._write_function_type is FunctionType.VECTOR:
                 
                 if self._can_apply_2d_3d_coupling():
@@ -343,12 +342,10 @@ class Adapter:
                     assert(precice_write_data.shape[0] == self._n_vertices and
                            precice_write_data.shape[1] == self._dimensions)
 
-                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids,
-                                                            precice_write_data.ravel())
+                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data.ravel())
                     
                 elif self._fenics_dimensions == self._dimensions:
-                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids,
-                                                            self._write_data.ravel())
+                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, self._write_data.ravel())
                 else:
                     raise Exception("Dimensions don't match.")
         else:
@@ -364,18 +361,15 @@ class Adapter:
         assert(self._read_function_type in list(FunctionType))
         
         if self._read_function_type is FunctionType.SCALAR:
-            self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids,
-                                                   self._read_data)
+            self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids, self._read_data)
         
         elif self._read_function_type is FunctionType.VECTOR:
             if self._fenics_dimensions == self._dimensions:
-                self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids,
-                                                       self._read_data.ravel())
+                self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids, self._read_data.ravel())
                                
             elif self._can_apply_2d_3d_coupling():
                 precice_data = np.zeros(self._n_vertices * self._dimensions)
-                self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids,
-                                                       precice_data)
+                self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids, precice_data)
                 
                 precice_read_data = np.reshape(precice_data,(self._n_vertices, self._dimensions), 'C')
                 
@@ -462,11 +456,9 @@ class Adapter:
 
         vertices_1 = np.array(vertices_1)
         vertices_2 = np.array(vertices_2)
-        vertices1_ids = np.zeros(n)
-        vertices2_ids = np.zeros(n)
 
-        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1, vertices1_ids)
-        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2, vertices2_ids)
+        vertices1_ids = self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1)
+        vertices2_ids = self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2)
 
         return vertices1_ids, vertices2_ids
 
@@ -478,7 +470,7 @@ class Adapter:
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
-        self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices.flatten('F'))
         self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
 
         for i in range(len(self._edge_vertex_ids1)):
