@@ -19,9 +19,9 @@ class Checkpoint:
         :param n: timestep
         """
         if self.is_empty():
-            self._state = SolverState(None, None, None)
-
-        self._state.copy(new_state)
+            self._state = new_state.get_copy()
+        else:
+            self._state.copy(new_state)
 
     def is_empty(self):
         """
