@@ -437,13 +437,12 @@ class Adapter:
         NOTE: Edge calculation is only relevant in 2D cases.
         """
 
-        n = 0
+        n_edges = 0
         vertices = dict()
 
         for v1 in dolfin.vertices(self._mesh_fenics):
             if self._coupling_subdomain.inside(v1.point(), True):
                 vertices[v1] = []
-                n += 1
 
         for v1 in vertices.keys():
             for v2 in vertices.keys():
@@ -455,22 +454,24 @@ class Adapter:
         vertices_2 = []
 
         for v1, v2 in vertices.items():
-            vertices_1.append(v1.x(0))
-            vertices_1.append(v1.x(1))
-            vertices_2.append(v2.x(0))
-            vertices_2.append(v2.x(1))
+            if v1 is not v2:
+                vertices_1.append(v1.x(0))
+                vertices_1.append(v1.x(1))
+                vertices_2.append(v2.x(0))
+                vertices_2.append(v2.x(1))
+                n_edges += 1
 
         vertices_1 = np.array(vertices_1)
         vertices_2 = np.array(vertices_2)
-        vertices1_ids = np.zeros(n)
-        vertices2_ids = np.zeros(n)
+        vertices1_ids = np.zeros(n_edges)
+        vertices2_ids = np.zeros(n_edges)
 
-        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_1, vertices1_ids)
-        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n, vertices_2, vertices2_ids)
+        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n_edges, vertices_1, vertices1_ids)
+        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n_edges, vertices_2, vertices2_ids)
 
         return vertices1_ids, vertices2_ids
 
-    def set_coupling_mesh(self, mesh, subdomain, use_nearest_projection=False):  # as soon as issue https://github.com/precice/fenics-adapter/issues/53 is fixed change default to use_nearest_projection=True
+    def set_coupling_mesh(self, mesh, subdomain, use_nearest_projection=True):  # as soon as issue https://github.com/precice/fenics-adapter/issues/53 is fixed change default to use_nearest_projection=True
         """Sets the coupling mesh. Called by initalize() function at the
         beginning of the simulation.
         """
