@@ -429,7 +429,7 @@ class Adapter:
                     return True
         return False
 
-    def _extract_coupling_boundary_edges(self):
+    def _extract_coupling_boundary_edges(self, id_mapping):
         """Extracts edges of mesh which lie on the boundary.
         :return: two arrays of vertex IDs. Array 1 consists of first points of all edges
         and Array 2 consists of second points of all edges
@@ -437,7 +437,6 @@ class Adapter:
         NOTE: Edge calculation is only relevant in 2D cases.
         """
 
-        n_edges = 0
         vertices = dict()
 
         for v1 in dolfin.vertices(self._mesh_fenics):
@@ -450,24 +449,16 @@ class Adapter:
                     vertices[v1] = v2
                     vertices[v2] = v1
 
-        vertices_1 = []
-        vertices_2 = []
+        vertices1_ids = []
+        vertices2_ids = []
 
         for v1, v2 in vertices.items():
             if v1 is not v2:
-                vertices_1.append(v1.x(0))
-                vertices_1.append(v1.x(1))
-                vertices_2.append(v2.x(0))
-                vertices_2.append(v2.x(1))
-                n_edges += 1
+                vertices1_ids.append(id_mapping[(v1.x(0), v1.x(1))])
+                vertices2_ids.append(id_mapping[(v2.x(0), v2.x(1))])
 
-        vertices_1 = np.array(vertices_1)
-        vertices_2 = np.array(vertices_2)
-        vertices1_ids = np.zeros(n_edges)
-        vertices2_ids = np.zeros(n_edges)
-
-        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n_edges, vertices_1, vertices1_ids)
-        self._interface.get_mesh_vertex_ids_from_positions(self._mesh_id, n_edges, vertices_2, vertices2_ids)
+        vertices1_ids = np.array(vertices1_ids)
+        vertices2_ids = np.array(vertices2_ids)
 
         return vertices1_ids, vertices2_ids
 
@@ -478,10 +469,18 @@ class Adapter:
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
+        print(self._coupling_mesh_vertices)
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+
+        """ Define a mapping between coupling vertices and their IDs in precice"""
+        id_mapping = dict()
+        id_at_x, id_at_y = dict()
+        for i in range(self._n_vertices):
+            id_mapping[(self._coupling_mesh_vertices[i, 0], self._coupling_mesh_vertices[i, 1])] = self._vertex_ids[i]
+
         if use_nearest_projection:
-            self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
+            self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges(id_mapping)
             for i in range(len(self._edge_vertex_ids1)):
                 print("e1:{}, e2:{}".format(self._edge_vertex_ids1[i], self._edge_vertex_ids2[i]))
                 assert(self._edge_vertex_ids1[i] != self._edge_vertex_ids2[i])
