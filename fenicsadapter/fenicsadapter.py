@@ -279,6 +279,7 @@ class Adapter:
         self._mesh_id = self._interface.get_mesh_id(self._mesh_name)
         self._vertex_ids = None  # initialized later
         self._n_vertices = None  # initialized later
+        self._coupling_fenics_vertices = None # initialized later
 
         # write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
@@ -394,6 +395,7 @@ class Adapter:
         :return: stack of vertices
         """
         n = 0
+        fenics_vertices = []
         vertices_x = []
         vertices_y = []
         if self._dimensions == 3:
@@ -405,6 +407,7 @@ class Adapter:
         for v in dolfin.vertices(self._mesh_fenics):
             if self._coupling_subdomain.inside(v.point(), True):
                 n += 1
+                fenics_vertices.append(v)
                 vertices_x.append(v.x(0))
                 if self._dimensions == 2:
                     vertices_y.append(v.x(1))
@@ -417,9 +420,9 @@ class Adapter:
         assert(n != 0), "No coupling boundary vertices detected"
 
         if self._dimensions == 2:
-            return np.stack([vertices_x, vertices_y]), n
+            return fenics_vertices, np.stack([vertices_x, vertices_y]), n
         elif self._dimensions == 3:
-            return np.stack([vertices_x, vertices_y, vertices_z]), n
+            return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z]), n
 
     def _are_connected_by_edge(self, v1, v2):
         """Returns true if both vertices are connected by an edge. """
@@ -454,8 +457,10 @@ class Adapter:
 
         for v1, v2 in vertices.items():
             if v1 is not v2:
-                vertices1_ids.append(id_mapping[(v1.x(0), v1.x(1))])
-                vertices2_ids.append(id_mapping[(v2.x(0), v2.x(1))])
+                # print("Vertex v1: {}".format(v1))
+                # print("Vertex v2: {}".format(v2))
+                vertices1_ids.append(id_mapping[v1])
+                vertices2_ids.append(id_mapping[v2])
 
         vertices1_ids = np.array(vertices1_ids)
         vertices2_ids = np.array(vertices2_ids)
@@ -468,21 +473,20 @@ class Adapter:
         """
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
-        self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
-        print(self._coupling_mesh_vertices)
+        self._coupling_fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
         """ Define a mapping between coupling vertices and their IDs in precice"""
         id_mapping = dict()
-        id_at_x, id_at_y = dict()
         for i in range(self._n_vertices):
-            id_mapping[(self._coupling_mesh_vertices[i, 0], self._coupling_mesh_vertices[i, 1])] = self._vertex_ids[i]
+            # print(self._coupling_fenics_vertices[i])
+            id_mapping[self._coupling_fenics_vertices[i]] = self._vertex_ids[i]
 
         if use_nearest_projection:
             self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges(id_mapping)
             for i in range(len(self._edge_vertex_ids1)):
-                print("e1:{}, e2:{}".format(self._edge_vertex_ids1[i], self._edge_vertex_ids2[i]))
+                # print("e1:{}, e2:{}".format(self._edge_vertex_ids1[i], self._edge_vertex_ids2[i]))
                 assert(self._edge_vertex_ids1[i] != self._edge_vertex_ids2[i])
                 self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
