@@ -279,7 +279,7 @@ class Adapter:
         self._mesh_id = self._interface.get_mesh_id(self._mesh_name)
         self._vertex_ids = None  # initialized later
         self._n_vertices = None  # initialized later
-        self._coupling_fenics_vertices = None # initialized later
+        self._fenics_vertices = None # initialized later
 
         # write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
@@ -442,12 +442,8 @@ class Adapter:
 
         vertices = dict()
 
-        for v1 in dolfin.vertices(self._mesh_fenics):
-            if self._coupling_subdomain.inside(v1.point(), True):
-                vertices[v1] = []
-
-        for v1 in vertices.keys():
-            for v2 in vertices.keys():
+        for v1 in id_mapping.keys():
+            for v2 in id_mapping.keys():
                 if self._are_connected_by_edge(v1, v2):
                     vertices[v1] = v2
                     vertices[v2] = v1
@@ -473,7 +469,7 @@ class Adapter:
         """
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
-        self._coupling_fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
+        self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
         self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
 
@@ -481,7 +477,7 @@ class Adapter:
         id_mapping = dict()
         for i in range(self._n_vertices):
             # print(self._coupling_fenics_vertices[i])
-            id_mapping[self._coupling_fenics_vertices[i]] = self._vertex_ids[i]
+            id_mapping[self._fenics_vertices[i]] = self._vertex_ids[i]
 
         if use_nearest_projection:
             self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges(id_mapping)
@@ -736,7 +732,7 @@ class Adapter:
 
         :return: x and y cooridinates.
         """
-        vertices, _ = self._extract_coupling_boundary_vertices()
+        _, vertices, _ = self._extract_coupling_boundary_vertices()
         vertices_x = vertices[0, :]
         vertices_y = vertices[1, :]
         if self._dimensions == 3:
