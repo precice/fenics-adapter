@@ -442,8 +442,12 @@ class Adapter:
 
         vertices = dict()
 
-        for v1 in id_mapping.keys():
-            for v2 in id_mapping.keys():
+        for v1 in dolfin.vertices(self._mesh_fenics):
+            if self._coupling_subdomain.inside(v1.point(), True):
+                vertices[v1] = []
+
+        for v1 in vertices.keys():
+            for v2 in vertices.keys():
                 if self._are_connected_by_edge(v1, v2):
                     vertices[v1] = v2
                     vertices[v2] = v1
@@ -453,17 +457,15 @@ class Adapter:
 
         for v1, v2 in vertices.items():
             if v1 is not v2:
-                # print("Vertex v1: {}".format(v1))
-                # print("Vertex v2: {}".format(v2))
-                vertices1_ids.append(id_mapping[v1])
-                vertices2_ids.append(id_mapping[v2])
+                vertices1_ids.append(id_mapping[v1.global_index()])
+                vertices2_ids.append(id_mapping[v2.global_index()])
 
         vertices1_ids = np.array(vertices1_ids)
         vertices2_ids = np.array(vertices2_ids)
 
         return vertices1_ids, vertices2_ids
 
-    def set_coupling_mesh(self, mesh, subdomain, use_nearest_projection=True):  # as soon as issue https://github.com/precice/fenics-adapter/issues/53 is fixed change default to use_nearest_projection=True
+    def set_coupling_mesh(self, mesh, subdomain, use_nearest_projection=False):  # as soon as issue https://github.com/precice/fenics-adapter/issues/53 is fixed change default to use_nearest_projection=True
         """Sets the coupling mesh. Called by initalize() function at the
         beginning of the simulation.
         """
@@ -476,13 +478,11 @@ class Adapter:
         """ Define a mapping between coupling vertices and their IDs in precice"""
         id_mapping = dict()
         for i in range(self._n_vertices):
-            # print(self._coupling_fenics_vertices[i])
-            id_mapping[self._fenics_vertices[i]] = self._vertex_ids[i]
+            id_mapping[self._fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
         if use_nearest_projection:
             self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges(id_mapping)
             for i in range(len(self._edge_vertex_ids1)):
-                # print("e1:{}, e2:{}".format(self._edge_vertex_ids1[i], self._edge_vertex_ids2[i]))
                 assert(self._edge_vertex_ids1[i] != self._edge_vertex_ids2[i])
                 self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
