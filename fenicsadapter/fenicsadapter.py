@@ -465,7 +465,7 @@ class Adapter:
 
         return vertices1_ids, vertices2_ids
 
-    def set_coupling_mesh(self, mesh, subdomain, use_nearest_projection=False):  # as soon as issue https://github.com/precice/fenics-adapter/issues/53 is fixed change default to use_nearest_projection=True
+    def set_coupling_mesh(self, mesh, subdomain, use_nearest_projection=True):  # as soon as issue https://github.com/precice/fenics-adapter/issues/53 is fixed change default to use_nearest_projection=True
         """Sets the coupling mesh. Called by initalize() function at the
         beginning of the simulation.
         """
