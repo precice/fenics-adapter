@@ -38,11 +38,16 @@ class TestWriteData(TestCase):
     def test_write_scalar_data(self):
         from precice import Interface
         import fenicsadapter
+
+        def return_dummy_vertices(unused1, unused2, unused3, vertices):
+            for i in range(len(vertices)):
+                vertices[i] = i
+
         Interface.configure = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(side_effect=return_dummy_vertices)
         Interface.initialize = MagicMock()
         Interface.initialize_data = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
@@ -78,11 +83,16 @@ class TestWriteData(TestCase):
     def test_write_vector_data(self):
         from precice import Interface
         import fenicsadapter
+
+        def return_dummy_vertices(unused1, unused2, unused3, vertices):
+            for i in range(len(vertices)):
+                vertices[i] = i
+
         Interface.configure = MagicMock()
         Interface.write_block_vector_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(side_effect=return_dummy_vertices)
         Interface.initialize = MagicMock()
         Interface.initialize_data = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
@@ -125,11 +135,15 @@ class TestWriteData(TestCase):
             for i in range(len(read_data)):
                 read_data[i] = i
 
+        def return_dummy_vertices(unused1, unused2, unused3, vertices):
+            for i in range(len(vertices)):
+                vertices[i] = i
+
         Interface.configure = MagicMock()
         Interface.write_block_vector_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock(side_effect=return_dummy_data)
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(side_effect=return_dummy_vertices)
         Interface.initialize = MagicMock()
         Interface.initialize_data = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
@@ -170,11 +184,15 @@ class TestWriteData(TestCase):
             for i in range(len(read_data)):
                 read_data[i] = i
 
+        def return_dummy_vertices(unused1, unused2, unused3, vertices):
+            for i in range(len(vertices)):
+                vertices[i] = i
+
         Interface.configure = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_vector_data = MagicMock(side_effect=return_dummy_data)
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock()
+        Interface.set_mesh_vertices = MagicMock(side_effect=return_dummy_vertices)
         Interface.initialize = MagicMock()
         Interface.initialize_data = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
