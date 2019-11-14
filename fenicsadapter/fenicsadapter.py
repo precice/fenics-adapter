@@ -462,7 +462,7 @@ class Adapter:
 
         return vertices1_ids, vertices2_ids
 
-    def set_coupling_mesh(self, mesh, subdomain):
+    def set_coupling_mesh(self, mesh, subdomain, use_nearest_projection=False):  # as soon as issue https://github.com/precice/fenics-adapter/issues/53 is fixed change default to use_nearest_projection=True
         """Sets the coupling mesh. Called by initalize() function at the
         beginning of the simulation.
         """
@@ -473,8 +473,9 @@ class Adapter:
         self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices.flatten('F'))
         self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
 
-        for i in range(len(self._edge_vertex_ids1)):
-            self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
+        if (use_nearest_projection):
+            for i in range(len(self._edge_vertex_ids1)):
+                self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
     def _set_write_field(self, write_function_init):
         """Sets the write field. Called by initalize() function at the
