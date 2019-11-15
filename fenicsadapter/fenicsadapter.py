@@ -279,7 +279,7 @@ class Adapter:
         self._mesh_id = self._interface.get_mesh_id(self._mesh_name)
         self._vertex_ids = None  # initialized later
         self._n_vertices = None  # initialized later
-        self._fenics_vertices = None # initialized later
+        self._fenics_vertices = None  # initialized later
 
         # write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
