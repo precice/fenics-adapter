@@ -378,13 +378,13 @@ class Adapter:
                 self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids,
                                                        precice_data)
                 
-                precice_read_data = np.reshape(precice_data,(self._n_vertices, self._dimensions), 'C')
+                precice_read_data = np.reshape(precice_data, (self._n_vertices, self._dimensions), 'C')
                 
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
                 #z is the dead direction so it is supposed that the data is close to zero
                 np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
-                assert(np.sum(np.abs(precice_read_data[:,2]))< 1e-10)
+                assert(np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
             else: 
                 raise Exception("Dimensions don't match.")
         else:
