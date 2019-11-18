@@ -64,11 +64,10 @@ class TestWriteData(TestCase):
         precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
-        expected_size = 11
         expected_values = np.array([self.scalar_expr(x_right, y) for y in np.linspace(y_bottom, y_top, 11)])
         expected_ids = np.zeros(11)
 
-        expected_args = [expected_data_id, expected_size, expected_ids, expected_values]
+        expected_args = [expected_data_id, expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.write_block_scalar_data.call_args[0], expected_args):
             if type(arg) is int:
@@ -105,13 +104,12 @@ class TestWriteData(TestCase):
         precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
-        expected_size = 11
         expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
         expected_values_y = np.array([self.vector_expr(x_right, y)[1] for y in np.linspace(y_bottom, y_top, 11)])
         expected_values = np.stack([expected_values_x, expected_values_y]).T.ravel()
         expected_ids = np.zeros(11)
 
-        expected_args = [expected_data_id, expected_size, expected_ids, expected_values]
+        expected_args = [expected_data_id, expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.write_block_vector_data.call_args[0], expected_args):
             if type(arg) is int:
@@ -153,11 +151,10 @@ class TestWriteData(TestCase):
         precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
-        expected_size = 11
         expected_values = np.array([i for i in range(11)])
         expected_ids = np.zeros(11)
 
-        expected_args = [expected_data_id, expected_size, expected_ids, expected_values]
+        expected_args = [expected_data_id, expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.read_block_scalar_data.call_args[0], expected_args):
             if type(arg) is int:
@@ -199,11 +196,10 @@ class TestWriteData(TestCase):
         precice.advance(write_u, u_init, u_init, 0, 0, 0)
 
         expected_data_id = 15
-        expected_size = 11
         expected_values = np.array([i for i in range(2 * 11)])
         expected_ids = np.zeros(11)
 
-        expected_args = [expected_data_id, expected_size, expected_ids, expected_values]
+        expected_args = [expected_data_id, expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.read_block_vector_data.call_args[0], expected_args):
             if type(arg) is int:
