@@ -469,7 +469,6 @@ class Adapter:
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
-        self._vertex_ids = np.zeros(self._n_vertices)
         self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices.flatten('F'))
         self._edge_vertex_ids1, self._edge_vertex_ids2 = self._extract_coupling_boundary_edges()
 
