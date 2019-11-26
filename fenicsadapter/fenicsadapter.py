@@ -565,8 +565,8 @@ class Adapter:
         x_forces = dict()  # dict of PointSources for Forces in x direction
         y_forces = dict()  # dict of PointSources for Forces in y direction
 
-        vertices_x = self._coupling_mesh_vertices[0, :]
-        vertices_y = self._coupling_mesh_vertices[1, :]
+        vertices_x = self._coupling_mesh_vertices[:, 0]
+        vertices_y = self._coupling_mesh_vertices[:, 1]
 
         for i in range(self._n_vertices):
             px, py = vertices_x[i], vertices_y[i]

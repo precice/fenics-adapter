@@ -151,7 +151,6 @@ class TestWriteData(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=15)
         Interface.is_read_data_available = MagicMock(return_value=False)
-        Interface.get_mesh_vertex_ids_from_positions = MagicMock()
         Interface.set_mesh_edge = MagicMock()
 
         write_u = self.vector_function
