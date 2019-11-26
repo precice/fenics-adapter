@@ -331,27 +331,23 @@ class Adapter:
         assert (self._write_function_type in list(FunctionType))
 
         if self._write_function_type is FunctionType.SCALAR:
-                self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids,
-                                                        self._write_data)
+            self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
         elif self._write_function_type is FunctionType.VECTOR:
-                
-                if self._can_apply_2d_3d_coupling():
-                    # in 2d-3d coupling z dimension is set to zero
-                    precice_write_data = np.column_stack((self._write_data[:, 0],
-                                                          self._write_data[:, 1],
-                                                          np.zeros(self._n_vertices)))
+            if self._can_apply_2d_3d_coupling():
+                # in 2d-3d coupling z dimension is set to zero
+                precice_write_data = np.column_stack((self._write_data[:, 0],
+                                                      self._write_data[:, 1],
+                                                      np.zeros(self._n_vertices)))
 
-                    assert(precice_write_data.shape[0] == self._n_vertices and
-                           precice_write_data.shape[1] == self._dimensions)
+                assert(precice_write_data.shape[0] == self._n_vertices and
+                       precice_write_data.shape[1] == self._dimensions)
 
-                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids,
-                                                            precice_write_data.ravel())
+                self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, precice_write_data.ravel())
                     
-                elif self._fenics_dimensions == self._dimensions:
-                    self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids,
-                                                            self._write_data.ravel())
-                else:
-                    raise Exception("Dimensions don't match.")
+            elif self._fenics_dimensions == self._dimensions:
+                self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data.ravel())
+            else:
+                raise Exception("Dimensions don't match.")
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
@@ -420,9 +416,9 @@ class Adapter:
         assert(n != 0), "No coupling boundary vertices detected"
 
         if self._dimensions == 2:
-            return fenics_vertices, np.stack([vertices_x, vertices_y]), n
+            return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1), n
         elif self._dimensions == 3:
-            return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z]), n
+            return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1), n
 
     def _are_connected_by_edge(self, v1, v2):
         """Returns true if both vertices are connected by an edge. """
@@ -473,7 +469,7 @@ class Adapter:
         self._mesh_fenics = mesh
         self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
         self._vertex_ids = np.zeros(self._n_vertices)
-        self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+        self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.ravel(), self._vertex_ids)
 
         """ Define a mapping between coupling vertices and their IDs in precice"""
         id_mapping = dict()
@@ -576,8 +572,8 @@ class Adapter:
         x_forces = dict()  # dict of PointSources for Forces in x direction
         y_forces = dict()  # dict of PointSources for Forces in y direction
 
-        vertices_x = self._coupling_mesh_vertices[0, :]
-        vertices_y = self._coupling_mesh_vertices[1, :]
+        vertices_x = self._coupling_mesh_vertices[:, 0]
+        vertices_y = self._coupling_mesh_vertices[:, 1]
 
         for i in range(self._n_vertices):
             px, py = vertices_x[i], vertices_y[i]
@@ -733,8 +729,8 @@ class Adapter:
         :return: x and y cooridinates.
         """
         _, vertices, _ = self._extract_coupling_boundary_vertices()
-        vertices_x = vertices[0, :]
-        vertices_y = vertices[1, :]
+        vertices_x = vertices[:, 0]
+        vertices_y = vertices[:, 1]
         if self._dimensions == 3:
             vertices_z = vertices[2, :]
 
