@@ -13,7 +13,7 @@ from enum import Enum
 import logging
 
 try:
-    import precice
+    import precice_future as precice
 except ImportError:
     import os
     import sys
@@ -24,7 +24,7 @@ except ImportError:
     precice_root = os.getenv('PRECICE_ROOT')
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
-    import precice
+    import precice_future as precice
 
 
 class FunctionType(Enum):
@@ -331,7 +331,7 @@ class Adapter:
         assert (self._write_function_type in list(FunctionType))
 
         if self._write_function_type is FunctionType.SCALAR:
-            self._interface.write_block_scalar_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data)
+            self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, self._write_data)
         elif self._write_function_type is FunctionType.VECTOR:
             if self._can_apply_2d_3d_coupling():
                 # in 2d-3d coupling z dimension is set to zero
@@ -342,10 +342,10 @@ class Adapter:
                 assert(precice_write_data.shape[0] == self._n_vertices and
                        precice_write_data.shape[1] == self._dimensions)
 
-                self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, precice_write_data.ravel())
+                self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
                     
             elif self._fenics_dimensions == self._dimensions:
-                self._interface.write_block_vector_data(self._write_data_id, self._n_vertices, self._vertex_ids, self._write_data.ravel())
+                self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, self._write_data)
             else:
                 raise Exception("Dimensions don't match.")
         else:
@@ -361,20 +361,14 @@ class Adapter:
         assert(self._read_function_type in list(FunctionType))
         
         if self._read_function_type is FunctionType.SCALAR:
-            self._interface.read_block_scalar_data(self._read_data_id, self._n_vertices, self._vertex_ids,
-                                                   self._read_data)
+            self._read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
         
         elif self._read_function_type is FunctionType.VECTOR:
             if self._fenics_dimensions == self._dimensions:
-                self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids,
-                                                       self._read_data.ravel())
+                self._read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
                                
             elif self._can_apply_2d_3d_coupling():
-                precice_data = np.zeros(self._n_vertices * self._dimensions)
-                self._interface.read_block_vector_data(self._read_data_id, self._n_vertices, self._vertex_ids,
-                                                       precice_data)
-                
-                precice_read_data = np.reshape(precice_data, (self._n_vertices, self._dimensions), 'C')
+                precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
                 
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
@@ -468,8 +462,7 @@ class Adapter:
         self._coupling_subdomain = subdomain
         self._mesh_fenics = mesh
         self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = self._extract_coupling_boundary_vertices()
-        self._vertex_ids = np.zeros(self._n_vertices)
-        self._interface.set_mesh_vertices(self._mesh_id, self._n_vertices, self._coupling_mesh_vertices.ravel(), self._vertex_ids)
+        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
         """ Define a mapping between coupling vertices and their IDs in precice"""
         id_mapping = dict()

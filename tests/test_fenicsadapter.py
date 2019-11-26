@@ -27,7 +27,7 @@ class MockedArray:
         return 0
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice_future': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
     """
     Test suite to check whether checkpointing is done correctly, if the advance function is called. We use the mock
@@ -76,7 +76,7 @@ class TestCheckpointing(TestCase):
         Test correct checkpointing, if advance succeeded
         """
         import fenicsadapter
-        from precice import Interface, action_read_iteration_checkpoint, \
+        from precice_future import Interface, action_read_iteration_checkpoint, \
             action_write_iteration_checkpoint
 
         def is_action_required_behavior(py_action):
@@ -117,7 +117,7 @@ class TestCheckpointing(TestCase):
         Test correct checkpointing, if advance did not succeed and we have to rollback
         """
         import fenicsadapter
-        from precice import Interface, action_write_iteration_checkpoint, \
+        from precice_future import Interface, action_write_iteration_checkpoint, \
             action_read_iteration_checkpoint
 
         def is_action_required_behavior(py_action):
@@ -157,7 +157,7 @@ class TestCheckpointing(TestCase):
         :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
         """
         import fenicsadapter
-        from precice import Interface, action_read_iteration_checkpoint, \
+        from precice_future import Interface, action_read_iteration_checkpoint, \
             action_write_iteration_checkpoint
 
         def is_action_required_behavior(py_action):
@@ -192,7 +192,7 @@ class TestCheckpointing(TestCase):
         self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice_future': tests.MockedPrecice})
 class TestIsCouplingOngoing(TestCase):
 
     dummy_config = "tests/precice-adapter-config.json"
@@ -202,7 +202,7 @@ class TestIsCouplingOngoing(TestCase):
 
     def test_isCouplingOngoing(self):
         import fenicsadapter
-        from precice import Interface
+        from precice_future import Interface
         Interface.is_coupling_ongoing = MagicMock(return_value=True)
         Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock()
