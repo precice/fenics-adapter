@@ -634,10 +634,11 @@ class Adapter:
 
         if self._interface.is_read_data_available():
             self._initial_read_data = self._read_block_data(t + float(dt))
+        else:
+            self._initial_read_data = read_data
     
-        if self._interface.writing_initial_data_is_required():
-            initial_state = SolverState(u_n, t, n)
-            self._save_solver_state_to_checkpoint(initial_state)
+        initial_state = SolverState(u_n, t, n)
+        self._save_solver_state_to_checkpoint(initial_state)
 
         return dt
 
