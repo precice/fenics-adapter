@@ -14,5 +14,6 @@ setup(name='fenics-adapter',
       license='LGPL-3.0',
       packages=['fenicsadapter'],
       install_requires=['precice_future', 'fenics', 'scipy', 'numpy>=1.13.3'],
+      setup_requires=['wheel'],
       test_suite='tests',
       zip_safe=False)
