@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function
+from dolfin import UserExpression, SubDomain, Function, FacetNormal, dot
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
