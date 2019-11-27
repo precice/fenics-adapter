@@ -154,7 +154,7 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
 
-        # we expect that precice._u_cp.value has not been updated
+        # we expect that precice._checkpoint.get_state().u has not been updated
         self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
 
     def test_advance_continue(self):
