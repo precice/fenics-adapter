@@ -14,6 +14,10 @@ from .solverstate import SolverState
 from enum import Enum
 import logging
 
+logger = logging.getLogger(__name__)
+logger.setLevel(level=logging.INFO)
+
+
 try:
     import precice_future as precice
 except ImportError:
@@ -27,9 +31,6 @@ except ImportError:
     precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
     sys.path.insert(0, precice_python_adapter_root)
     import precice_future as precice
-
-
-logging.basicConfig(level=logging.INFO)
 
 
 class FunctionType(Enum):
@@ -187,7 +188,7 @@ class GeneralInterpolationExpression(CustomExpression):
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         elif self._dimension == 3:
-            logging.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
+            logger.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
             if self.is_scalar_valued():
                 interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten()))
             elif self.is_vector_valued():
@@ -591,7 +592,7 @@ class Adapter:
         """Resets the solver's state to the checkpoint's state.
         :param state: current state of the FEniCS solver
         """
-        logging.debug("Restore solver state")
+        logger.debug("Restore solver state")
         state.update(self._checkpoint.get_state())
         self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
 
@@ -602,16 +603,16 @@ class Adapter:
         :param dt: timestep size
         :return:
         """
-        logging.debug("Advance solver state")
-        logging.debug("old state: t={time}".format(time=state.t))
+        logger.debug("Advance solver state")
+        logger.debug("old state: t={time}".format(time=state.t))
         state.update(SolverState(u_np1, state.t + dt, state.n + 1))
-        logging.debug("new state: t={time}".format(time=state.t))
+        logger.debug("new state: t={time}".format(time=state.t))
 
     def _save_solver_state_to_checkpoint(self, state):
         """Writes given solver state to checkpoint.
         :param state: state being saved as checkpoint
         """
-        logging.debug("Save solver state")
+        logger.debug("Save solver state")
         self._checkpoint.write(state)
         self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
 
@@ -701,10 +702,10 @@ class Adapter:
         self._fenics_dimensions = dimension
 
         if self._fenics_dimensions != self._dimensions:
-            logging.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
+            logger.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
                                                                                             self._dimensions))
             if self._can_apply_2d_3d_coupling():
-                logging.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
+                logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
             else:
                 raise Exception("fenics_dimension = {}, precice_dimension = {}. "
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
