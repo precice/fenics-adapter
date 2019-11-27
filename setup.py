@@ -13,5 +13,6 @@ setup(name='fenics-adapter',
       author_email='benjamin.rueth@tum.de',
       license='LGPL-3.0',
       packages=['fenicsadapter'],
+      install_requires=['precice_future', 'fenics', 'scipy', 'numpy>=1.13.3'],
       test_suite='tests',
       zip_safe=False)
