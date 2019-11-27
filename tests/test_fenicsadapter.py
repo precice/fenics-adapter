@@ -96,8 +96,7 @@ class TestCheckpointing(TestCase):
         Interface.get_data_id = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
-        Interface.is_read_data_available = MagicMock(return_value=True)
-        Interface.is_write_data_required = MagicMock(return_value=True)
+        Interface.is_timestep_complete = MagicMock(return_value=True)
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
@@ -139,8 +138,7 @@ class TestCheckpointing(TestCase):
         Interface.get_data_id = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
-        Interface.is_read_data_available = MagicMock(return_value=True)
-        Interface.is_write_data_required = MagicMock(return_value=True)
+        Interface.is_timestep_complete = MagicMock(return_value=False)
         Interface.advance = MagicMock(return_value=self.dt)
         Interface.fulfilled_action = MagicMock()
 
@@ -179,6 +177,7 @@ class TestCheckpointing(TestCase):
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock()
+        Interface.is_timestep_complete = MagicMock(return_value=False)
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
         Interface.advance = MagicMock(return_value=self.dt)
