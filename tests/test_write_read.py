@@ -18,7 +18,7 @@ class RightBoundary(SubDomain):
             return False
 
 
-@patch.dict('sys.modules', **{'precice_future': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
 class TestWriteData(TestCase):
     dummy_config = "tests/precice-adapter-config.json"
 
@@ -37,7 +37,7 @@ class TestWriteData(TestCase):
         pass
 
     def test_write_scalar_data(self):
-        from precice_future import Interface
+        from precice import Interface
         import fenicsadapter
 
         def dummy_set_mesh_vertices(mesh_id, positions):
@@ -82,7 +82,7 @@ class TestWriteData(TestCase):
                 np.testing.assert_allclose(arg, expected_arg)
 
     def test_write_vector_data(self):
-        from precice_future import Interface
+        from precice import Interface
         import fenicsadapter
 
         def dummy_set_mesh_vertices(mesh_id, positions):
@@ -129,7 +129,7 @@ class TestWriteData(TestCase):
                 np.testing.assert_almost_equal(arg, expected_arg)
 
     def test_read_scalar_data(self):
-        from precice_future import Interface
+        from precice import Interface
         import fenicsadapter
 
         def return_dummy_data(data_id, value_indices):
@@ -177,7 +177,7 @@ class TestWriteData(TestCase):
                 np.testing.assert_allclose(arg, expected_arg)
 
     def test_read_vector_data(self):
-        from precice_future import Interface
+        from precice import Interface
         import fenicsadapter
 
         def return_dummy_data(data_id, value_indices):
