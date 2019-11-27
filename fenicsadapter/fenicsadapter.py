@@ -4,13 +4,19 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import Point, UserExpression, SubDomain, Function, Measure, Expression, dot, PointSource, FacetNormal
+from dolfin import UserExpression, SubDomain, Function
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
 from .config import Config
+from .checkpointing import Checkpoint
+from .solverstate import SolverState
 from enum import Enum
 import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(level=logging.INFO)
+
 
 try:
     import precice_future as precice
@@ -182,7 +188,7 @@ class GeneralInterpolationExpression(CustomExpression):
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         elif self._dimension == 3:
-            logging.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
+            logger.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
             if self.is_scalar_valued():
                 interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten()))
             elif self.is_vector_valued():
@@ -298,9 +304,7 @@ class Adapter:
         self._my_expression = interpolation_strategy
 
         # checkpointing
-        self._u_cp = None  # checkpoint for temperature inside domain
-        self._t_cp = None  # time of the checkpoint
-        self._n_cp = None  # timestep of the checkpoint
+        self._checkpoint = Checkpoint()
 
         # function space
         self._function_space = None
@@ -584,12 +588,40 @@ class Adapter:
 
         return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
+    def _restore_solver_state_from_checkpoint(self, state):
+        """Resets the solver's state to the checkpoint's state.
+        :param state: current state of the FEniCS solver
+        """
+        logger.debug("Restore solver state")
+        state.update(self._checkpoint.get_state())
+        self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+
+    def _advance_solver_state(self, state, u_np1, dt):
+        """Advances the solver's state by one timestep.
+        :param state: old state
+        :param u_np1: new value
+        :param dt: timestep size
+        :return:
+        """
+        logger.debug("Advance solver state")
+        logger.debug("old state: t={time}".format(time=state.t))
+        state.update(SolverState(u_np1, state.t + dt, state.n + 1))
+        logger.debug("new state: t={time}".format(time=state.t))
+
+    def _save_solver_state_to_checkpoint(self, state):
+        """Writes given solver state to checkpoint.
+        :param state: state being saved as checkpoint
+        """
+        logger.debug("Save solver state")
+        self._checkpoint.write(state)
+        self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
+
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
         The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
 
         This means:
-        * either, the checkpoint self._u_cp is assigned to u_n to repeat the iteration,
+        * either, the old value of the checkpoint is assigned to u_n to repeat the iteration,
         * or u_n+1 is assigned to u_n and the checkpoint is updated correspondingly.
 
         :param write_function: a FEniCS function being sent to the other participant as boundary condition at the coupling interface
@@ -600,6 +632,8 @@ class Adapter:
         :param n: current timestep
         :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly.
         """
+
+        state = SolverState(u_n, t, n)
 
         # sample write data at interface
         x_vert, y_vert = self._extract_coupling_boundary_coordinates()
@@ -618,29 +652,24 @@ class Adapter:
         else:
             self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
-        precice_step_complete = False
+        solver_state_has_been_restored = False
 
         # checkpointing
         if self._interface.is_action_required(precice.action_read_iteration_checkpoint()):
-            # continue FEniCS computation from checkpoint
-            u_n.assign(self._u_cp)  # set u_n to value of checkpoint
-            t = self._t_cp
-            n = self._n_cp
-            self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+            assert (not self._interface.is_timestep_complete())  # avoids invalid control flow
+            self._restore_solver_state_from_checkpoint(state)
+            solver_state_has_been_restored = True
         else:
-            u_n.assign(u_np1)
-            t = new_t = t + dt  # TODO: the variables new_t, new_n could be saved, by just using t and n below, however I think it improved readability.
-            n = new_n = n + 1
+            self._advance_solver_state(state, u_np1, dt)
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
-            # continue FEniCS computation with u_np1
-            # update checkpoint
-            self._u_cp.assign(u_np1)
-            self._t_cp = new_t
-            self._n_cp = new_n
-            self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
-            precice_step_complete = True
+            assert (not solver_state_has_been_restored)  # avoids invalid control flow
+            assert (self._interface.is_timestep_complete())  # avoids invalid control flow
+            self._save_solver_state_to_checkpoint(state)
 
+        precice_step_complete = self._interface.is_timestep_complete()
+
+        _, t, n = state.get_state()
         # TODO: this if-else statement smells.
         if self._has_force_boundary:
             return t, n, precice_step_complete, max_dt, x_forces, y_forces
@@ -673,10 +702,10 @@ class Adapter:
         self._fenics_dimensions = dimension
 
         if self._fenics_dimensions != self._dimensions:
-            logging.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
+            logger.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
                                                                                             self._dimensions))
             if self._can_apply_2d_3d_coupling():
-                logging.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
+                logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
             else:
                 raise Exception("fenics_dimension = {}, precice_dimension = {}. "
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
@@ -689,22 +718,20 @@ class Adapter:
         self._set_read_field(read_field)
         self._set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
-        
+
         if self._interface.is_action_required(precice.action_write_initial_data()):
             self._write_block_data()
             self._interface.fulfilled_action(precice.action_write_initial_data())
-                
+
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
             self._read_block_data()
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
-            self._u_cp = u_n.copy(deepcopy=True)
-            self._t_cp = t
-            self._n_cp = n
-            self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
-            
+            initial_state = SolverState(u_n, t, n)
+            self._save_solver_state_to_checkpoint(initial_state)
+
         return self._precice_tau
 
     def is_coupling_ongoing(self):
