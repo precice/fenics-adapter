@@ -13,24 +13,10 @@ from .checkpointing import Checkpoint
 from .solverstate import SolverState
 from enum import Enum
 import logging
+import precice
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
-
-
-try:
-    import precice_future as precice
-except ImportError:
-    import os
-    import sys
-    # check if PRECICE_ROOT is defined
-    if not os.getenv('PRECICE_ROOT'):
-       raise Exception("ERROR: PRECICE_ROOT not defined!")
-
-    precice_root = os.getenv('PRECICE_ROOT')
-    precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
-    sys.path.insert(0, precice_python_adapter_root)
-    import precice_future as precice
 
 
 class FunctionType(Enum):
