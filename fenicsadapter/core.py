@@ -21,12 +21,12 @@ except ImportError:
        raise Exception("ERROR: PRECICE_ROOT not defined!")
 
     precice_root = os.getenv('PRECICE_ROOT')
-    precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
-    sys.path.insert(0, precice_python_adapter_root)
-    import precice
-    from precice import action_read_iteration_checkpoint
-    from precice import action_write_iteration_checkpoint
-    from precice import action_write_initial_data
+    # precice_python_adapter_root = precice_root+"/src/precice/bindings/python"
+    # sys.path.insert(0, precice_python_adapter_root)
+    # import precice
+    # from precice import action_read_iteration_checkpoint
+    # from precice import action_write_iteration_checkpoint
+    # from precice import action_write_initial_data
 
 
 def extract_subdomain_vertices(mesh, subdomain, dimension):
@@ -187,7 +187,7 @@ class Adapter:
         mesh_id = self._interface.get_mesh_id(mesh_name)
         read_data_id = self._interface.get_data_id(read_data_name, mesh_id)
         read_data_buffer = np.empty(n_vertices)
-        self._interface.read_block_scalar_data(read_data_id, n_vertices, self._vertex_ids, read_data_buffer)
+        self._interface.read_block_scalar_data(read_data_id, self._vertex_ids, read_data_buffer)
         return self._create_coupling_boundary_condition(read_data_buffer)
 
     def write_block_scalar_data(self, write_data_name, mesh_name, u):
@@ -198,7 +198,7 @@ class Adapter:
         write_data = convert_fenics_to_precice(u, self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
 
         # communication
-        self._interface.write_block_scalar_data(write_data_id, self._n_vertices, self._vertex_ids, write_data)
+        self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
 
     def initialize(self):
         return self._interface.initialize()
@@ -219,7 +219,7 @@ class Adapter:
         coupling_mesh_vertices, self._n_vertices = extract_subdomain_vertices(self._fenics_mesh, self._coupling_subdomain, self._interface.get_dimensions())
         mesh_id = self._interface.get_mesh_id(mesh_name)
         self._vertex_ids = np.empty(self._n_vertices)
-        self._interface.set_mesh_vertices(mesh_id, self._n_vertices, coupling_mesh_vertices.flatten('F'), self._vertex_ids)
+        self._interface.set_mesh_vertices(mesh_id, coupling_mesh_vertices)
 
     def advance(self, dt):
         return self._interface.advance(dt)
