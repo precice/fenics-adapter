@@ -1,2 +1,2 @@
-from .fenicsadapter import Adapter
-from .core import GeneralInterpolationExpression, ExactInterpolationExpression
+from .fenicsadapter import Adapter, GeneralInterpolationExpression, ExactInterpolationExpression
+
