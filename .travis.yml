@@ -30,7 +30,6 @@ matrix:
       - $PY -m pip install wheel
   - os: linux
     name: "Systemtests"
-    if: fork = false AND ( branch = master OR branch = develop )
     python: "3.6" 
     env: PY=python3
     script:
