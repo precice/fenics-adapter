@@ -33,7 +33,7 @@ matrix:
     python: "3.6" 
     env: PY=python3
     script:
-    - curl -LO --retry 3 https://raw.githubusercontent.com/precice/systemtests/master/trigger_systemtests.py
+    - curl -LO --retry 3 https://raw.githubusercontent.com/precice/systemtests/i_141/trigger_systemtests.py
     - travis_wait 60 $PY trigger_systemtests.py --adapter fenics --wait --branch develop
 
   - os: osx
