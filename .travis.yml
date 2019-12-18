@@ -6,7 +6,7 @@ matrix:
     dist: bionic
     virtualenv:
       system_site_packages: true
-    python: "3.6" 
+    python: "3.7.1" 
     env: PY=python3
     before_install:
     - sudo apt-get install software-properties-common
