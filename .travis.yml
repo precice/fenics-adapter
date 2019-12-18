@@ -4,8 +4,6 @@ matrix:
     name: "Full tests [Linux]"
     language: python
     dist: bionic
-    virtualenv:
-      system_site_packages: true
     python: "3.7.1" 
     env: PY=python3
     before_install:
