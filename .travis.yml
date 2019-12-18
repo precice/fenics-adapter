@@ -3,10 +3,10 @@ matrix:
   - os: linux  
     name: "Full tests [Linux]"
     language: python
-    dist: disco
+    dist: bionic
     virtualenv:
       system_site_packages: true
-    python: "3.6"
+    python: "3.6" 
     env: PY=python3
     before_install:
     - sudo apt-get install software-properties-common
@@ -15,8 +15,6 @@ matrix:
     - sudo apt-get install -y --no-install-recommends fenics
     install: 
     - pip install scipy
-    - pip install --upgrade numpy
-    - pip install --upgrade scipy
 
   - os: windows 
     name: "Mock tests [Windows]"
@@ -29,10 +27,7 @@ matrix:
       - $PY -m pip install --upgrade pip
       - $PY -m pip install scipy 
       - $PY -m pip install --upgrade setuptools
-      - $PY -m pip install --upgrade numpy
-      - $PY -m pip install --upgrade scipy
       - $PY -m pip install wheel
-
   - os: linux
     name: "Systemtests"
     if: fork = false AND ( branch = master OR branch = develop )
