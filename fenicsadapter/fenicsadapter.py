@@ -5,8 +5,7 @@ adapter.
 """
 import dolfin
 from dolfin import UserExpression, SubDomain, Function, FacetNormal, dot
-from scipy.interpolate import Rbf
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, Rbf
 import numpy as np
 from .config import Config
 from .checkpointing import Checkpoint
