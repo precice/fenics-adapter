@@ -3,8 +3,7 @@ matrix:
   - os: linux  
     name: "Full tests [Linux]"
     language: python
-    dist: bionic
-    python: "3.7.1" 
+    dist: disco
     env: PY=python3
     before_install:
     - sudo apt-get install software-properties-common
