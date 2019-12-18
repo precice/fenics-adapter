@@ -4,6 +4,8 @@ matrix:
     name: "Full tests [Linux]"
     language: python
     dist: disco
+    virtualenv:
+      system_site_packages: true
     env: PY=python3
     before_install:
     - sudo apt-get install software-properties-common
