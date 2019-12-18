@@ -27,7 +27,9 @@ matrix:
       - $PY -m pip install --upgrade pip
       - $PY -m pip install scipy 
       - $PY -m pip install --upgrade setuptools
+      - $PY -m pip install --upgrade numpy
       - $PY -m pip install wheel
+
   - os: linux
     name: "Systemtests"
     if: fork = false AND ( branch = master OR branch = develop )
