@@ -15,6 +15,8 @@ matrix:
     - sudo apt-get install -y --no-install-recommends fenics
     install: 
     - pip install scipy
+    - pip install --upgrade numpy
+    - pip install --upgrade scipy
 
   - os: windows 
     name: "Mock tests [Windows]"
