@@ -22,7 +22,7 @@ matrix:
     - conda update -q conda    
     - conda info -a  # Useful for debugging any issues with conda
     - conda create -n fenicsproject -c conda-forge fenics
-    - source activate fenicsproject
+    - conda activate fenicsproject
     
   - os: windows 
     name: "Mock tests [Windows]"
