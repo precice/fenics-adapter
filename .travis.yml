@@ -27,8 +27,8 @@ matrix:
     # does not support python 
     language: bash 
     env: PY=py
-    python: "3.5"
-    before_install: choco install python --version 3.5.4 
+    python: "3.7"
+    before_install: choco install python --version 3.7.5 
     install: 
       - $PY -m pip install --upgrade pip
       - $PY -m pip install scipy 
