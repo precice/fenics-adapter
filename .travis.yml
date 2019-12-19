@@ -6,7 +6,6 @@ matrix:
     dist: eoan
     virtualenv:
       system_site_packages: true
-    python: "3.7" 
     env: PY=python3
     before_install:
     - sudo apt-get install software-properties-common
