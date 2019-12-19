@@ -3,7 +3,7 @@
 """
 
 import dolfin
-from dolfin import UserExpression, SubDomain, Function, FacetNormal, dot, Point
+from dolfin import UserExpression, SubDomain, FacetNormal, dot, Point
 from dolfin.cpp.fem import PointSource
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
@@ -242,7 +242,7 @@ class ExactInterpolationExpression(CustomExpression):
         return return_value
 
 
-def convert_fenics_to_precice(self, data):
+def convert_fenics_to_precice(data):
     """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
     :param data: FEniCS boundary function
@@ -250,13 +250,13 @@ def convert_fenics_to_precice(self, data):
     :return: array of FEniCS function values at each point on the boundary
     """
     if type(data) is dolfin.Function:
-        x_all, y_all = self._extract_coupling_boundary_coordinates()
+        x_all, y_all = extract_coupling_boundary_coordinates()
         return np.array([data(x, y) for x, y in zip(x_all, y_all)])
     else:
         raise Exception("Cannot handle data type %s" % type(data))
 
 
-def extract_coupling_boundary_vertices(self):
+def extract_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, dimensions):
     """Extracts vertices which lie on the boundary.
     :return: stack of vertices
     """
@@ -264,20 +264,20 @@ def extract_coupling_boundary_vertices(self):
     fenics_vertices = []
     vertices_x = []
     vertices_y = []
-    if self._dimensions == 3:
+    if dimensions == 3:
         vertices_z = []
 
-    if not issubclass(type(self._coupling_subdomain), SubDomain):
+    if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("no correct coupling interface defined!")
 
-    for v in dolfin.vertices(self._mesh_fenics):
-        if self._coupling_subdomain.inside(v.point(), True):
+    for v in dolfin.vertices(mesh_fenics):
+        if coupling_subdomain.inside(v.point(), True):
             n += 1
             fenics_vertices.append(v)
             vertices_x.append(v.x(0))
-            if self._dimensions == 2:
+            if dimensions == 2:
                 vertices_y.append(v.x(1))
-            elif self._can_apply_2d_3d_coupling():
+            elif can_apply_2d_3d_coupling():
                 vertices_y.append(v.x(1))
                 vertices_z.append(0)
             else:
@@ -285,9 +285,9 @@ def extract_coupling_boundary_vertices(self):
 
     assert (n != 0), "No coupling boundary vertices detected"
 
-    if self._dimensions == 2:
+    if dimensions == 2:
         return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1), n
-    elif self._dimensions == 3:
+    elif dimensions == 3:
         return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1), n
 
 
@@ -300,7 +300,7 @@ def are_connected_by_edge(v1, v2):
     return False
 
 
-def extract_coupling_boundary_edges(self, id_mapping):
+def extract_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
     """Extracts edges of mesh which lie on the boundary.
     :return: two arrays of vertex IDs. Array 1 consists of first points of all edges
     and Array 2 consists of second points of all edges
@@ -310,13 +310,13 @@ def extract_coupling_boundary_edges(self, id_mapping):
 
     vertices = dict()
 
-    for v1 in dolfin.vertices(self._mesh_fenics):
-        if self._coupling_subdomain.inside(v1.point(), True):
+    for v1 in dolfin.vertices(mesh_fenics):
+        if coupling_subdomain.inside(v1.point(), True):
             vertices[v1] = []
 
     for v1 in vertices.keys():
         for v2 in vertices.keys():
-            if self._are_connected_by_edge(v1, v2):
+            if are_connected_by_edge(v1, v2):
                 vertices[v1] = v2
                 vertices[v2] = v1
 
@@ -334,50 +334,48 @@ def extract_coupling_boundary_edges(self, id_mapping):
     return vertices1_ids, vertices2_ids
 
 
-def set_write_field(self, write_function_init):
+def set_write_field(write_function_init):
     """Sets the write field. Called by initalize() function at the
     beginning of the simulation.
 
     :param write_function_init: function on the write field
     """
-    self._write_function_type = determine_function_type(write_function_init)
-    self._write_data = self._convert_fenics_to_precice(write_function_init)
+    write_function_type = determine_function_type(write_function_init)
+    write_data = convert_fenics_to_precice(write_function_init)
 
 
-def set_read_field(self, read_function_init):
+def set_read_field(read_function_init):
     """Sets the read field. Called by initalize() function at the
     beginning of the simulation.
 
     :param read_function_init: function on the read field
     """
-    self._read_function_type = determine_function_type(read_function_init)
-    self._read_data = self._convert_fenics_to_precice(read_function_init)
+    read_function_type = determine_function_type(read_function_init)
+    read_data = convert_fenics_to_precice(read_function_init)
 
 
-def create_coupling_boundary_condition(self):
+def create_coupling_boundary_condition(my_expression, read_data, function_space=None):
     """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
-    x_vert, y_vert = self._extract_coupling_boundary_coordinates()
+    x_vert, y_vert = extract_coupling_boundary_coordinates()
 
     try:  # works with dolfin 1.6.0
-        self._coupling_bc_expression = self._my_expression(
-            element=self._function_space.ufl_element())  # elemnt information must be provided, else DOLFIN assumes scalar function
+        coupling_bc_expression = my_expression(element=function_space.ufl_element())  # elemnt information must be provided, else DOLFIN assumes scalar function
     except (TypeError, KeyError):  # works with dolfin 2017.2.0
-        self._coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
-    self._coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
+        coupling_bc_expression = my_expression(element=function_space.ufl_element(), degree=0)
+    coupling_bc_expression.set_boundary_data(read_data, x_vert, y_vert)
 
 
-def create_coupling_dirichlet_boundary_condition(self, function_space):
+def create_coupling_dirichlet_boundary_condition(function_space, coupling_bc_expression, coupling_subdomain):
     """Creates the coupling Dirichlet boundary conditions using
     create_coupling_boundary_condition() method.
 
     :return: dolfin.DirichletBC()
     """
-    self._function_space = function_space
-    self._create_coupling_boundary_condition()
-    return dolfin.DirichletBC(self._function_space, self._coupling_bc_expression, self._coupling_subdomain)
+    create_coupling_boundary_condition()
+    return dolfin.DirichletBC(function_space, coupling_bc_expression, coupling_subdomain)
 
 
-def create_coupling_neumann_boundary_condition(self, test_functions, function_space=None, boundary_marker=None):
+def create_coupling_neumann_boundary_condition(test_functions, mesh_fenics, coupling_bc_expression, function_space=None, boundary_marker=None):
     """Creates the coupling Neumann boundary conditions using
     create_coupling_boundary_condition() method.
 
@@ -386,16 +384,16 @@ def create_coupling_neumann_boundary_condition(self, test_functions, function_sp
      FEniCS Tutorial Volume I." (2016).)
     """
     if not function_space:
-        self._function_space = test_functions.function_space()
+        function_space = test_functions.function_space()
     else:
-        self._function_space = function_space
-    self._create_coupling_boundary_condition()
+        function_space = function_space
+    create_coupling_boundary_condition()
     if not boundary_marker:  # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
-        if self._coupling_bc_expression.is_scalar_valued():
-            return test_functions * self._coupling_bc_expression * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
-        elif self._coupling_bc_expression.is_vector_valued():
-            n = FacetNormal(self._mesh_fenics)
-            return -test_functions * dot(n, self._coupling_bc_expression) * dolfin.ds
+        if coupling_bc_expression.is_scalar_valued():
+            return test_functions * coupling_bc_expression * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
+        elif coupling_bc_expression.is_vector_valued():
+            n = FacetNormal(mesh_fenics)
+            return -test_functions * dot(n, coupling_bc_expression) * dolfin.ds
         else:
             raise Exception("invalid!")
     else:  # For multiple Neumann BCs integration should only be performed over the respective domain.
@@ -404,7 +402,7 @@ def create_coupling_neumann_boundary_condition(self, test_functions, function_sp
         return dot(self._coupling_bc_expression, test_functions) * self.dss(boundary_marker)
 
 
-def create_force_boundary_condition(self, function_space):
+def create_force_boundary_condition(function_space):
     """
     Initializes force-coupling via PointSource.
 
@@ -412,13 +410,12 @@ def create_force_boundary_condition(self, function_space):
 
     :param function_space: The Function Space used for the Test and Trial functions
     """
-    self._function_space = function_space
-    self._has_force_boundary = True
+    has_force_boundary = True
 
-    return self._get_forces_as_point_sources()
+    return get_forces_as_point_sources()
 
 
-def get_forces_as_point_sources(self):
+def get_forces_as_point_sources(read_data, coupling_mesh_vertices, n_vertices, Dirichlet_Boundary, function_space=None):
     """
     Creates 2 dicts of PointSources that can be applied to the assembled system.
     Applies filter_point_source to avoid forces being applied to already existing Dirichlet BC, since this would
@@ -431,49 +428,49 @@ def get_forces_as_point_sources(self):
     x_forces = dict()  # dict of PointSources for Forces in x direction
     y_forces = dict()  # dict of PointSources for Forces in y direction
 
-    vertices_x = self._coupling_mesh_vertices[:, 0]
-    vertices_y = self._coupling_mesh_vertices[:, 1]
+    vertices_x = coupling_mesh_vertices[:, 0]
+    vertices_y = coupling_mesh_vertices[:, 1]
 
-    for i in range(self._n_vertices):
+    for i in range(n_vertices):
         px, py = vertices_x[i], vertices_y[i]
         key = (px, py)
-        x_forces[key] = PointSource(self._function_space.sub(0),
+        x_forces[key] = PointSource(function_space.sub(0),
                                     Point(px, py),
-                                    self._read_data[i, 0])
-        y_forces[key] = PointSource(self._function_space.sub(1),
+                                    read_data[i, 0])
+        y_forces[key] = PointSource(function_space.sub(1),
                                     Point(px, py),
-                                    self._read_data[i, 1])
+                                    read_data[i, 1])
 
     # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-    x_forces = filter_point_sources(x_forces, self._Dirichlet_Boundary)
-    y_forces = filter_point_sources(y_forces, self._Dirichlet_Boundary)
+    x_forces = filter_point_sources(x_forces, Dirichlet_Boundary)
+    y_forces = filter_point_sources(y_forces, Dirichlet_Boundary)
 
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def can_apply_2d_3d_coupling(self):
+def can_apply_2d_3d_coupling(dimensions, fenics_dimensions):
     """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
     received from preCICE is ignored. If FEniCS sends data to preCICE, the y-dimension of data and node coordinates
     is set to zero.
 
     :return: True, if the 2D-3D coupling can be applied
     """
-    return self._fenics_dimensions == 2 and self._dimensions == 3
+    return fenics_dimensions == 2 and dimensions == 3
 
 
-def extract_coupling_boundary_coordinates(self):
+def extract_coupling_boundary_coordinates(dimensions):
     """Extracts the coordinates of vertices that lay on the boundary. 3D
     case currently handled as 2D.
 
     :return: x and y cooridinates.
     """
-    _, vertices, _ = self._extract_coupling_boundary_vertices()
+    _, vertices, _ = extract_coupling_boundary_vertices()
     vertices_x = vertices[:, 0]
     vertices_y = vertices[:, 1]
-    if self._dimensions == 3:
+    if dimensions == 3:
         vertices_z = vertices[2, :]
 
-    if self._dimensions == 2 or self._can_apply_2d_3d_coupling():
+    if dimensions == 2 or can_apply_2d_3d_coupling():
         return vertices_x, vertices_y
     else:
         raise Exception("Error: These Dimensions are not supported by the adapter.")

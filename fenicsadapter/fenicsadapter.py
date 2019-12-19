@@ -8,7 +8,7 @@ from .checkpointing import Checkpoint
 import logging
 import precice
 from .adapter_core import FunctionType, extract_coupling_boundary_vertices, extract_coupling_boundary_edges, GeneralInterpolationExpression\
-    , set_read_field, set_write_field
+    , set_read_field, set_write_field, can_apply_2d_3d_coupling
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class Adapter:
 
         # numerics
         self._precice_tau = None
-        # Temporarily hard-coding interpolation strategy. Need to provide
+        # Temporarily hard-coding interpolation strategy. Need to provide user with the appropriate choice
         self._my_expression = GeneralInterpolationExpression
 
         # checkpointing
@@ -88,7 +88,7 @@ class Adapter:
                 if self._fenics_dimensions == self._dimensions:
                     self._read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
-                elif self._can_apply_2d_3d_coupling():
+                elif can_apply_2d_3d_coupling():
                     precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
                     self._read_data[:, 0] = precice_read_data[:, 0]
@@ -111,7 +111,7 @@ class Adapter:
             if self._write_function_type is FunctionType.SCALAR:
                 self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, self._write_data)
             elif self._write_function_type is FunctionType.VECTOR:
-                if self._can_apply_2d_3d_coupling():
+                if can_apply_2d_3d_coupling():
                     # in 2d-3d coupling z dimension is set to zero
                     precice_write_data = np.column_stack((self._write_data[:, 0],
                                                           self._write_data[:, 1],
@@ -129,7 +129,7 @@ class Adapter:
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
 
-        def initialize(self, coupling_subdomain, mesh, read_field, write_field,
+        def initialize(coupling_subdomain, mesh, read_field, write_field,
                        u_n, dimension=2, t=0, n=0, dirichlet_boundary=None):
             """Initializes remaining attributes. Called once, from the solver.
 
@@ -149,7 +149,7 @@ class Adapter:
                 logger.warning(
                     "fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
                                                                                             self._dimensions))
-                if self._can_apply_2d_3d_coupling():
+                if can_apply_2d_3d_coupling():
                     logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
                 else:
                     raise Exception("fenics_dimension = {}, precice_dimension = {}. "
@@ -175,13 +175,15 @@ class Adapter:
 
             if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
                 initial_state = SolverState(u_n, t, n)
-                self._save_solver_state_to_checkpoint(initial_state)
+                save_solver_state_to_checkpoint(initial_state)
 
             return self._precice_tau
 
         def set_coupling_mesh(mesh, subdomain):
             """Sets the coupling mesh. Called by initalize() function at the
             beginning of the simulation.
+            :param mesh: fenics mesh
+            :param: subdomain: subdomain which will be computed by this coupling instance
             """
             self._coupling_subdomain = subdomain
             self._mesh_fenics = mesh
