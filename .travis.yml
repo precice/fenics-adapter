@@ -6,10 +6,8 @@ matrix:
     dist: bionic
     env: PY=python3
     python: "3.7"
-    install:
+    install:  # use conda for python. See https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/use-conda-with-travis-ci.html#id2
     - sudo apt-get update
-    # We do this conditionally because it saves us some downloading if the
-    # version is the same.
     - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
         wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
       else
@@ -21,7 +19,7 @@ matrix:
     - conda config --set always_yes yes --set changeps1 no
     - conda update -q conda    
     - conda info -a  # Useful for debugging any issues with conda
-    - conda create -n fenicsproject -c conda-forge fenics
+    - conda create -n fenicsproject -c conda-forge fenics  # install fenics via conda. See https://fenicsproject.org/download/
     - conda activate fenicsproject
     
   - os: windows 
