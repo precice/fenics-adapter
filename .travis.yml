@@ -3,10 +3,10 @@ matrix:
   - os: linux  
     name: "Full tests [Linux]"
     language: python
-    dist: bionic
+    dist: eoan
     virtualenv:
       system_site_packages: true
-    python: "3.6" 
+    python: "3.7" 
     env: PY=python3
     before_install:
     - sudo apt-get install software-properties-common
@@ -28,6 +28,7 @@ matrix:
       - $PY -m pip install scipy 
       - $PY -m pip install --upgrade setuptools
       - $PY -m pip install wheel
+
   - os: linux
     name: "Systemtests"
     if: fork = false AND ( branch = master OR branch = develop )
