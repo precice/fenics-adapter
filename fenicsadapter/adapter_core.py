@@ -2,7 +2,9 @@
    The module also consists of additional helper functions for the user
 """
 
-from dolfin import UserExpression, SubDomain, Function, FacetNormal, dot
+import dolfin
+from dolfin import UserExpression, SubDomain, Function, FacetNormal, dot, Point
+from dolfin.cpp.fem import PointSource
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -289,7 +291,7 @@ def extract_coupling_boundary_vertices(self):
         return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1), n
 
 
-def are_connected_by_edge(self, v1, v2):
+def are_connected_by_edge(v1, v2):
     """Returns true if both vertices are connected by an edge. """
     for edge1 in dolfin.edges(v1):
         for edge2 in dolfin.edges(v2):
@@ -449,35 +451,32 @@ def get_forces_as_point_sources(self):
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def restore_solver_state_from_checkpoint(self, state):
-    """Resets the solver's state to the checkpoint's state.
-    :param state: current state of the FEniCS solver
+def can_apply_2d_3d_coupling(self):
+    """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
+    received from preCICE is ignored. If FEniCS sends data to preCICE, the y-dimension of data and node coordinates
+    is set to zero.
+
+    :return: True, if the 2D-3D coupling can be applied
     """
-    logger.debug("Restore solver state")
-    state.update(self._checkpoint.get_state())
-    self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+    return self._fenics_dimensions == 2 and self._dimensions == 3
 
 
-def advance_solver_state(self, state, u_np1, dt):
-    """Advances the solver's state by one timestep.
-    :param state: old state
-    :param u_np1: new value
-    :param dt: timestep size
-    :return:
+def extract_coupling_boundary_coordinates(self):
+    """Extracts the coordinates of vertices that lay on the boundary. 3D
+    case currently handled as 2D.
+
+    :return: x and y cooridinates.
     """
-    logger.debug("Advance solver state")
-    logger.debug("old state: t={time}".format(time=state.t))
-    state.update(SolverState(u_np1, state.t + dt, state.n + 1))
-    logger.debug("new state: t={time}".format(time=state.t))
+    _, vertices, _ = self._extract_coupling_boundary_vertices()
+    vertices_x = vertices[:, 0]
+    vertices_y = vertices[:, 1]
+    if self._dimensions == 3:
+        vertices_z = vertices[2, :]
 
-
-def save_solver_state_to_checkpoint(self, state):
-    """Writes given solver state to checkpoint.
-    :param state: state being saved as checkpoint
-    """
-    logger.debug("Save solver state")
-    self._checkpoint.write(state)
-    self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
+    if self._dimensions == 2 or self._can_apply_2d_3d_coupling():
+        return vertices_x, vertices_y
+    else:
+        raise Exception("Error: These Dimensions are not supported by the adapter.")
 
 
 """
@@ -543,34 +542,4 @@ def old_advance(self, write_function, u_np1, u_n, t, dt, n):
         return t, n, precice_step_complete, max_dt, x_forces, y_forces
     else:
         return t, n, precice_step_complete, max_dt
-
-
-def can_apply_2d_3d_coupling(self):
-    """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
-    received from preCICE is ignored. If FEniCS sends data to preCICE, the y-dimension of data and node coordinates
-    is set to zero.
-
-    :return: True, if the 2D-3D coupling can be applied
-    """
-    return self._fenics_dimensions == 2 and self._dimensions == 3
-
-
-def extract_coupling_boundary_coordinates(self):
-    """Extracts the coordinates of vertices that lay on the boundary. 3D
-    case currently handled as 2D.
-
-    :return: x and y cooridinates.
-    """
-    _, vertices, _ = self._extract_coupling_boundary_vertices()
-    vertices_x = vertices[:, 0]
-    vertices_y = vertices[:, 1]
-    if self._dimensions == 3:
-        vertices_z = vertices[2, :]
-
-    if self._dimensions == 2 or self._can_apply_2d_3d_coupling():
-        return vertices_x, vertices_y
-    else:
-        raise Exception("Error: These Dimensions are not supported by the adapter.")
-
-
 

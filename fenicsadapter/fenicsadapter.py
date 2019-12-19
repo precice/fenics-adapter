@@ -7,7 +7,8 @@ from .config import Config
 from .checkpointing import Checkpoint
 import logging
 import precice
-from .adapter_core import GeneralInterpolationExpression, FunctionType, extract_coupling_boundary_vertices, extract_coupling_boundary_edges
+from .adapter_core import FunctionType, extract_coupling_boundary_vertices, extract_coupling_boundary_edges, GeneralInterpolationExpression\
+    , set_read_field, set_write_field
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,8 @@ class Adapter:
 
         # numerics
         self._precice_tau = None
-        # self._my_expression = interpolation_strategy
+        # Temporarily hard-coding interpolation strategy. Need to provide
+        self._my_expression = GeneralInterpolationExpression
 
         # checkpointing
         self._checkpoint = Checkpoint()
@@ -70,7 +72,7 @@ class Adapter:
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
         self._has_force_boundary = None  # stores whether force_boundary exists
 
-        def read_data(self):
+        def read_data():
             """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
             Scalar/Vector write function) read_data is converted.
 
@@ -157,19 +159,19 @@ class Adapter:
             if dirichlet_boundary is not None:
                 self._Dirichlet_Boundary = dirichlet_boundary
 
-            self.set_coupling_mesh(mesh, coupling_subdomain)
-            self._set_read_field(read_field)
-            self._set_write_field(write_field)
+            set_coupling_mesh(mesh, coupling_subdomain)
+            set_read_field(read_field)
+            set_write_field(write_field)
             self._precice_tau = self._interface.initialize()
 
             if self._interface.is_action_required(precice.action_write_initial_data()):
-                self._write_block_data()
+                write_data()
                 self._interface.fulfilled_action(precice.action_write_initial_data())
 
             self._interface.initialize_data()
 
             if self._interface.is_read_data_available():
-                self._read_block_data()
+                read_data()
 
             if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
                 initial_state = SolverState(u_n, t, n)
@@ -177,7 +179,7 @@ class Adapter:
 
             return self._precice_tau
 
-        def set_coupling_mesh(self, mesh, subdomain):
+        def set_coupling_mesh(mesh, subdomain):
             """Sets the coupling mesh. Called by initalize() function at the
             beginning of the simulation.
             """
@@ -197,29 +199,48 @@ class Adapter:
                 assert (self._edge_vertex_ids1[i] != self._edge_vertex_ids2[i])
                 self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
 
-        def add_checkpoint()
-
-        def restore_state()
-
-        def advance():
-
-        def is_coupling_ongoing(self):
+        def is_coupling_ongoing():
             """Determines whether simulation should continue. Called from the
             simulation loop in the solver.
             :return: True if the coupling is ongoing, False otherwise
             """
             return self._interface.is_coupling_ongoing()
 
-        def finalize(self):
+        def restore_solver_state_from_checkpoint(state):
+            """Resets the solver's state to the checkpoint's state.
+            :param state: current state of the FEniCS solver
+            """
+            logger.debug("Restore solver state")
+            state.update(self._checkpoint.get_state())
+            self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+
+        def advance_solver_state(state, u_np1, dt):
+            """Advances the solver's state by one timestep.
+            :param state: old state
+            :param u_np1: new value
+            :param dt: timestep size
+            :return:
+            """
+            logger.debug("Advance solver state")
+            logger.debug("old state: t={time}".format(time=state.t))
+            state.update(SolverState(u_np1, state.t + dt, state.n + 1))
+            logger.debug("new state: t={time}".format(time=state.t))
+
+        def save_solver_state_to_checkpoint(state):
+            """Writes given solver state to checkpoint.
+            :param state: state being saved as checkpoint
+            """
+            logger.debug("Save solver state")
+            self._checkpoint.write(state)
+            self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
+
+        def finalize():
             """Finalizes the coupling interface."""
             self._interface.finalize()
 
-        def get_solver_name(self):
+        def get_solver_name():
             """Returns name of this solver as defined in config file.
             :return: Solver name.
             """
             return self._solver_name
-
-
-
 
