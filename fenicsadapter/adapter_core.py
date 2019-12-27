@@ -3,14 +3,12 @@
 """
 
 import dolfin
-from dolfin import UserExpression, SubDomain, FacetNormal, dot, Point, PointSource
+from dolfin import UserExpression, SubDomain, Point, PointSource
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
-from .solverstate import SolverState
 from enum import Enum
 import logging
-import precice
 from .fenicsadapter import Adapter
 
 logger = logging.getLogger(__name__)
@@ -350,54 +348,6 @@ class AdapterCore(Adapter):
             coupling_bc_expression = my_expression(element=function_space.ufl_element(), degree=0)
         coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
-    def create_coupling_dirichlet_boundary_condition(self, function_space, coupling_bc_expression):
-        """Creates the coupling Dirichlet boundary conditions using
-        create_coupling_boundary_condition() method.
-
-        :return: dolfin.DirichletBC()
-        """
-        self._create_coupling_boundary_condition(coupling_bc_expression, function_space)
-        return dolfin.DirichletBC(function_space, coupling_bc_expression, self._coupling_subdomain)
-
-    def create_coupling_neumann_boundary_condition(self, test_functions, function_space=None, boundary_marker=None):
-        """Creates the coupling Neumann boundary conditions using
-        create_coupling_boundary_condition() method.
-
-        :return: expression in form of integral: g*v*ds. (see e.g. p. 83ff
-        Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The
-        FEniCS Tutorial Volume I." (2016).)
-        """
-        if not function_space:
-            function_space = test_functions.function_space()
-        else:
-            function_space = function_space
-        self._create_coupling_boundary_condition(self._coupling_bc_expression, function_space)
-        if not boundary_marker:  # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
-            if self._coupling_bc_expression.is_scalar_valued():
-                return test_functions * self._coupling_bc_expression * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
-            elif self._coupling_bc_expression.is_vector_valued():
-                n = FacetNormal(self._mesh_fenics)
-                return -test_functions * dot(n, self._coupling_bc_expression) * dolfin.ds
-            else:
-                raise Exception("invalid!")
-        else:  # For multiple Neumann BCs integration should only be performed over the respective domain.
-            # TODO: fix the problem here
-            raise Exception("Boundary markers are not implemented yet")
-            return dot(self._coupling_bc_expression, test_functions) * self.dss(boundary_marker)
-
-    def create_force_boundary_condition(self, Dirichlet_Boundary, function_space):
-        """
-        Initializes force-coupling via PointSource.
-
-        This function only works for 2D-pseudo3D coupling.
-
-        :param Dirichlet_Boundary:
-        :param function_space: The Function Space used for the Test and Trial functions
-        """
-        has_force_boundary = True
-
-        return self._get_forces_as_point_sources(Dirichlet_Boundary, function_space)
-
     def get_forces_as_point_sources(self, Dirichlet_Boundary, function_space=None):
         """
         Creates 2 dicts of PointSources that can be applied to the assembled system.
@@ -449,67 +399,4 @@ class AdapterCore(Adapter):
             return vertices_x, vertices_y
         else:
             raise Exception("Error: These Dimensions are not supported by the adapter.")
-
-"""
-OLD advance function which wrapped all preCICE functionality which is now named ---> old_advance 
-"""
-# def old_advance(self, write_function, u_np1, u_n, t, dt, n):
-#     """Calls preCICE advance function using precice and manages checkpointing.
-#     The solution u_n is updated by this function via call-by-reference. The corresponding values for t and n are returned.
-#
-#     This means:
-#     * either, the old value of the checkpoint is assigned to u_n to repeat the iteration,
-#     * or u_n+1 is assigned to u_n and the checkpoint is updated correspondingly.
-#
-#     :param write_function: a FEniCS function being sent to the other participant as boundary condition at the coupling interface
-#     :param u_np1: new value of FEniCS solution u_n+1 at time t_n+1 = t+dt
-#     :param u_n: old value of FEniCS solution u_n at time t_n = t; updated via call-by-reference
-#     :param t: current time t_n for timestep n
-#     :param dt: timestep size dt = t_n+1 - t_n
-#     :param n: current timestep
-#     :return: return starting time t and timestep n for next FEniCS solver iteration. u_n is updated by advance correspondingly.
-#     """
-#
-#     state = SolverState(u_n, t, n)
-#
-#     # sample write data at interface
-#     x_vert, y_vert = self._extract_coupling_boundary_coordinates()
-#     self._write_data = self._convert_fenics_to_precice(write_function)
-#
-#     # communication
-#     self._write_block_data()
-#
-#     max_dt = self._interface.advance(dt)
-#
-#     self._read_block_data()
-#
-#     # update boundary condition with read data
-#     if self._has_force_boundary:
-#         x_forces, y_forces = self._get_forces_as_point_sources()
-#     else:
-#         self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
-#
-#     solver_state_has_been_restored = False
-#
-#     # checkpointing
-#     if self._interface.is_action_required(precice.action_read_iteration_checkpoint()):
-#         assert (not self._interface.is_timestep_complete())  # avoids invalid control flow
-#         self._restore_solver_state_from_checkpoint(state)
-#         solver_state_has_been_restored = True
-#     else:
-#         self._advance_solver_state(state, u_np1, dt)
-#
-#     if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
-#         assert (not solver_state_has_been_restored)  # avoids invalid control flow
-#         assert (self._interface.is_timestep_complete())  # avoids invalid control flow
-#         self._save_solver_state_to_checkpoint(state)
-#
-#     precice_step_complete = self._interface.is_timestep_complete()
-#
-#     _, t, n = state.get_state()
-#     # TODO: this if-else statement smells.
-#     if self._has_force_boundary:
-#         return t, n, precice_step_complete, max_dt, x_forces, y_forces
-#     else:
-#         return t, n, precice_step_complete, max_dt
 
