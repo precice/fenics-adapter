@@ -7,8 +7,7 @@ from .config import Config
 from .checkpointing import Checkpoint
 import logging
 import precice
-from .adapter_core import FunctionType, extract_coupling_boundary_vertices, extract_coupling_boundary_edges, GeneralInterpolationExpression\
-    , set_read_field, set_write_field, can_apply_2d_3d_coupling
+from .adapter_core import AdapterCore, FunctionType, GeneralInterpolationExpression
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
@@ -72,50 +71,60 @@ class Adapter:
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
         self._has_force_boundary = None  # stores whether force_boundary exists
 
-        def read_data():
+        def read():
             """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
             Scalar/Vector write function) read_data is converted.
-
             Note: For quasi 2D fenics in a 3D coupled simulation the y component of the vectors is deleted.
+
+            :return: data read from preCICE in the form of a numpy 1D array with the values like it is used by preCICE
+            (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny)
+            The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
             """
 
             assert (self._read_function_type in list(FunctionType))
 
+            read_data = None
+
             if self._read_function_type is FunctionType.SCALAR:
-                self._read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
+                read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
+                return read_data
 
             elif self._read_function_type is FunctionType.VECTOR:
                 if self._fenics_dimensions == self._dimensions:
-                    self._read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
+                    read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
+                    return read_data
 
-                elif can_apply_2d_3d_coupling():
+                elif AdapterCore.can_apply_2d_3d_coupling():
                     precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
-                    self._read_data[:, 0] = precice_read_data[:, 0]
-                    self._read_data[:, 1] = precice_read_data[:, 1]
+                    read_data[:, 0] = precice_read_data[:, 0]
+                    read_data[:, 1] = precice_read_data[:, 1]
                     # z is the dead direction so it is supposed that the data is close to zero
                     np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
                     assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
+                    return read_data
                 else:
                     raise Exception("Dimensions don't match.")
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
 
-        def write_data():
+        def write(write_data):
             """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
             Scalar/Vector write function) write_data is first converted.
+
+            :param write_data: Data to be written to preCICE in the format of a numpy 1D array with the values like it is used by preCICE
+            (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny)
+            The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
             """
 
             assert (self._write_function_type in list(FunctionType))
 
             if self._write_function_type is FunctionType.SCALAR:
-                self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, self._write_data)
+                self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, write_data)
             elif self._write_function_type is FunctionType.VECTOR:
-                if can_apply_2d_3d_coupling():
+                if AdapterCore.can_apply_2d_3d_coupling():
                     # in 2d-3d coupling z dimension is set to zero
-                    precice_write_data = np.column_stack((self._write_data[:, 0],
-                                                          self._write_data[:, 1],
-                                                          np.zeros(self._n_vertices)))
+                    precice_write_data = np.column_stack((write_data[:, 0], write_data[:, 1], np.zeros(self._n_vertices)))
 
                     assert (precice_write_data.shape[0] == self._n_vertices and
                             precice_write_data.shape[1] == self._dimensions)
@@ -123,20 +132,17 @@ class Adapter:
                     self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
 
                 elif self._fenics_dimensions == self._dimensions:
-                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, self._write_data)
+                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, write_data)
                 else:
                     raise Exception("Dimensions don't match.")
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
 
-        def initialize(coupling_subdomain, mesh, read_field, write_field,
-                       u_n, dimension=2, t=0, n=0, dirichlet_boundary=None):
+        def initialize(coupling_subdomain, mesh, u_n, dimension=2, t=0, n=0, dirichlet_boundary=None):
             """Initializes remaining attributes. Called once, from the solver.
 
             :param coupling_subdomain: domain where coupling takes place
             :param mesh: fenics mesh
-            :param read_field: function applied on the read field
-            :param write_field: function applied on the write field
             :param u_n: initial data for solution
             :param dimension: problem dimension
             :param t: starting time
@@ -149,7 +155,7 @@ class Adapter:
                 logger.warning(
                     "fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
                                                                                             self._dimensions))
-                if can_apply_2d_3d_coupling():
+                if AdapterCore.can_apply_2d_3d_coupling():
                     logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
                 else:
                     raise Exception("fenics_dimension = {}, precice_dimension = {}. "
@@ -160,18 +166,16 @@ class Adapter:
                 self._Dirichlet_Boundary = dirichlet_boundary
 
             set_coupling_mesh(mesh, coupling_subdomain)
-            set_read_field(read_field)
-            set_write_field(write_field)
             self._precice_tau = self._interface.initialize()
 
             if self._interface.is_action_required(precice.action_write_initial_data()):
-                write_data()
+                write(self._write_data)
                 self._interface.fulfilled_action(precice.action_write_initial_data())
 
             self._interface.initialize_data()
 
             if self._interface.is_read_data_available():
-                read_data()
+                self._read_data = read()
 
             if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
                 initial_state = SolverState(u_n, t, n)
@@ -187,7 +191,7 @@ class Adapter:
             """
             self._coupling_subdomain = subdomain
             self._mesh_fenics = mesh
-            self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = extract_coupling_boundary_vertices()
+            self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = AdapterCore.extract_coupling_boundary_vertices()
             self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
             """ Define a mapping between coupling vertices and their IDs in precice"""
@@ -195,7 +199,7 @@ class Adapter:
             for i in range(self._n_vertices):
                 id_mapping[self._fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-            self._edge_vertex_ids1, self._edge_vertex_ids2 = extract_coupling_boundary_edges(id_mapping)
+            self._edge_vertex_ids1, self._edge_vertex_ids2 = AdapterCore.extract_coupling_boundary_edges(id_mapping)
 
             for i in range(len(self._edge_vertex_ids1)):
                 assert (self._edge_vertex_ids1[i] != self._edge_vertex_ids2[i])
@@ -217,16 +221,16 @@ class Adapter:
             self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
 
         def advance_solver_state(state, u_np1, dt):
-            """Advances the solver's state by one timestep.
+            """Advances the solver's state by one timestep. Also advances coupling state
             :param state: old state
             :param u_np1: new value
             :param dt: timestep size
-            :return:
             """
             logger.debug("Advance solver state")
             logger.debug("old state: t={time}".format(time=state.t))
             state.update(SolverState(u_np1, state.t + dt, state.n + 1))
             logger.debug("new state: t={time}".format(time=state.t))
+            self._interface.advance(dt)
 
         def save_solver_state_to_checkpoint(state):
             """Writes given solver state to checkpoint.
