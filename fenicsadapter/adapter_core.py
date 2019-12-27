@@ -9,7 +9,6 @@ from scipy.interpolate import interp1d
 import numpy as np
 from enum import Enum
 import logging
-from .fenicsadapter import Adapter
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -240,8 +239,18 @@ class ExactInterpolationExpression(CustomExpression):
         return return_value
 
 
-class AdapterCore(Adapter):
-    def can_apply_2d_3d_coupling(self):
+class AdapterCore:
+
+    def __init__(self, dimensions, fenics_dimensions, mesh_fenics, coupling_subdomain,
+                 read_data, coupling_mesh_vertices):
+        self._dimensions = dimensions
+        self._fenics_dimensions = fenics_dimensions
+        self._mesh_fenics = mesh_fenics
+        self._coupling_subdomain = coupling_subdomain
+        self._read_data = read_data
+        self._coupling_mesh_vertices = coupling_mesh_vertices
+
+    def _can_apply_2d_3d_coupling(self):
         """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
         received from preCICE is ignored. If FEniCS sends data to preCICE, the y-dimension of data and node coordinates
         is set to zero.
@@ -263,7 +272,7 @@ class AdapterCore(Adapter):
         else:
             raise Exception("Cannot handle data type %s" % type(data))
 
-    def extract_coupling_boundary_vertices(self):
+    def _extract_coupling_boundary_vertices(self):
         """Extracts vertices which lie on the boundary.
         :return: stack of vertices
         """
@@ -297,7 +306,7 @@ class AdapterCore(Adapter):
         elif self._dimensions == 3:
             return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1), n
 
-    def are_connected_by_edge(self, v1, v2):
+    def _are_connected_by_edge(self, v1, v2):
         """Returns true if both vertices are connected by an edge. """
         for edge1 in dolfin.edges(v1):
             for edge2 in dolfin.edges(v2):
@@ -383,7 +392,7 @@ class AdapterCore(Adapter):
 
         return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
-    def extract_coupling_boundary_coordinates(self):
+    def _extract_coupling_boundary_coordinates(self):
         """Extracts the coordinates of vertices that lay on the boundary. 3D
         case currently handled as 2D.
 

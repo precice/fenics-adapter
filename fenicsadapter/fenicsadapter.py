@@ -73,6 +73,10 @@ class Adapter:
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
         self._has_force_boundary = None  # stores whether force_boundary exists
 
+        # Initialize the adapter core
+        AdapterCore(self._dimensions, self._fenics_dimensions, self._mesh_fenics, self._coupling_subdomain,
+                    self._read_data, self._coupling_mesh_vertices)
+
         def read():
             """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
             Scalar/Vector write function) read_data is converted.
@@ -92,7 +96,7 @@ class Adapter:
                 if self._fenics_dimensions == self._dimensions:
                     self._read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
-                elif AdapterCore.can_apply_2d_3d_coupling():
+                elif AdapterCore._can_apply_2d_3d_coupling():
                     precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
                     self._read_data[:, 0] = precice_read_data[:, 0]
@@ -121,7 +125,7 @@ class Adapter:
             if self._write_function_type is FunctionType.SCALAR:
                 self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, self._write_data)
             elif self._write_function_type is FunctionType.VECTOR:
-                if AdapterCore.can_apply_2d_3d_coupling():
+                if AdapterCore._can_apply_2d_3d_coupling():
                     # in 2d-3d coupling z dimension is set to zero
                     precice_write_data = np.column_stack((self._write_data[:, 0], self._write_data[:, 1], np.zeros(self._n_vertices)))
 
@@ -131,7 +135,7 @@ class Adapter:
                     self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
 
                 elif self._fenics_dimensions == self._dimensions:
-                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, write_data)
+                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, self._write_data)
                 else:
                     raise Exception("Dimensions don't match.")
             else:
@@ -154,7 +158,7 @@ class Adapter:
                 logger.warning(
                     "fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
                                                                                             self._dimensions))
-                if AdapterCore.can_apply_2d_3d_coupling():
+                if AdapterCore._can_apply_2d_3d_coupling():
                     logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
                 else:
                     raise Exception("fenics_dimension = {}, precice_dimension = {}. "
@@ -189,7 +193,7 @@ class Adapter:
             """
             self._coupling_subdomain = subdomain
             self._mesh_fenics = mesh
-            self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = AdapterCore.extract_coupling_boundary_vertices()
+            self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = AdapterCore._extract_coupling_boundary_vertices()
             self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
             """ Define a mapping between coupling vertices and their IDs in preCICE """
@@ -254,7 +258,7 @@ class Adapter:
             return AdapterCore.get_forces_as_point_sources(Dirichlet_Boundary, function_space)
 
         def update_boundary_condition():
-            x_vert, y_vert = AdapterCore.extract_coupling_boundary_coordinates()
+            x_vert, y_vert = AdapterCore._extract_coupling_boundary_coordinates()
             if self._has_force_boundary:
                 x_forces, y_forces = AdapterCore.get_forces_as_point_sources()
             else:
