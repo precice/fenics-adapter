@@ -15,7 +15,6 @@ from .solverstate import SolverState
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 
-
 class Adapter:
     """Initializes the Adapter. Initalizer creates object of class Config (from
     config.py module).
@@ -59,6 +58,7 @@ class Adapter:
 
         # numerics
         self._precice_tau = None
+
         # Temporarily hard-coding interpolation strategy. Need to provide user with the appropriate choice
         self._my_expression = GeneralInterpolationExpression
 
