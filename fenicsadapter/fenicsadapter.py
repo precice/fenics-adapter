@@ -73,8 +73,8 @@ class Adapter:
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
         self._has_force_boundary = None  # stores whether force_boundary exists
 
-        # Initialize the adapter core
-        AdapterCore(self._dimensions, self._fenics_dimensions, self._mesh_fenics, self._coupling_subdomain,
+        # Initialize an object of the Adapter core to access all functionality
+        self._CoreObject = AdapterCore(self._dimensions, self._fenics_dimensions, self._mesh_fenics, self._coupling_subdomain,
                     self._read_data, self._coupling_mesh_vertices)
 
         def read():
@@ -96,7 +96,7 @@ class Adapter:
                 if self._fenics_dimensions == self._dimensions:
                     self._read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
-                elif AdapterCore._can_apply_2d_3d_coupling():
+                elif self._CoreObject.can_apply_2d_3d_coupling():
                     precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
                     self._read_data[:, 0] = precice_read_data[:, 0]
@@ -113,19 +113,19 @@ class Adapter:
             """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
             Scalar/Vector write function) write_data is first converted.
 
-            :param write_data: Data to be written to preCICE in the format of a numpy 1D array with the values like it is used by preCICE
+            :param write_function: Data to be written to preCICE in the format of a numpy 1D array with the values like it is used by preCICE
             (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny)
             The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
             """
 
             assert (self._write_function_type in list(FunctionType))
 
-            self._write_data = AdapterCore.convert_fenics_to_precice(write_function)
+            self._write_data = self._CoreObject.convert_fenics_to_precice(write_function)
 
             if self._write_function_type is FunctionType.SCALAR:
                 self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, self._write_data)
             elif self._write_function_type is FunctionType.VECTOR:
-                if AdapterCore._can_apply_2d_3d_coupling():
+                if self._CoreObject.can_apply_2d_3d_coupling():
                     # in 2d-3d coupling z dimension is set to zero
                     precice_write_data = np.column_stack((self._write_data[:, 0], self._write_data[:, 1], np.zeros(self._n_vertices)))
 
@@ -158,7 +158,7 @@ class Adapter:
                 logger.warning(
                     "fenics_dimension = {} and precice_dimension = {} do not match!".format(self._fenics_dimensions,
                                                                                             self._dimensions))
-                if AdapterCore._can_apply_2d_3d_coupling():
+                if self._CoreObject.can_apply_2d_3d_coupling():
                     logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
                 else:
                     raise Exception("fenics_dimension = {}, precice_dimension = {}. "
@@ -193,7 +193,7 @@ class Adapter:
             """
             self._coupling_subdomain = subdomain
             self._mesh_fenics = mesh
-            self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = AdapterCore._extract_coupling_boundary_vertices()
+            self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices = self._CoreObject.extract_coupling_boundary_vertices()
             self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
             """ Define a mapping between coupling vertices and their IDs in preCICE """
@@ -201,7 +201,7 @@ class Adapter:
             for i in range(self._n_vertices):
                 id_mapping[self._fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-            self._edge_vertex_ids1, self._edge_vertex_ids2 = AdapterCore.extract_coupling_boundary_edges(id_mapping)
+            self._edge_vertex_ids1, self._edge_vertex_ids2 = self._CoreObject.extract_coupling_boundary_edges(id_mapping)
 
             for i in range(len(self._edge_vertex_ids1)):
                 assert (self._edge_vertex_ids1[i] != self._edge_vertex_ids2[i])
@@ -258,9 +258,9 @@ class Adapter:
             return AdapterCore.get_forces_as_point_sources(Dirichlet_Boundary, function_space)
 
         def update_boundary_condition():
-            x_vert, y_vert = AdapterCore._extract_coupling_boundary_coordinates()
+            x_vert, y_vert = self._CoreObject.extract_coupling_boundary_coordinates()
             if self._has_force_boundary:
-                x_forces, y_forces = AdapterCore.get_forces_as_point_sources()
+                x_forces, y_forces = self._CoreObject.get_forces_as_point_sources()
             else:
                 self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 

@@ -240,7 +240,8 @@ class ExactInterpolationExpression(CustomExpression):
 
 
 class AdapterCore:
-
+    """Initializes the Adapter Core.
+    """
     def __init__(self, dimensions, fenics_dimensions, mesh_fenics, coupling_subdomain,
                  read_data, coupling_mesh_vertices):
         self._dimensions = dimensions
@@ -250,7 +251,7 @@ class AdapterCore:
         self._read_data = read_data
         self._coupling_mesh_vertices = coupling_mesh_vertices
 
-    def _can_apply_2d_3d_coupling(self):
+    def can_apply_2d_3d_coupling(self):
         """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
         received from preCICE is ignored. If FEniCS sends data to preCICE, the y-dimension of data and node coordinates
         is set to zero.
@@ -267,12 +268,12 @@ class AdapterCore:
         :return: array of FEniCS function values at each point on the boundary
         """
         if type(data) is dolfin.Function:
-            x_all, y_all = self._extract_coupling_boundary_coordinates()
+            x_all, y_all = self.extract_coupling_boundary_coordinates()
             return np.array([data(x, y) for x, y in zip(x_all, y_all)])
         else:
             raise Exception("Cannot handle data type %s" % type(data))
 
-    def _extract_coupling_boundary_vertices(self):
+    def extract_coupling_boundary_vertices(self):
         """Extracts vertices which lie on the boundary.
         :return: stack of vertices
         """
@@ -293,7 +294,7 @@ class AdapterCore:
                 vertices_x.append(v.x(0))
                 if self._dimensions == 2:
                     vertices_y.append(v.x(1))
-                elif self._can_apply_2d_3d_coupling():
+                elif self.can_apply_2d_3d_coupling():
                     vertices_y.append(v.x(1))
                     vertices_z.append(0)
                 else:
@@ -349,7 +350,7 @@ class AdapterCore:
 
     def create_coupling_boundary_condition(self, my_expression, function_space=None):
         """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
-        x_vert, y_vert = self._extract_coupling_boundary_coordinates()
+        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
 
         try:  # works with dolfin 1.6.0
             coupling_bc_expression = my_expression(element=function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
@@ -392,19 +393,19 @@ class AdapterCore:
 
         return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
-    def _extract_coupling_boundary_coordinates(self):
+    def extract_coupling_boundary_coordinates(self):
         """Extracts the coordinates of vertices that lay on the boundary. 3D
         case currently handled as 2D.
 
         :return: x and y cooridinates.
         """
-        _, vertices, _ = self._extract_coupling_boundary_vertices()
+        _, vertices, _ = self.extract_coupling_boundary_vertices()
         vertices_x = vertices[:, 0]
         vertices_y = vertices[:, 1]
         if self._dimensions == 3:
             vertices_z = vertices[2, :]
 
-        if self._dimensions == 2 or self._can_apply_2d_3d_coupling():
+        if self._dimensions == 2 or self.can_apply_2d_3d_coupling():
             return vertices_x, vertices_y
         else:
             raise Exception("Error: These Dimensions are not supported by the adapter.")
