@@ -9,6 +9,7 @@ from .config import Config
 from .checkpointing import Checkpoint
 import logging
 import precice
+from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
 from .adapter_core import AdapterCore, FunctionType, GeneralInterpolationExpression
 from .solverstate import SolverState
 
@@ -73,9 +74,8 @@ class Adapter:
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
         self._has_force_boundary = None  # stores whether force_boundary exists
 
-        # Initialize an object of the Adapter core to access all functionality
-        self._CoreObject = AdapterCore(self._dimensions, self._fenics_dimensions, self._mesh_fenics, self._coupling_subdomain,
-                    self._read_data, self._coupling_mesh_vertices)
+        # Adapter core
+        self._CoreObject = None  # Adapter core object. Initialized later
 
     def read(self):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -109,13 +109,11 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def write(self, write_function):
+    def write(self, write_function=None):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted.
 
-        :param write_function: Data to be written to preCICE in the format of a numpy 1D array with the values like it is used by preCICE
-        (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny)
-        The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
+        :param write_function: FEniCS function
         """
 
         assert (self._write_function_type in list(FunctionType))
@@ -166,11 +164,15 @@ class Adapter:
                     self._fenics_dimensions,
                     self._dimensions))
 
+        # Initialize an object of the Adapter core to access all functionality
+        self._CoreObject = AdapterCore(self._dimensions, self._fenics_dimensions, mesh, coupling_subdomain
+                                       , self._read_data)
+
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._precice_tau = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
-            self.write(self._write_data)
+            self.write()
             self._interface.fulfilled_action(precice.action_write_initial_data())
 
         self._interface.initialize_data()
@@ -324,3 +326,26 @@ class Adapter:
         """
         return self._solver_name
 
+    def is_timestep_complete(self):
+        """
+        :return: preCICE call if timestep is complete or not
+        """
+        return self._interface.is_timestep_complete()
+
+    def is_action_required(self, action):
+        """
+        :return: preCICE call which returns true if provided action is required
+        """
+        return self._interface.is_action_required(action)
+
+    def write_checkpoint(self):
+        """
+        :return: preCICE call to write checkpoint
+        """
+        return action_write_iteration_checkpoint()
+
+    def restore_to_checkpoint(self):
+        """
+        :return:
+        """
+        return action_read_iteration_checkpoint()

@@ -243,13 +243,12 @@ class AdapterCore:
     """Initializes the Adapter Core.
     """
     def __init__(self, dimensions, fenics_dimensions, mesh_fenics, coupling_subdomain,
-                 read_data, coupling_mesh_vertices):
+                 read_data):
         self._dimensions = dimensions
         self._fenics_dimensions = fenics_dimensions
         self._mesh_fenics = mesh_fenics
         self._coupling_subdomain = coupling_subdomain
         self._read_data = read_data
-        self._coupling_mesh_vertices = coupling_mesh_vertices
 
     def can_apply_2d_3d_coupling(self):
         """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
@@ -358,7 +357,7 @@ class AdapterCore:
             coupling_bc_expression = my_expression(element=function_space.ufl_element(), degree=0)
         coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
-    def get_forces_as_point_sources(self, Dirichlet_Boundary, function_space=None):
+    def get_forces_as_point_sources(self, Dirichlet_Boundary, coupling_mesh_vertices, function_space=None):
         """
         Creates 2 dicts of PointSources that can be applied to the assembled system.
         Applies filter_point_source to avoid forces being applied to already existing Dirichlet BC, since this would
@@ -372,10 +371,10 @@ class AdapterCore:
         x_forces = dict()  # dict of PointSources for Forces in x direction
         y_forces = dict()  # dict of PointSources for Forces in y direction
 
-        vertices_x = self._coupling_mesh_vertices[:, 0]
-        vertices_y = self._coupling_mesh_vertices[:, 1]
+        vertices_x = coupling_mesh_vertices[:, 0]
+        vertices_y = coupling_mesh_vertices[:, 1]
 
-        n_vertices, _ = self._coupling_mesh_vertices.shape
+        n_vertices, _ = coupling_mesh_vertices.shape
 
         for i in range(n_vertices):
             px, py = vertices_x[i], vertices_y[i]
