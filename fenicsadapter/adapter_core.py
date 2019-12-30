@@ -90,7 +90,7 @@ class CustomExpression(UserExpression):
         self._coords_z = coords_z
         self._vals = vals
 
-        self._f = self.create_interpolant(coords_x)
+        self._f = self.create_interpolant()
 
         if self.is_scalar_valued():
             assert (self._vals.shape == self._coords_x.shape)
@@ -242,13 +242,11 @@ class ExactInterpolationExpression(CustomExpression):
 class AdapterCore:
     """Initializes the Adapter Core.
     """
-    def __init__(self, dimensions, fenics_dimensions, mesh_fenics, coupling_subdomain,
-                 read_data):
+    def __init__(self, dimensions, fenics_dimensions, mesh_fenics, coupling_subdomain):
         self._dimensions = dimensions
         self._fenics_dimensions = fenics_dimensions
         self._mesh_fenics = mesh_fenics
         self._coupling_subdomain = coupling_subdomain
-        self._read_data = read_data
 
     def can_apply_2d_3d_coupling(self):
         """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
@@ -347,7 +345,7 @@ class AdapterCore:
 
         return vertices1_ids, vertices2_ids
 
-    def create_coupling_boundary_condition(self, my_expression, function_space=None):
+    def create_coupling_boundary_condition(self, my_expression, read_data, function_space):
         """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
         x_vert, y_vert = self.extract_coupling_boundary_coordinates()
 
@@ -355,7 +353,9 @@ class AdapterCore:
             coupling_bc_expression = my_expression(element=function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_bc_expression = my_expression(element=function_space.ufl_element(), degree=0)
-        coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
+        coupling_bc_expression.set_boundary_data(read_data, x_vert, y_vert)
+
+        return coupling_bc_expression
 
     def get_forces_as_point_sources(self, Dirichlet_Boundary, coupling_mesh_vertices, function_space=None):
         """

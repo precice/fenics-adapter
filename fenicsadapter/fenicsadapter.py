@@ -10,7 +10,7 @@ from .checkpointing import Checkpoint
 import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
-from .adapter_core import AdapterCore, FunctionType, GeneralInterpolationExpression
+from .adapter_core import AdapterCore, FunctionType, GeneralInterpolationExpression, determine_function_type
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
@@ -109,13 +109,14 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def write(self, write_function=None):
+    def write(self, write_function):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted.
 
         :param write_function: FEniCS function
         """
 
+        self._write_function_type = determine_function_type(write_function)
         assert (self._write_function_type in list(FunctionType))
 
         self._write_data = self._CoreObject.convert_fenics_to_precice(write_function)
@@ -139,9 +140,11 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def initialize(self, coupling_subdomain, mesh, u_n, dimension=2, t=0, n=0):
+    def initialize(self, coupling_subdomain, mesh, u_n, read_function, write_function, dimension=2, t=0, n=0):
         """Initializes remaining attributes. Called once, from the solver.
 
+        :param write_function:
+        :param read_function:
         :param coupling_subdomain: domain where coupling takes place
         :param mesh: fenics mesh
         :param u_n: initial data for solution
@@ -165,14 +168,17 @@ class Adapter:
                     self._dimensions))
 
         # Initialize an object of the Adapter core to access all functionality
-        self._CoreObject = AdapterCore(self._dimensions, self._fenics_dimensions, mesh, coupling_subdomain
-                                       , self._read_data)
+        self._CoreObject = AdapterCore(self._dimensions, self._fenics_dimensions, mesh, coupling_subdomain)
+
+        # Set read_function and read_data
+        self._read_function_type = determine_function_type(read_function)
+        self._read_data = self._CoreObject.convert_fenics_to_precice(read_function)
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._precice_tau = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
-            self.write()
+            self.write(write_function)
             self._interface.fulfilled_action(precice.action_write_initial_data())
 
         self._interface.initialize_data()
@@ -217,7 +223,8 @@ class Adapter:
         """
         self._Dirichlet_Boundary = True
 
-        AdapterCore.create_coupling_boundary_condition(self._coupling_bc_expression, function_space)
+        self._coupling_bc_expression = self._CoreObject.create_coupling_boundary_condition(self._my_expression, self._read_data
+                                                                                           , function_space)
         return dolfin.DirichletBC(function_space, self._coupling_bc_expression, self._coupling_subdomain)
 
     def create_coupling_neumann_boundary_condition(self, test_functions, function_space=None, boundary_marker=None):
@@ -232,7 +239,8 @@ class Adapter:
             function_space = test_functions.function_space()
         else:
             function_space = function_space
-        AdapterCore.create_coupling_boundary_condition(self._coupling_bc_expression, function_space)
+        self._coupling_bc_expression = self._CoreObject.create_coupling_boundary_condition(self._my_expression, self._read_data
+                                                                                           , function_space)
         if not boundary_marker:  # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
             if self._coupling_bc_expression.is_scalar_valued():
                 return test_functions * self._coupling_bc_expression * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
