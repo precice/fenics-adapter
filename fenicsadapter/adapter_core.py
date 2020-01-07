@@ -66,6 +66,7 @@ class CustomExpression(UserExpression):
         :param coords_y: y coordinates of nodes
         :param coords_z: z coordinates of nodes
         """
+
         self.update_boundary_data(vals, coords_x, coords_y, coords_z)
 
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
@@ -76,6 +77,7 @@ class CustomExpression(UserExpression):
         :param coords_y: y coordinates of nodes
         :param coords_z: z coordinates of nodes
         """
+
         self._coords_x = coords_x
         self._dimension = 3
         if coords_y is None:
@@ -353,6 +355,7 @@ class AdapterCore:
             coupling_bc_expression = my_expression(element=function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_bc_expression = my_expression(element=function_space.ufl_element(), degree=0)
+
         coupling_bc_expression.set_boundary_data(read_data, x_vert, y_vert)
 
         return coupling_bc_expression

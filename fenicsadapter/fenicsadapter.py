@@ -10,7 +10,8 @@ from .checkpointing import Checkpoint
 import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
-from .adapter_core import AdapterCore, FunctionType, GeneralInterpolationExpression, determine_function_type
+from .adapter_core import AdapterCore, FunctionType, GeneralInterpolationExpression, ExactInterpolationExpression,\
+    determine_function_type
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ class Adapter:
         self._precice_tau = None
 
         # Temporarily hard-coding interpolation strategy. Need to provide user with the appropriate choice
-        self._my_expression = GeneralInterpolationExpression
+        self._my_expression = None
 
         # checkpointing
         self._checkpoint = Checkpoint()
@@ -76,6 +77,12 @@ class Adapter:
 
         # Adapter core
         self._CoreObject = None  # Adapter core object. Initialized later
+
+    def set_interpolation_type(self, expression):
+        if expression is "cubic_spline":
+            self._my_expression = ExactInterpolationExpression
+        elif expression is "RBF":
+            self._my_expression = GeneralInterpolationExpression
 
     def read(self):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -183,8 +190,8 @@ class Adapter:
 
         self._interface.initialize_data()
 
-        if self._interface.is_read_data_available():
-            self._read_data = self.read()
+        #if self._interface.is_read_data_available():
+        #    self._read_data = self.read()
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             initial_state = SolverState(u_n, t, n)
@@ -311,9 +318,8 @@ class Adapter:
         state.update(SolverState(u_np1, state.t + dt, state.n + 1))
         logger.debug("new state: t={time}".format(time=state.t))
 
-    def advance_coupling(self, dt, fenics_dt):
+    def advance_coupling(self, dt):
         max_dt = self._interface.advance(dt)
-        max_dt = np.min(max_dt, fenics_dt)
         return max_dt
 
     def save_solver_state_to_checkpoint(self, state):
