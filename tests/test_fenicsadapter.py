@@ -65,15 +65,11 @@ class TestCheckpointing(TestCase):
         :param precice: the fenicsadapter
         """
         # define functions that are called by advance, but not necessary for the test
-        precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice._convert_fenics_to_precice = MagicMock()
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
         # initialize checkpointing manually
         mocked_state = SolverState(self.u_cp_mocked, self.t_cp_mocked, self.n_cp_mocked)
-        precice._checkpoint.write(mocked_state)
-        precice._write_function_type = FunctionType.SCALAR
-        precice._read_function_type = FunctionType.SCALAR
+        precice.save_solver_state_to_checkpoint(mocked_state)
 
     def test_advance_success(self):
         """
@@ -107,9 +103,8 @@ class TestCheckpointing(TestCase):
 
         precice_step_complete = True
         # time and iteration count should be increased by a successful call of advance
-        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
-        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
-                         desired_output)
+        desired_output = self.t + self.dt
+        self.assertEqual(precice.advance(self.t), desired_output)
 
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
@@ -147,9 +142,8 @@ class TestCheckpointing(TestCase):
 
         precice_step_complete = False
         # time and iteration count should be rolled back by a not successful call of advance
-        desired_output = (self.t_cp_mocked, self.n_cp_mocked, precice_step_complete, self.dt)
-        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
-                         desired_output)
+        desired_output = self.t_cp_mocked
+        self.assertEqual(precice.advance(self.t), desired_output)
 
         # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
@@ -188,9 +182,8 @@ class TestCheckpointing(TestCase):
 
         precice_step_complete = False
         # time and iteration count should be rolled back by a not successful call of advance
-        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
-        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
-                         desired_output)
+        desired_output = self.t + self.dt
+        self.assertEqual(precice.advance(self.t), desired_output)
 
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)

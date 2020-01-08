@@ -19,7 +19,7 @@ class SolverState:
 
     def update(self, other_state):
         """
-        updates the state using FEniCS assing function. self.u is updated.
+        updates the state using FEniCS assign function. self.u is updated.
         This may also have an effect outside of this object! Compare to SolverState.copy(other_state).
         :param other_state:
         """

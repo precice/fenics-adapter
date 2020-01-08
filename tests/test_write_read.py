@@ -40,6 +40,7 @@ class TestWriteData(TestCase):
         from precice import Interface
         import fenicsadapter
 
+
         def dummy_set_mesh_vertices(mesh_id, positions):
             vertex_ids = np.arange(len(positions))
             return vertex_ids
@@ -67,7 +68,7 @@ class TestWriteData(TestCase):
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
         precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
-        precice.advance(write_u, u_init, u_init, 0, 0, 0)
+        precice.advance(0)
 
         expected_data_id = 15
         expected_values = np.array([self.scalar_expr(x_right, y) for y in np.linspace(y_bottom, y_top, 11)])
@@ -112,7 +113,7 @@ class TestWriteData(TestCase):
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
         precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
-        precice.advance(write_u, u_init, u_init, 0, 0, 0)
+        precice.advance(0)
 
         expected_data_id = 15
         expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
@@ -163,7 +164,7 @@ class TestWriteData(TestCase):
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
         precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
-        precice.advance(write_u, u_init, u_init, 0, 0, 0)
+        precice.advance(0)
 
         expected_data_id = 15
         expected_ids = np.arange(11)
@@ -211,7 +212,7 @@ class TestWriteData(TestCase):
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._coupling_bc_expression = MagicMock()
         precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
-        precice.advance(write_u, u_init, u_init, 0, 0, 0)
+        precice.advance(0)
 
         expected_data_id = 15
         expected_ids = np.arange(11)

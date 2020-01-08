@@ -79,6 +79,11 @@ class Adapter:
         self._CoreObject = None  # Adapter core object. Initialized later
 
     def set_interpolation_type(self, expression):
+        """
+        Sets interpolation strategy according to choice of user
+        :param expression: string naming which interpolation strategy to be pursued
+        (Choices are 1. cubic_spline  2. RBF)
+        """
         if expression is "cubic_spline":
             self._my_expression = ExactInterpolationExpression
         elif expression is "RBF":
@@ -150,15 +155,14 @@ class Adapter:
     def initialize(self, coupling_subdomain, mesh, u_n, read_function, write_function, dimension=2, t=0, n=0):
         """Initializes remaining attributes. Called once, from the solver.
 
-        :param write_function:
-        :param read_function:
+        :param write_function: FEniCS function for data to be written by this instance of coupling
+        :param read_function: FEniCS function for data to be read by this instance of coupling
         :param coupling_subdomain: domain where coupling takes place
         :param mesh: fenics mesh
         :param u_n: initial data for solution
         :param dimension: problem dimension
         :param t: starting time
         :param n: time step n
-        :param coupling_marker: boundary marker, can be used for coupling, multiple Neumann boundary conditions are applied
         """
         self._fenics_dimensions = dimension
 
@@ -216,11 +220,11 @@ class Adapter:
         for i in range(self._n_vertices):
             id_mapping[self._fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-        self._edge_vertex_ids1, self._edge_vertex_ids2 = self._CoreObject.extract_coupling_boundary_edges(id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2 = self._CoreObject.extract_coupling_boundary_edges(id_mapping)
 
-        for i in range(len(self._edge_vertex_ids1)):
-            assert (self._edge_vertex_ids1[i] != self._edge_vertex_ids2[i])
-            self._interface.set_mesh_edge(self._mesh_id, self._edge_vertex_ids1[i], self._edge_vertex_ids2[i])
+        for i in range(len(edge_vertex_ids1)):
+            assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
+            self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
 
     def create_coupling_dirichlet_boundary_condition(self, function_space):
         """Creates the coupling Dirichlet boundary conditions using
@@ -288,7 +292,7 @@ class Adapter:
         """
         return self._interface.is_coupling_ongoing()
 
-    def initialize_solver_state(self, u_n, t, n):
+    def get_solver_state(self, u_n, t, n):
         """Initalizes the solver state before coupling starts in each iteration
         :param u_n:
         :param t:
@@ -318,7 +322,7 @@ class Adapter:
         state.update(SolverState(u_np1, state.t + dt, state.n + 1))
         logger.debug("new state: t={time}".format(time=state.t))
 
-    def advance_coupling(self, dt):
+    def advance(self, dt):
         max_dt = self._interface.advance(dt)
         return max_dt
 
@@ -358,7 +362,7 @@ class Adapter:
         """
         return action_write_iteration_checkpoint()
 
-    def restore_to_checkpoint(self):
+    def read_checkpoint(self):
         """
         :return:
         """
