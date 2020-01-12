@@ -11,11 +11,12 @@ import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
 from .adapter_core import AdapterCore, FunctionType, GeneralInterpolationExpression, ExactInterpolationExpression,\
-    determine_function_type
+    determine_function_type, InterpolationType
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
+
 
 class Adapter:
     """Initializes the Adapter. Initalizer creates object of class Config (from
@@ -67,6 +68,9 @@ class Adapter:
         # checkpointing
         self._checkpoint = Checkpoint()
 
+        # Solver state used by the Adapter internally to handle checkpointing
+        self._state = None
+
         # function space
         self._function_space = None
         self._dss = None  # measure for boundary integral
@@ -78,16 +82,18 @@ class Adapter:
         # Adapter core
         self._CoreObject = None  # Adapter core object. Initialized later
 
-    def set_interpolation_type(self, expression):
+    def set_interpolation_type(self, type):
         """
         Sets interpolation strategy according to choice of user
-        :param expression: string naming which interpolation strategy to be pursued
+        :param type: Enum stating which interpolation strategy to be pursued
         (Choices are 1. cubic_spline  2. RBF)
         """
-        if expression is "cubic_spline":
+        if type == InterpolationType.CUBIC_SPLINE.value:
             self._my_expression = ExactInterpolationExpression
-        elif expression is "RBF":
+            print("Using cubic spline interpolation")
+        elif type == InterpolationType.RBF.value:
             self._my_expression = GeneralInterpolationExpression
+            print("Using RBF interpolation")
 
     def read(self):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -164,6 +170,7 @@ class Adapter:
         :param t: starting time
         :param n: time step n
         """
+
         self._fenics_dimensions = dimension
 
         if self._fenics_dimensions != self._dimensions:
@@ -188,18 +195,16 @@ class Adapter:
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._precice_tau = self._interface.initialize()
 
-        if self._interface.is_action_required(precice.action_write_initial_data()):
+        if self._interface.is_action_required(action_write_initial_data()):
             self.write(write_function)
-            self._interface.fulfilled_action(precice.action_write_initial_data())
+            self._interface.fulfilled_action(action_write_initial_data())
 
         self._interface.initialize_data()
 
         #if self._interface.is_read_data_available():
         #    self._read_data = self.read()
 
-        if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
-            initial_state = SolverState(u_n, t, n)
-            self.save_solver_state_to_checkpoint(initial_state)
+        self.initialize_solver_state(u_n, t, n)
 
         return self._precice_tau
 
@@ -268,15 +273,12 @@ class Adapter:
     def create_force_boundary_condition(self, Dirichlet_Boundary, function_space):
         """
         Initializes force-coupling via PointSource.
-
         This function only works for 2D-pseudo3D coupling.
-
         :param Dirichlet_Boundary:
         :param function_space: The Function Space used for the Test and Trial functions
         """
         self._has_force_boundary = True
-
-        return AdapterCore.get_forces_as_point_sources(Dirichlet_Boundary, function_space)
+        return AdapterCore.get_forces_as_point_sources(Dirichlet_Boundary, function_space, self._coupling_mesh_vertices, self._read_data)
 
     def update_boundary_condition(self):
         x_vert, y_vert = self._CoreObject.extract_coupling_boundary_coordinates()
@@ -285,32 +287,31 @@ class Adapter:
         else:
             self._coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
-    def is_coupling_ongoing(self):
-        """Determines whether simulation should continue. Called from the
-        simulation loop in the solver.
-        :return: True if the coupling is ongoing, False otherwise
-        """
-        return self._interface.is_coupling_ongoing()
-
-    def get_solver_state(self, u_n, t, n):
+    def initialize_solver_state(self, u_n, t, n):
         """Initalizes the solver state before coupling starts in each iteration
         :param u_n:
         :param t:
         :param n:
         """
-        state = SolverState(u_n, t, n)
+        self._state = SolverState(u_n, t, n)
         logger.debug("Solver state is initialized")
-        return state
 
-    def restore_solver_state_from_checkpoint(self, state):
-        """Resets the solver's state to the checkpoint's state.
-        :param state: current state of the FEniCS solver
+    def store_checkpoint(self):
+        """Stores the current solver state to a checkpoint.
         """
-        logger.debug("Restore solver state")
-        state.update(self._checkpoint.get_state())
-        self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+        logger.debug("Save solver state")
+        self._checkpoint.write(self._state)
+        self._interface.fulfilled_action(self.action_write_checkpoint())
 
-    def advance_solver_state(self, state, u_np1, dt):
+    def retrieve_checkpoint(self):
+        """Resets the solver's state to the checkpoint's state.
+        """
+        assert (not self._interface.is_timestep_complete())  # avoids invalid control flow
+        logger.debug("Restore solver state")
+        self._state.update(self._checkpoint.get_state())
+        self._interface.fulfilled_action(self.action_read_checkpoint())
+
+    def end_timestep(self, u_np1, dt):
         """Advances the solver's state by one timestep. Also advances coupling state
         :param state: old state
         :param u_np1: new value
@@ -318,21 +319,13 @@ class Adapter:
         :return: maximum time step value recommended by preCICE
         """
         logger.debug("Advance solver state")
-        logger.debug("old state: t={time}".format(time=state.t))
-        state.update(SolverState(u_np1, state.t + dt, state.n + 1))
-        logger.debug("new state: t={time}".format(time=state.t))
+        logger.debug("old state: t={time}".format(time=self._state.t))
+        self._state.update(SolverState(u_np1, self._state.t + dt, self._state.n + 1))
+        logger.debug("new state: t={time}".format(time=self._state.t))
 
     def advance(self, dt):
         max_dt = self._interface.advance(dt)
         return max_dt
-
-    def save_solver_state_to_checkpoint(self, state):
-        """Writes given solver state to checkpoint.
-        :param state: state being saved as checkpoint
-        """
-        logger.debug("Save solver state")
-        self._checkpoint.write(state)
-        self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
 
     def finalize(self):
         """Finalizes the coupling interface."""
@@ -344,6 +337,13 @@ class Adapter:
         """
         return self._solver_name
 
+    def is_coupling_ongoing(self):
+        """Determines whether simulation should continue. Called from the
+        simulation loop in the solver.
+        :return: True if the coupling is ongoing, False otherwise
+        """
+        return self._interface.is_coupling_ongoing()
+
     def is_timestep_complete(self):
         """
         :return: preCICE call if timestep is complete or not
@@ -352,17 +352,18 @@ class Adapter:
 
     def is_action_required(self, action):
         """
+        :param action:
         :return: preCICE call which returns true if provided action is required
         """
         return self._interface.is_action_required(action)
 
-    def write_checkpoint(self):
+    def action_write_checkpoint(self):
         """
         :return: preCICE call to write checkpoint
         """
         return action_write_iteration_checkpoint()
 
-    def read_checkpoint(self):
+    def action_read_checkpoint(self):
         """
         :return:
         """

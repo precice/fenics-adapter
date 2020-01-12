@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 
 
+class InterpolationType(Enum):
+    """ Defines the type of interpolation strategy used"""
+    CUBIC_SPLINE = 1  # cubic splines used interpolation
+    RBF = 2  # Radial basis functions used for interpolation
+
+
 class FunctionType(Enum):
     """ Defines scalar- and vector-valued function """
     SCALAR = 0  # scalar valued function
@@ -360,7 +366,7 @@ class AdapterCore:
 
         return coupling_bc_expression
 
-    def get_forces_as_point_sources(self, Dirichlet_Boundary, coupling_mesh_vertices, function_space=None):
+    def get_forces_as_point_sources(self, Dirichlet_Boundary, coupling_mesh_vertices, read_data, function_space=None):
         """
         Creates 2 dicts of PointSources that can be applied to the assembled system.
         Applies filter_point_source to avoid forces being applied to already existing Dirichlet BC, since this would
@@ -382,12 +388,8 @@ class AdapterCore:
         for i in range(n_vertices):
             px, py = vertices_x[i], vertices_y[i]
             key = (px, py)
-            x_forces[key] = PointSource(function_space.sub(0),
-                                        Point(px, py),
-                                        self._read_data[i, 0])
-            y_forces[key] = PointSource(function_space.sub(1),
-                                        Point(px, py),
-                                        self._read_data[i, 1])
+            x_forces[key] = PointSource(function_space.sub(0), Point(px, py), read_data[i, 0])
+            y_forces[key] = PointSource(function_space.sub(1), Point(px, py), read_data[i, 1])
 
         # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
         x_forces = filter_point_sources(x_forces, Dirichlet_Boundary)
