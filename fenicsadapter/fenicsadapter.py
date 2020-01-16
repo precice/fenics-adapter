@@ -256,8 +256,7 @@ class Adapter:
 
         self._solver_name = self._config.get_solver_name()
 
-        self._interface = precice.Interface(self._solver_name, 0, 1)
-        self._interface.configure(self._config.get_config_file_name())
+        self._interface = precice.Interface(self._solver_name, self._config.get_config_file_name(), 0, 1)
         self._dimensions = self._interface.get_dimensions()
 
         self._coupling_subdomain = None  # initialized later
