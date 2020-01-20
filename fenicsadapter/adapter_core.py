@@ -353,19 +353,6 @@ class AdapterCore:
 
         return vertices1_ids, vertices2_ids
 
-    def create_coupling_boundary_condition(self, my_expression, read_data, function_space):
-        """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
-        x_vert, y_vert = self.extract_coupling_boundary_coordinates()
-
-        try:  # works with dolfin 1.6.0
-            coupling_bc_expression = my_expression(element=function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
-        except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_bc_expression = my_expression(element=function_space.ufl_element(), degree=0)
-
-        coupling_bc_expression.set_boundary_data(read_data, x_vert, y_vert)
-
-        return coupling_bc_expression
-
     def get_forces_as_point_sources(self, Dirichlet_Boundary, coupling_mesh_vertices, read_data, function_space=None):
         """
         Creates 2 dicts of PointSources that can be applied to the assembled system.

@@ -2,8 +2,6 @@
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 
-import dolfin
-from dolfin import FacetNormal, dot
 import numpy as np
 from .config import Config
 from .checkpointing import Checkpoint
@@ -30,8 +28,8 @@ class Adapter:
 
         self._solver_name = self._config.get_solver_name()
 
-        self._interface = precice.Interface(self._solver_name, 0, 1)
-        self._interface.configure(self._config.get_config_file_name())
+        self._interface = precice.Interface(self._solver_name, self._config.get_config_file_name(), 0, 1)
+        # self._interface.configure(self._config.get_config_file_name())
         self._dimensions = self._interface.get_dimensions()
 
         self._coupling_subdomain = None  # initialized later
@@ -88,10 +86,10 @@ class Adapter:
         :param type: Enum stating which interpolation strategy to be pursued
         (Choices are 1. cubic_spline  2. RBF)
         """
-        if type == InterpolationType.CUBIC_SPLINE.value:
+        if type == InterpolationType.CUBIC_SPLINE:
             self._my_expression = ExactInterpolationExpression
             print("Using cubic spline interpolation")
-        elif type == InterpolationType.RBF.value:
+        elif type == InterpolationType.RBF:
             self._my_expression = GeneralInterpolationExpression
             print("Using RBF interpolation")
 
@@ -231,44 +229,18 @@ class Adapter:
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-    def create_coupling_dirichlet_boundary_condition(self, function_space):
-        """Creates the coupling Dirichlet boundary conditions using
-        create_coupling_boundary_condition() method.
+    def create_coupling_boundary_condition(self, function_space):
+        """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
+        x_vert, y_vert = self._CoreObject.extract_coupling_boundary_coordinates()
 
-        :return: dolfin.DirichletBC()
-        """
-        self._Dirichlet_Boundary = True
+        try:  # works with dolfin 1.6.0
+            coupling_bc_expression = self._my_expression(element=function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+        except (TypeError, KeyError):  # works with dolfin 2017.2.0
+            coupling_bc_expression = self._my_expression(element=function_space.ufl_element(), degree=0)
 
-        self._coupling_bc_expression = self._CoreObject.create_coupling_boundary_condition(self._my_expression, self._read_data
-                                                                                           , function_space)
-        return dolfin.DirichletBC(function_space, self._coupling_bc_expression, self._coupling_subdomain)
+        coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
-    def create_coupling_neumann_boundary_condition(self, test_functions, function_space=None, boundary_marker=None):
-        """Creates the coupling Neumann boundary conditions using
-        create_coupling_boundary_condition() method.
-
-        :return: expression in form of integral: g*v*ds. (see e.g. p. 83ff
-        Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The
-        FEniCS Tutorial Volume I." (2016).)
-        """
-        if not function_space:
-            function_space = test_functions.function_space()
-        else:
-            function_space = function_space
-        self._coupling_bc_expression = self._CoreObject.create_coupling_boundary_condition(self._my_expression, self._read_data
-                                                                                           , function_space)
-        if not boundary_marker:  # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
-            if self._coupling_bc_expression.is_scalar_valued():
-                return test_functions * self._coupling_bc_expression * dolfin.ds  # this term has to be added to weak form to add a Neumann BC (see e.g. p. 83ff Langtangen, Hans Petter, and Anders Logg. "Solving PDEs in Python The FEniCS Tutorial Volume I." (2016).)
-            elif self._coupling_bc_expression.is_vector_valued():
-                n = FacetNormal(self._mesh_fenics)
-                return -test_functions * dot(n, self._coupling_bc_expression) * dolfin.ds
-            else:
-                raise Exception("invalid!")
-        else:  # For multiple Neumann BCs integration should only be performed over the respective domain.
-            # TODO: fix the problem here
-            raise Exception("Boundary markers are not implemented yet")
-            return dot(self._coupling_bc_expression, test_functions) * self.dss(boundary_marker)
+        return coupling_bc_expression
 
     def create_force_boundary_condition(self, Dirichlet_Boundary, function_space):
         """

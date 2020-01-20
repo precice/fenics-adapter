@@ -1,2 +1,2 @@
 from .fenicsadapter import Adapter
-from .adapter_core import AdapterCore
+from .adapter_core import InterpolationType
