@@ -69,7 +69,7 @@ class TestCheckpointing(TestCase):
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
         # initialize checkpointing manually
         mocked_state = SolverState(self.u_cp_mocked, self.t_cp_mocked, self.n_cp_mocked)
-        precice.save_solver_state_to_checkpoint(mocked_state)
+        precice.retrieve_checkpoint()
 
     def test_advance_success(self):
         """

@@ -40,39 +40,27 @@ class TestWriteData(TestCase):
         from precice import Interface
         import fenicsadapter
 
-
-        def dummy_set_mesh_vertices(mesh_id, positions):
-            vertex_ids = np.arange(len(positions))
-            return vertex_ids
-
-        Interface.configure = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
-        Interface.read_block_vector_data = MagicMock()
-        Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock(side_effect=dummy_set_mesh_vertices)
-        Interface.initialize = MagicMock()
-        Interface.initialize_data = MagicMock()
-        Interface.is_action_required = MagicMock(return_value=False)
-        Interface.fulfilled_action = MagicMock()
-        Interface.is_timestep_complete = MagicMock()
-        Interface.advance = MagicMock()
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock(return_value=15)
-        Interface.is_read_data_available = MagicMock(return_value=False)
-        Interface.set_mesh_edge = MagicMock()
 
         write_u = self.scalar_function
-        read_u = self.vector_function
-        u_init = self.scalar_function
+        n_vertices = 11
+        fake_id = 15
+        vertices_x = [x_right for _ in range(n_vertices)]
+        vertices_y = np.linspace(y_bottom, y_top, n_vertices)
 
+        fenicsadapter.Adapter.__init__ = MagicMock(return_value=None)
         precice = fenicsadapter.Adapter(self.dummy_config)
-        precice._coupling_bc_expression = MagicMock()
-        precice.initialize(RightBoundary(), self.mesh, read_u, write_u, u_init)
-        precice.advance(0)
+        precice._CoreObject = fenicsadapter.adapter_core.AdapterCore(None, None, None, None)
+        precice._interface = Interface(None, None, None, None)
+        precice._coupling_mesh_vertices = np.stack([vertices_x, vertices_y], axis=1)
+        precice._write_data_id = fake_id
+        precice._vertex_ids = np.arange(n_vertices)
 
-        expected_data_id = 15
-        expected_values = np.array([self.scalar_expr(x_right, y) for y in np.linspace(y_bottom, y_top, 11)])
-        expected_ids = np.arange(11)
+        precice.write(write_u)
+
+        expected_data_id = fake_id
+        expected_values = np.array([self.scalar_expr(x_right, y) for y in vertices_y])
+        expected_ids = np.arange(n_vertices)
 
         expected_args = [expected_data_id, expected_ids, expected_values]
 
