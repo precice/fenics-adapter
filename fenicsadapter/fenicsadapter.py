@@ -4,7 +4,6 @@
 
 import numpy as np
 from .config import Config
-from .checkpointing import Checkpoint
 import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
@@ -64,11 +63,8 @@ class Adapter:
         # Temporarily hard-coding interpolation strategy. Need to provide user with the appropriate choice
         self._my_expression = None
 
-        # checkpointing
-        self._checkpoint = Checkpoint()
-
         # Solver state used by the Adapter internally to handle checkpointing
-        self._state = None
+        self._checkpoint = None
 
         # function space
         self._function_space = None
@@ -154,17 +150,14 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def initialize(self, coupling_subdomain, mesh, u_n, read_function, write_function, dimension=2, t=0, n=0):
+    def initialize(self, coupling_subdomain, mesh, read_function, write_function, dimension=2):
         """Initializes remaining attributes. Called once, from the solver.
 
         :param write_function: FEniCS function for data to be written by this instance of coupling
         :param read_function: FEniCS function for data to be read by this instance of coupling
         :param coupling_subdomain: domain where coupling takes place
         :param mesh: fenics mesh
-        :param u_n: initial data for solution
         :param dimension: problem dimension
-        :param t: starting time
-        :param n: time step n
         """
 
         self._fenics_dimensions = dimension
@@ -194,10 +187,8 @@ class Adapter:
 
         self._interface.initialize_data()
 
-        #if self._interface.is_read_data_available():
-        #    self._read_data = self.read()
-
-        self.initialize_solver_state(u_n, t, n)
+        if self._interface.is_read_data_available():
+            self.read()
 
         return self._precice_tau
 
@@ -255,20 +246,11 @@ class Adapter:
         else:
             coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
 
-    def initialize_solver_state(self, u_n, t, n):
-        """Initalizes the solver state before coupling starts in each iteration
-        :param u_n:
-        :param t:
-        :param n:
-        """
-        self._state = SolverState(u_n, t, n)
-        logger.debug("Solver state is initialized")
-
-    def store_checkpoint(self):
+    def store_checkpoint(self, u, t, n):
         """Stores the current solver state to a checkpoint.
         """
-        logger.debug("Save solver state")
-        self._checkpoint.write(self._state)
+        logger.debug("Store checkpoint")
+        self._checkpoint = SolverState(u, t, n)
         self._interface.fulfilled_action(self.action_write_checkpoint())
 
     def retrieve_checkpoint(self):
@@ -276,20 +258,8 @@ class Adapter:
         """
         assert (not self._interface.is_timestep_complete())  # avoids invalid control flow
         logger.debug("Restore solver state")
-        self._state.update(self._checkpoint.get_state())
         self._interface.fulfilled_action(self.action_read_checkpoint())
-
-    def end_timestep(self, u_np1, dt):
-        """Advances the solver's state by one timestep. Also advances coupling state
-        :param state: old state
-        :param u_np1: new value
-        :param dt: timestep size
-        :return: maximum time step value recommended by preCICE
-        """
-        logger.debug("Advance solver state")
-        logger.debug("old state: t={time}".format(time=self._state.t))
-        self._state.update(SolverState(u_np1, self._state.t + dt, self._state.n + 1))
-        logger.debug("new state: t={time}".format(time=self._state.t))
+        return self._checkpoint.get_state()
 
     def advance(self, dt):
         max_dt = self._interface.advance(dt)
