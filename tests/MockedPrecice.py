@@ -38,5 +38,5 @@ class Interface:
     def get_dimensions(self):
         raise Exception("not implemented")
 
-    def is_timestep_complete(self):
+    def is_timewindow_complete(self):
         raise Exception("not implemented")

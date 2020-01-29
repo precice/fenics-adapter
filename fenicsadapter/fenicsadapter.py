@@ -579,7 +579,7 @@ class Adapter:
         """
         logger.debug("Restore solver state")
         state.update(self._checkpoint.get_state())
-        self._interface.fulfilled_action(precice.action_read_iteration_checkpoint())
+        self._interface.mark_action_fulfilled(precice.action_read_iteration_checkpoint())
 
     def _advance_solver_state(self, state, u_np1, dt):
         """Advances the solver's state by one timestep.
@@ -599,7 +599,7 @@ class Adapter:
         """
         logger.debug("Save solver state")
         self._checkpoint.write(state)
-        self._interface.fulfilled_action(precice.action_write_iteration_checkpoint())
+        self._interface.mark_action_fulfilled(precice.action_write_iteration_checkpoint())
 
     def advance(self, write_function, u_np1, u_n, t, dt, n):
         """Calls preCICE advance function using precice and manages checkpointing.
@@ -641,7 +641,7 @@ class Adapter:
 
         # checkpointing
         if self._interface.is_action_required(precice.action_read_iteration_checkpoint()):
-            assert (not self._interface.is_timestep_complete())  # avoids invalid control flow
+            assert (not self._interface.is_timewindow_complete())  # avoids invalid control flow
             self._restore_solver_state_from_checkpoint(state)
             solver_state_has_been_restored = True
         else:
@@ -649,10 +649,10 @@ class Adapter:
 
         if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             assert (not solver_state_has_been_restored)  # avoids invalid control flow
-            assert (self._interface.is_timestep_complete())  # avoids invalid control flow
+            assert (self._interface.is_timewindow_complete())  # avoids invalid control flow
             self._save_solver_state_to_checkpoint(state)
 
-        precice_step_complete = self._interface.is_timestep_complete()
+        precice_step_complete = self._interface.is_timewindow_complete()
 
         _, t, n = state.get_state()
         # TODO: this if-else statement smells.
@@ -704,16 +704,16 @@ class Adapter:
         self._set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
-        if self._interface.is_action_required(precice.action_write_initial_data()):
+        if self._interface.mark_action_fulfilled(precice.action_write_initial_data()):
             self._write_block_data()
-            self._interface.fulfilled_action(precice.action_write_initial_data())
+            self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
             self._read_block_data()
 
-        if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
+        if self._interface.mark_action_fulfilled(precice.action_write_iteration_checkpoint()):
             initial_state = SolverState(u_n, t, n)
             self._save_solver_state_to_checkpoint(initial_state)
 
