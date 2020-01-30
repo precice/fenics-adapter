@@ -713,7 +713,7 @@ class Adapter:
         if self._interface.is_read_data_available():
             self._read_block_data()
 
-        if self._interface.mark_action_fulfilled(precice.action_write_iteration_checkpoint()):
+        if self._interface.is_action_required(precice.action_write_iteration_checkpoint()):
             initial_state = SolverState(u_n, t, n)
             self._save_solver_state_to_checkpoint(initial_state)
 
