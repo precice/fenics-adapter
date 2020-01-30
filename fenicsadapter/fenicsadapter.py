@@ -4,7 +4,7 @@ adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import dolfin
-from dolfin import UserExpression, SubDomain, Function, FacetNormal, dot
+from dolfin import UserExpression, SubDomain, Function, FacetNormal, dot, PointSource, Point
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -362,7 +362,7 @@ class Adapter:
                 self._read_data[:, 0] = precice_read_data[:, 0]
                 self._read_data[:, 1] = precice_read_data[:, 1]
                 #z is the dead direction so it is supposed that the data is close to zero
-                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
+                np.testing.assert_almost_equal(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
                 assert(np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
             else: 
                 raise Exception("Dimensions don't match.")
