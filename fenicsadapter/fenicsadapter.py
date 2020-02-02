@@ -704,7 +704,7 @@ class Adapter:
         self._set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
-        if self._interface.mark_action_fulfilled(precice.action_write_initial_data()):
+        if self._interface.is_action_required(precice.action_write_initial_data()):
             self._write_block_data()
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
