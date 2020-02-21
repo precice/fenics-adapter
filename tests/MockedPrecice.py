@@ -8,7 +8,7 @@ action_write_initial_data = MagicMock()
 
 class Interface:
 
-    def __init__(self, name, rank, procs):
+    def __init__(self, solver_name, configuration_file_name, rank, procs):
         pass
 
     def read_block_scalar_data(self, read_data_id, n_vertices, vertex_ids, read_data):
@@ -36,4 +36,7 @@ class Interface:
         raise Exception("not implemented")
 
     def get_dimensions(self):
+        raise Exception("not implemented")
+
+    def is_time_window_complete(self):
         raise Exception("not implemented")

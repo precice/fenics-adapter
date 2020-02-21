@@ -23,6 +23,14 @@ class MockedArray:
         """
         self.value = new_value.value
 
+    def copy(self):
+        returned_array = MockedArray()
+        returned_array.value = self.value
+        return returned_array
+
+    def value_rank(self):
+        return 0
+
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
@@ -36,6 +44,7 @@ class TestCheckpointing(TestCase):
     t = 0  # current time
     u_n_mocked = MockedArray()  # result at the beginning of the timestep
     u_np1_mocked = MockedArray()  # newly computed result
+    write_function_mocked = MockedArray()
     u_cp_mocked = MockedArray()  # value of the checkpoint
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
@@ -49,20 +58,22 @@ class TestCheckpointing(TestCase):
         warnings.simplefilter('ignore', category=ImportWarning)
 
     def mock_the_adapter(self, precice):
+        from fenicsadapter.fenicsadapter import FunctionType, SolverState
         """
         We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
         necessary to test checkpointing.
         :param precice: the fenicsadapter
         """
         # define functions that are called by advance, but not necessary for the test
-        precice.extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice.convert_fenics_to_precice = MagicMock()
+        precice._extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
+        precice._convert_fenics_to_precice = MagicMock()
         precice._coupling_bc_expression = MagicMock()
         precice._coupling_bc_expression.update_boundary_data = MagicMock()
         # initialize checkpointing manually
-        precice._t_cp = self.t_cp_mocked
-        precice._u_cp = self.u_cp_mocked
-        precice._n_cp = self.n_cp_mocked
+        mocked_state = SolverState(self.u_cp_mocked, self.t_cp_mocked, self.n_cp_mocked)
+        precice._checkpoint.write(mocked_state)
+        precice._write_function_type = FunctionType.SCALAR
+        precice._read_function_type = FunctionType.SCALAR
 
     def test_advance_success(self):
         """
@@ -85,8 +96,9 @@ class TestCheckpointing(TestCase):
         Interface.get_data_id = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
+        Interface.is_time_window_complete = MagicMock(return_value=True)
         Interface.advance = MagicMock(return_value=self.dt)
-        Interface.fulfilled_action = MagicMock()
+        Interface.mark_action_fulfilled = MagicMock()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         self.mock_the_adapter(precice)
@@ -102,8 +114,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
-        # we expect that precice._u_cp.value has been updated to value_u_np1
-        self.assertEqual(precice._u_cp.value, value_u_np1)
+        # we expect that the value of the checkpoint has been updated to value_u_np1
+        self.assertEqual(precice._checkpoint.get_state().u.value, value_u_np1)
 
     def test_advance_rollback(self):
         """
@@ -126,8 +138,9 @@ class TestCheckpointing(TestCase):
         Interface.get_data_id = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
+        Interface.is_time_window_complete = MagicMock(return_value=False)
         Interface.advance = MagicMock(return_value=self.dt)
-        Interface.fulfilled_action = MagicMock()
+        Interface.mark_action_fulfilled = MagicMock()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         self.mock_the_adapter(precice)
@@ -141,8 +154,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
 
-        # we expect that precice._u_cp.value has not been updated
-        self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
+        # we expect that precice._checkpoint.get_state().u has not been updated
+        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
 
     def test_advance_continue(self):
         """
@@ -164,10 +177,11 @@ class TestCheckpointing(TestCase):
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock()
+        Interface.is_time_window_complete = MagicMock(return_value=False)
         Interface.write_block_scalar_data = MagicMock()
         Interface.read_block_scalar_data = MagicMock()
         Interface.advance = MagicMock(return_value=self.dt)
-        Interface.fulfilled_action = MagicMock()
+        Interface.mark_action_fulfilled = MagicMock()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         self.mock_the_adapter(precice)
@@ -181,8 +195,8 @@ class TestCheckpointing(TestCase):
         # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
         self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
 
-        # we expect that precice._u_cp.value has not been updated
-        self.assertEqual(precice._u_cp.value, self.u_cp_mocked.value)
+        # we expect that the value of the checkpoint has not been updated
+        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
 
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
