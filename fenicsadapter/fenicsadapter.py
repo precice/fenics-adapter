@@ -60,8 +60,8 @@ class Adapter:
         # numerics
         self._precice_tau = None
 
-        # Temporarily hard-coding interpolation strategy. Need to provide user with the appropriate choice
-        self._my_expression = None
+        # Interpolation strategy as provided by the user
+        self._my_expression = None  # initalized later
 
         # Solver state used by the Adapter internally to handle checkpointing
         self._checkpoint = None
@@ -183,7 +183,7 @@ class Adapter:
 
         if self._interface.is_action_required(action_write_initial_data()):
             self.write(write_function)
-            self._interface.fulfilled_action(action_write_initial_data())
+            self._interface.mark_action_fulfilled(action_write_initial_data())
 
         self._interface.initialize_data()
 
@@ -251,14 +251,14 @@ class Adapter:
         """
         logger.debug("Store checkpoint")
         self._checkpoint = SolverState(u, t, n)
-        self._interface.fulfilled_action(self.action_write_checkpoint())
+        self._interface.mark_action_fulfilled(self.action_write_checkpoint())
 
     def retrieve_checkpoint(self):
         """Resets the solver's state to the checkpoint's state.
         """
-        assert (not self._interface.is_timestep_complete())  # avoids invalid control flow
+        assert (not self._interface.is_time_window_complete())  # avoids invalid control flow
         logger.debug("Restore solver state")
-        self._interface.fulfilled_action(self.action_read_checkpoint())
+        self._interface.mark_action_fulfilled(self.action_read_checkpoint())
         return self._checkpoint.get_state()
 
     def advance(self, dt):
@@ -286,7 +286,7 @@ class Adapter:
         """
         :return: preCICE call if timestep is complete or not
         """
-        return self._interface.is_timestep_complete()
+        return self._interface.is_time_window_complete()
 
     def is_action_required(self, action):
         """
