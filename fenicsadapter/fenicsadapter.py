@@ -34,8 +34,8 @@ class Adapter:
         # FEniCS related quantities
         self._coupling_subdomain = None  # initialized later
         self._mesh_fenics = None  # initialized later
-        self._coupling_bc_expression = None  # initialized later
         self._fenics_dimensions = None  # initialized later
+        self._function_space = None  # initialized later
 
         # coupling mesh related quantities
         self._coupling_mesh_vertices = None  # initialized later
@@ -119,6 +119,19 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
+        # Create a new coupling function which will be set using latest read_data
+        try:  # works with dolfin 1.6.0
+            coupling_function = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+        except (TypeError, KeyError):  # works with dolfin 2017.2.0
+            coupling_function = self._my_expression(element=self._function_space.ufl_element(), degree=0)
+
+        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
+                                                               self._dimensions)
+
+        coupling_function.set_boundary_data(self._read_data, x_vert, y_vert)
+
+        return coupling_function
+
     def write(self, write_function):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted.
@@ -150,9 +163,10 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def initialize(self, coupling_subdomain, mesh, read_function, write_function, dimension=2):
+    def initialize(self, coupling_subdomain, mesh, read_function, write_function, function_space, dimension=2):
         """Initializes remaining attributes. Called once, from the solver.
 
+        :param function_space:
         :param write_function: FEniCS function for data to be written by this instance of coupling
         :param read_function: FEniCS function for data to be read by this instance of coupling
         :param coupling_subdomain: domain where coupling takes place
@@ -161,6 +175,7 @@ class Adapter:
         """
 
         self._fenics_dimensions = dimension
+        self._function_space = function_space
 
         if self._fenics_dimensions != self._dimensions:
             logger.warning(
@@ -188,7 +203,7 @@ class Adapter:
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
-            self.read()
+            dummy_coupling_function = self.read()
 
         return self._precice_tau
 
@@ -216,14 +231,14 @@ class Adapter:
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-    def create_coupling_boundary_condition(self, function_space):
+    def create_coupling_boundary_condition(self):
         """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
         x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions, self._dimensions)
 
         try:  # works with dolfin 1.6.0
-            coupling_bc_expression = self._my_expression(element=function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+            coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_bc_expression = self._my_expression(element=function_space.ufl_element(), degree=0)
+            coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
         coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
 
