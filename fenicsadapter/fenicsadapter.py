@@ -163,7 +163,7 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def initialize(self, coupling_subdomain, mesh, read_function, write_function, function_space, dimension=2):
+    def initialize(self, coupling_subdomain, mesh, dimension=2):
         """Initializes remaining attributes. Called once, from the solver.
 
         :param function_space:
@@ -175,7 +175,6 @@ class Adapter:
         """
 
         self._fenics_dimensions = dimension
-        self._function_space = function_space
 
         if self._fenics_dimensions != self._dimensions:
             logger.warning(
@@ -192,9 +191,22 @@ class Adapter:
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._precice_tau = self._interface.initialize()
 
+        return self._precice_tau
+
+    def initialize_data(self, read_function, write_function, function_space):
+        """
+        Data initialization and initial boundary conditions
+        :param read_function:
+        :param write_function:
+        :param function_space:
+        :return:
+        """
         # Set read_function and read_data
         self._read_function_type = determine_function_type(read_function)
         self._read_data = convert_fenics_to_precice(read_function, self._coupling_mesh_vertices)
+        coupling_function = None
+
+        self._function_space = function_space
 
         if self._interface.is_action_required(action_write_initial_data()):
             self.write(write_function)
@@ -203,9 +215,9 @@ class Adapter:
         self._interface.initialize_data()
 
         if self._interface.is_read_data_available():
-            dummy_coupling_function = self.read()
+            coupling_function = self.read()
 
-        return self._precice_tau
+        return coupling_function
 
     def set_coupling_mesh(self, mesh, subdomain):
         """Sets the coupling mesh. Called by initalize() function at the
@@ -254,13 +266,6 @@ class Adapter:
         self._has_force_boundary = True
         return get_forces_as_point_sources(Dirichlet_Boundary, function_space, self._coupling_mesh_vertices, self._read_data)
 
-    def update_boundary_condition(self, coupling_bc_expression):
-        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions, self._dimensions)
-        if self._has_force_boundary:
-            x_forces, y_forces = get_forces_as_point_sources()
-        else:
-            coupling_bc_expression.update_boundary_data(self._read_data, x_vert, y_vert)
-
     def store_checkpoint(self, u, t, n):
         """Stores the current solver state to a checkpoint.
         """
@@ -297,7 +302,7 @@ class Adapter:
         """
         return self._interface.is_coupling_ongoing()
 
-    def is_timestep_complete(self):
+    def is_time_window_complete(self):
         """
         :return: preCICE call if timestep is complete or not
         """
