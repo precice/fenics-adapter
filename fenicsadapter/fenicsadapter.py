@@ -672,7 +672,7 @@ class Adapter:
         """
         return self._fenics_dimensions == 2 and self._dimensions == 3
 
-    def initialize(self, coupling_subdomain, mesh, u_n, read_field, write_field=None,
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n,
                    dimension=2, t=0, n=0, dirichlet_boundary=None ):
         """Initializes remaining attributes. Called once, from the solver.
 
