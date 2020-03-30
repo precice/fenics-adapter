@@ -274,9 +274,10 @@ class Adapter:
 
         # write data related quantities (write data is written by this solver to preCICE)
         self._write_data_name = self._config.get_write_data_name()
-        self._write_data_id = self._interface.get_data_id(self._write_data_name, self._mesh_id)
-        self._write_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
-        self._write_function_type = None  # stores whether write function is scalar or vector valued
+        if self._write_data_name:
+            self._write_data_id = self._interface.get_data_id(self._write_data_name, self._mesh_id)
+            self._write_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
+            self._write_function_type = None  # stores whether write function is scalar or vector valued
 
         # read data related quantities (read data is read by this solver from preCICE)
         self._read_data_name = self._config.get_read_data_name()
@@ -622,10 +623,11 @@ class Adapter:
 
         # sample write data at interface
         x_vert, y_vert = self._extract_coupling_boundary_coordinates()
-        self._write_data = self._convert_fenics_to_precice(write_function)
+        if self._write_data_name:
+            self._write_data = self._convert_fenics_to_precice(write_function)
 
         # communication
-        self._write_block_data()
+            self._write_block_data()
 
         max_dt = self._interface.advance(dt)
         
@@ -670,8 +672,8 @@ class Adapter:
         """
         return self._fenics_dimensions == 2 and self._dimensions == 3
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field, 
-                   u_n, dimension=2, t=0, n=0, dirichlet_boundary=None ):
+    def initialize(self, coupling_subdomain, mesh, read_field, write_field, u_n,
+                   dimension=2, t=0, n=0, dirichlet_boundary=None ):
         """Initializes remaining attributes. Called once, from the solver.
 
         :param coupling_subdomain: domain where coupling takes place
@@ -701,12 +703,14 @@ class Adapter:
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._set_read_field(read_field)
-        self._set_write_field(write_field)
+        if write_field:
+            self._set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
-        if self._interface.is_action_required(precice.action_write_initial_data()):
-            self._write_block_data()
-            self._interface.mark_action_fulfilled(precice.action_write_initial_data())
+        if write_field:
+            if self._interface.is_action_required(precice.action_write_initial_data()):
+                self._write_block_data()
+                self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
         self._interface.initialize_data()
 
