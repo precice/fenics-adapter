@@ -672,8 +672,8 @@ class Adapter:
         """
         return self._fenics_dimensions == 2 and self._dimensions == 3
 
-    def initialize(self, coupling_subdomain, mesh, read_field, write_field, 
-                   u_n, dimension=2, t=0, n=0, dirichlet_boundary=None ):
+    def initialize(self, coupling_subdomain, mesh, u_n, read_field, write_field=None,
+                   dimension=2, t=0, n=0, dirichlet_boundary=None ):
         """Initializes remaining attributes. Called once, from the solver.
 
         :param coupling_subdomain: domain where coupling takes place
@@ -703,12 +703,14 @@ class Adapter:
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
         self._set_read_field(read_field)
-        self._set_write_field(write_field)
+        if write_field:
+            self._set_write_field(write_field)
         self._precice_tau = self._interface.initialize()
 
-        if self._interface.is_action_required(precice.action_write_initial_data()):
-            self._write_block_data()
-            self._interface.mark_action_fulfilled(precice.action_write_initial_data())
+        if write_field:
+            if self._interface.is_action_required(precice.action_write_initial_data()):
+                self._write_block_data()
+                self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
         self._interface.initialize_data()
 
