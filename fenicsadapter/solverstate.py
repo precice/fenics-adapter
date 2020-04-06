@@ -15,8 +15,8 @@ class SolverState:
         returns the state variables value u, associated time t and timestep n
         :return:
         """
-        return self.u, self.t, self.n
+        return self.u.copy(), self.t, self.n
 
     def print_state(self):
         u, t, n = self.get_state()
-        return "u={u}, t={t}, n={n}".format(u=u, t=t, n=n)
+        return print("u={u}, t={t}, n={n}".format(u=u, t=t, n=n))

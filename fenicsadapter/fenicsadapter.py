@@ -87,6 +87,21 @@ class Adapter:
             self._my_expression = GeneralInterpolationExpression
             print("Using RBF interpolation")
 
+    def create_coupling_function(self, read_data):
+        """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
+        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
+                                                               self._dimensions)
+
+        try:  # works with dolfin 1.6.0
+            coupling_function = self._my_expression(
+                element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+        except (TypeError, KeyError):  # works with dolfin 2017.2.0
+            coupling_function = self._my_expression(element=self._function_space.ufl_element(), degree=0)
+
+        coupling_function.set_boundary_data(read_data, x_vert, y_vert)
+
+        return coupling_function
+
     def read(self):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) read_data is converted.
@@ -119,16 +134,7 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-        # Create a new coupling function which will be set using latest read_data
-        try:  # works with dolfin 1.6.0
-            coupling_function = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
-        except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_function = self._my_expression(element=self._function_space.ufl_element(), degree=0)
-
-        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
-                                                               self._dimensions)
-
-        coupling_function.set_boundary_data(self._read_data, x_vert, y_vert)
+        coupling_function = self.create_coupling_function(self._read_data)
 
         return coupling_function
 
@@ -166,9 +172,6 @@ class Adapter:
     def initialize(self, coupling_subdomain, mesh, dimension=2):
         """Initializes remaining attributes. Called once, from the solver.
 
-        :param function_space:
-        :param write_function: FEniCS function for data to be written by this instance of coupling
-        :param read_function: FEniCS function for data to be read by this instance of coupling
         :param coupling_subdomain: domain where coupling takes place
         :param mesh: fenics mesh
         :param dimension: problem dimension
@@ -222,7 +225,6 @@ class Adapter:
     def set_coupling_mesh(self, mesh, subdomain):
         """Sets the coupling mesh. Called by initalize() function at the
         beginning of the simulation.
-        :param subdomain: fenics subdomain on which coupling will be implemented
         :param mesh: fenics mesh
         :param: subdomain: subdomain which will be computed by this coupling instance
         """
@@ -239,22 +241,10 @@ class Adapter:
 
         edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(self._mesh_fenics, self._coupling_subdomain, id_mapping)
 
+        """ Set mesh edges in preCICE to allow nearest-projection mapping"""
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
-
-    def create_coupling_boundary_condition(self):
-        """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
-        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions, self._dimensions)
-
-        try:  # works with dolfin 1.6.0
-            coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
-        except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_bc_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
-
-        coupling_bc_expression.set_boundary_data(self._read_data, x_vert, y_vert)
-
-        return coupling_bc_expression
 
     def create_force_boundary_condition(self, Dirichlet_Boundary, function_space):
         """
@@ -266,11 +256,13 @@ class Adapter:
         self._has_force_boundary = True
         return get_forces_as_point_sources(Dirichlet_Boundary, function_space, self._coupling_mesh_vertices, self._read_data)
 
-    def store_checkpoint(self, u, t, n):
+    def store_checkpoint(self, user_u, t, n):
         """Stores the current solver state to a checkpoint.
         """
         logger.debug("Store checkpoint")
-        self._checkpoint = SolverState(u, t, n)
+        my_u = user_u.copy()
+        assert(my_u != user_u)  # wrt to pointer
+        self._checkpoint = SolverState(my_u, t, n)
         self._interface.mark_action_fulfilled(self.action_write_checkpoint())
 
     def retrieve_checkpoint(self):
