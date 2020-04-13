@@ -48,13 +48,10 @@ class Adapter:
         # write data related quantities (write data is written by user from FEniCS to preCICE)
         self._write_data_name = self._config.get_write_data_name()
         self._write_data_id = self._interface.get_data_id(self._write_data_name, self._mesh_id)
-        self._write_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
-        self._write_function_type = None  # stores whether write function is scalar or vector valued
 
         # read data related quantities (read data is read by use to FEniCS from preCICE)
         self._read_data_name = self._config.get_read_data_name()
         self._read_data_id = self._interface.get_data_id(self._read_data_name, self._mesh_id)
-        self._read_data = None  # a numpy 1D array with the values like it is used by precice (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny) The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
         self._read_function_type = None  # stores whether read function is scalar or vector valued
 
         # numerics
@@ -66,8 +63,6 @@ class Adapter:
         # Solver state used by the Adapter internally to handle checkpointing
         self._checkpoint = None
 
-        # function space
-        self._function_space = None
         self._dss = None  # measure for boundary integral
 
         # Nodes with Dirichlet and Force-boundary
@@ -114,18 +109,20 @@ class Adapter:
 
         assert (self._read_function_type in list(FunctionType))
 
+        read_data = []
+
         if self._read_function_type is FunctionType.SCALAR:
-            self._read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
+            read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
 
         elif self._read_function_type is FunctionType.VECTOR:
             if self._fenics_dimensions == self._dimensions:
-                self._read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
+                read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
             elif can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
                 precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
 
-                self._read_data[:, 0] = precice_read_data[:, 0]
-                self._read_data[:, 1] = precice_read_data[:, 1]
+                read_data[:, 0] = precice_read_data[:, 0]
+                read_data[:, 1] = precice_read_data[:, 1]
                 # z is the dead direction so it is supposed that the data is close to zero
                 np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
                 assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
@@ -134,7 +131,10 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-        coupling_function = self.create_coupling_function(self._read_data)
+        coupling_function = self.create_coupling_function(read_data)
+
+        print(">> adapter << Read Data:")
+        print(read_data)
 
         return coupling_function
 
@@ -145,17 +145,20 @@ class Adapter:
         :param write_function: FEniCS function
         """
 
-        self._write_function_type = determine_function_type(write_function)
-        assert (self._write_function_type in list(FunctionType))
+        write_function_type = determine_function_type(write_function)
+        assert (write_function_type in list(FunctionType))
 
-        self._write_data = convert_fenics_to_precice(write_function, self._coupling_mesh_vertices)
+        write_data = convert_fenics_to_precice(write_function, self._coupling_mesh_vertices)
 
-        if self._write_function_type is FunctionType.SCALAR:
-            self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, self._write_data)
-        elif self._write_function_type is FunctionType.VECTOR:
+        print(">> adapter << Write Data:")
+        print(write_data)
+
+        if write_function_type is FunctionType.SCALAR:
+            self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, write_data)
+        elif write_function_type is FunctionType.VECTOR:
             if can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
                 # in 2d-3d coupling z dimension is set to zero
-                precice_write_data = np.column_stack(self._write_data[:, 0], self._write_data[:, 1], np.zeros(self._n_vertices))
+                precice_write_data = np.column_stack(write_data[:, 0], write_data[:, 1], np.zeros(self._n_vertices))
 
                 assert (precice_write_data.shape[0] == self._n_vertices and
                         precice_write_data.shape[1] == self._dimensions)
@@ -163,7 +166,7 @@ class Adapter:
                 self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
 
             elif self._fenics_dimensions == self._dimensions:
-                self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, self._write_data)
+                self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, write_data)
             else:
                 raise Exception("Dimensions don't match.")
         else:
