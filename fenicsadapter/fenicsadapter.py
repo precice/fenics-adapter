@@ -33,7 +33,6 @@ class Adapter:
 
         # FEniCS related quantities
         self._coupling_subdomain = None  # initialized later
-        self._mesh_fenics = None  # initialized later
         self._fenics_dimensions = None  # initialized later
         self._function_space = None  # initialized later
 
@@ -43,7 +42,6 @@ class Adapter:
         self._mesh_id = self._interface.get_mesh_id(self._mesh_name)
         self._vertex_ids = None  # initialized later
         self._n_vertices = None  # initialized later
-        self._fenics_vertices = None  # initialized later
 
         # write data related quantities (write data is written by user from FEniCS to preCICE)
         self._write_data_name = self._config.get_write_data_name()
@@ -53,9 +51,6 @@ class Adapter:
         self._read_data_name = self._config.get_read_data_name()
         self._read_data_id = self._interface.get_data_id(self._read_data_name, self._mesh_id)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
-
-        # numerics
-        self._precice_tau = None
 
         # Interpolation strategy as provided by the user
         self._my_expression = None  # initalized later
@@ -195,9 +190,9 @@ class Adapter:
                     self._dimensions))
 
         self.set_coupling_mesh(mesh, coupling_subdomain)
-        self._precice_tau = self._interface.initialize()
+        precice_tau = self._interface.initialize()
 
-        return self._precice_tau
+        return precice_tau
 
     def initialize_data(self, read_function, write_function, function_space):
         """
@@ -209,7 +204,6 @@ class Adapter:
         """
         # Set read_function and read_data
         self._read_function_type = determine_function_type(read_function)
-        self._read_data = convert_fenics_to_precice(read_function, self._coupling_mesh_vertices)
         coupling_function = None
 
         self._function_space = function_space
@@ -232,17 +226,16 @@ class Adapter:
         :param: subdomain: subdomain which will be computed by this coupling instance
         """
         self._coupling_subdomain = subdomain
-        self._mesh_fenics = mesh
-        self._fenics_vertices, self._coupling_mesh_vertices, self._n_vertices \
-            = extract_coupling_boundary_vertices(self._mesh_fenics, self._coupling_subdomain, self._fenics_dimensions, self._dimensions)
+        fenics_vertices, self._coupling_mesh_vertices, self._n_vertices \
+            = extract_coupling_boundary_vertices(mesh, self._coupling_subdomain, self._fenics_dimensions, self._dimensions)
         self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
         """ Define a mapping between coupling vertices and their IDs in preCICE """
         id_mapping = dict()
         for i in range(self._n_vertices):
-            id_mapping[self._fenics_vertices[i].global_index()] = self._vertex_ids[i]
+            id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(self._mesh_fenics, self._coupling_subdomain, id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, self._coupling_subdomain, id_mapping)
 
         """ Set mesh edges in preCICE to allow nearest-projection mapping"""
         for i in range(len(edge_vertex_ids1)):
@@ -271,7 +264,7 @@ class Adapter:
     def retrieve_checkpoint(self):
         """Resets the solver's state to the checkpoint's state.
         """
-        assert (not self._interface.is_time_window_complete())  # avoids invalid control flow
+        assert (not self.is_time_window_complete())  # avoids invalid control flow
         logger.debug("Restore solver state")
         self._interface.mark_action_fulfilled(self.action_read_checkpoint())
         return self._checkpoint.get_state()
