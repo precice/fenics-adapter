@@ -11,16 +11,25 @@ class Interface:
     def __init__(self, name, config_file, rank, procs):
         pass
 
-    def read_block_scalar_data(self, read_data_id, n_vertices, vertex_ids, read_data):
+    def read_block_scalar_data(self, read_data_id, vertex_ids):
         raise Exception("not implemented")
 
-    def write_block_scalar_data(self, write_data_id, n_vertices, vertex_ids, write_data):
+    def read_block_vector_data(self, read_data_id, vertex_ids):
+        raise Exception("not implemented")
+
+    def write_block_scalar_data(self, write_data_id, vertex_ids, write_data):
+        raise Exception("not implemented")
+
+    def write_block_vector_data(self, write_data_id, vertex_ids, write_data):
         raise Exception("not implemented")
 
     def get_data_id(self, foo, bar):
         raise Exception("not implemented")
 
     def get_mesh_id(self, foo):
+        raise Exception("not implemented")
+
+    def initialize_data(self):
         raise Exception("not implemented")
 
     def advance(self, foo):
@@ -32,11 +41,11 @@ class Interface:
     def is_coupling_ongoing(self):
         raise Exception("not implemented")
 
-    def configure(self, foo):
+    def mark_action_fulfilled(self, py_action):
         raise Exception("not implemented")
 
     def get_dimensions(self):
         raise Exception("not implemented")
 
-    def is_timestep_complete(self):
+    def is_time_window_complete(self):
         raise Exception("not implemented")
