@@ -64,6 +64,9 @@ class Adapter:
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
         self._has_force_boundary = None  # stores whether force_boundary exists
 
+        # Controlling the store checkpoint
+        self._first_advance_done = None
+
     def set_interpolation_type(self, interpolation_type):
         """
         Sets interpolation strategy according to choice of user
@@ -77,20 +80,20 @@ class Adapter:
             self._my_expression = GeneralInterpolationExpression
             print("Using RBF interpolation")
 
-    def create_coupling_function(self, read_data):
+    def create_coupling_expression(self):
         """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
-        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
-                                                               self._dimensions)
-
         try:  # works with dolfin 1.6.0
-            coupling_function = self._my_expression(
+            coupling_expression = self._my_expression(
                 element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_function = self._my_expression(element=self._function_space.ufl_element(), degree=0)
+            coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
-        coupling_function.set_boundary_data(read_data, x_vert, y_vert)
+        return coupling_expression
 
-        return coupling_function
+    def update_coupling_expression(self, coupling_expression, read_data):
+        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
+                                                               self._dimensions)
+        coupling_expression.update_boundary_data(read_data, x_vert, y_vert)
 
     def read(self):
         """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -126,12 +129,10 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-        coupling_function = self.create_coupling_function(read_data)
-
         print(">> adapter << Read Data:")
         print(read_data)
 
-        return coupling_function
+        return read_data
 
     def write(self, write_function):
         """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -192,6 +193,9 @@ class Adapter:
         self.set_coupling_mesh(mesh, coupling_subdomain)
         precice_tau = self._interface.initialize()
 
+        # Adapter is initialized but first advance is yet to be called
+        self._first_advance_done = False
+
         return precice_tau
 
     def initialize_data(self, read_function, write_function, function_space):
@@ -204,7 +208,6 @@ class Adapter:
         """
         # Set read_function and read_data
         self._read_function_type = determine_function_type(read_function)
-        coupling_function = None
 
         self._function_space = function_space
 
@@ -214,10 +217,16 @@ class Adapter:
 
         self._interface.initialize_data()
 
-        if self._interface.is_read_data_available():
-            coupling_function = self.read()
+        coupling_expression = self.create_coupling_expression()
 
-        return coupling_function
+        read_data = None
+
+        if self._interface.is_read_data_available():
+            read_data = self.read()
+
+        self.update_coupling_expression(coupling_expression, read_data)
+
+        return coupling_expression
 
     def set_coupling_mesh(self, mesh, subdomain):
         """Sets the coupling mesh. Called by initalize() function at the
@@ -255,6 +264,9 @@ class Adapter:
     def store_checkpoint(self, user_u, t, n):
         """Stores the current solver state to a checkpoint.
         """
+        if self._first_advance_done:
+            assert(self.is_time_window_complete())
+
         logger.debug("Store checkpoint")
         my_u = user_u.copy()
         assert(my_u != user_u)  # wrt to pointer
@@ -270,6 +282,7 @@ class Adapter:
         return self._checkpoint.get_state()
 
     def advance(self, dt):
+        self._first_advance_done = True
         max_dt = self._interface.advance(dt)
         return max_dt
 
