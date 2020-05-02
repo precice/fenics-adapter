@@ -1,4 +1,5 @@
-""" This module handles CustomExpression and initialization of the FEniCS adapter.
+"""
+Adapter to FEniCS solver handles CustomExpression and initialization of the FEniCS adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 
@@ -17,10 +18,15 @@ logger.setLevel(level=logging.INFO)
 
 
 class Adapter:
-    """Initializes the Adapter. Initalizer creates object of class Config (from
-    config.py module).
+    """
+    Initializes the Adapter. Initalizer creates object of class Config (from
+    config.py module) and creates an object of the preCICE Interface from the python
+    bindings of the preCICE API.
 
     :ivar _config: object of class Config, which stores data from the JSON config file
+    :ivar _interface: object of class Interface, which is used to call API functions
+
+    :param adapter_config_filename: Name of .json config file
     """
     def __init__(self, adapter_config_filename='precice-adapter-config.json'):
 
@@ -32,7 +38,6 @@ class Adapter:
         self._dimensions = self._interface.get_dimensions()
 
         # FEniCS related quantities
-        self._coupling_subdomain = None  # initialized later
         self._fenics_dimensions = None  # initialized later
         self._function_space = None  # initialized later
 
@@ -81,7 +86,11 @@ class Adapter:
             print("Using RBF interpolation")
 
     def create_coupling_expression(self):
-        """Creates the coupling boundary conditions using an actual implementation of CustomExpression."""
+        """
+        Creates an object of class GeneralInterpolationExpression or ExactInterpolationExpression which does
+        not carry any data. The adapter will hold this object till the coupling is on going.
+        :return: coupling_expression: Return the reference to created FEniCS Expression object
+        """
         try:  # works with dolfin 1.6.0
             coupling_expression = self._my_expression(
                 element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
@@ -90,35 +99,35 @@ class Adapter:
 
         return coupling_expression
 
-    def update_coupling_expression(self, coupling_expression, read_data):
+    def update_coupling_expression(self, coupling_expression, data):
+        """
+        Updates a given coupling expression using a given data. The boundary data is updated.
+        User needs to explicitly call this function in each time step
+        :param coupling_expression: FEniCS Expression object
+        :param data: Data used to update the boundary values in the coupling expression
+        """
         x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
                                                                self._dimensions)
-        coupling_expression.update_boundary_data(read_data, x_vert, y_vert)
+        coupling_expression.update_boundary_data(data, x_vert, y_vert)
 
     def read(self):
-        """ Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
+        """
+        Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) read_data is converted.
         Note: For quasi 2D fenics in a 3D coupled simulation the y component of the vectors is deleted.
-
-        :return: data read from preCICE in the form of a numpy 1D array with the values like it is used by preCICE
-        (The 2D-format of values is (d0x, d0y, d1x, d1y, ..., dnx, dny)
-        The 3D-format of values is (d0x, d0y, d0z, d1x, d1y, d1z, ..., dnx, dny, dnz))
+        :return: data read from preCICE in the form of a numpy array with the values like it is used by preCICE
         """
-
         assert (self._read_function_type in list(FunctionType))
 
         read_data = []
 
         if self._read_function_type is FunctionType.SCALAR:
             read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
-
         elif self._read_function_type is FunctionType.VECTOR:
             if self._fenics_dimensions == self._dimensions:
                 read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
-
             elif can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
                 precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
-
                 read_data[:, 0] = precice_read_data[:, 0]
                 read_data[:, 1] = precice_read_data[:, 1]
                 # z is the dead direction so it is supposed that the data is close to zero
@@ -129,25 +138,18 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-        print(">> adapter << Read Data:")
-        print(read_data)
-
         return read_data
 
     def write(self, write_function):
-        """ Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
+        """
+        Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted.
-
         :param write_function: FEniCS function
         """
-
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
 
         write_data = convert_fenics_to_precice(write_function, self._coupling_mesh_vertices)
-
-        print(">> adapter << Write Data:")
-        print(write_data)
 
         if write_function_type is FunctionType.SCALAR:
             self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, write_data)
@@ -155,12 +157,9 @@ class Adapter:
             if can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
                 # in 2d-3d coupling z dimension is set to zero
                 precice_write_data = np.column_stack(write_data[:, 0], write_data[:, 1], np.zeros(self._n_vertices))
-
                 assert (precice_write_data.shape[0] == self._n_vertices and
                         precice_write_data.shape[1] == self._dimensions)
-
                 self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
-
             elif self._fenics_dimensions == self._dimensions:
                 self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, write_data)
             else:
@@ -169,13 +168,12 @@ class Adapter:
             raise Exception("Rank of function space is neither 0 nor 1")
 
     def initialize(self, coupling_subdomain, mesh, dimension=2):
-        """Initializes remaining attributes. Called once, from the solver.
-
+        """
+        Initializes remaining attributes. Called once, from the solver.
         :param coupling_subdomain: domain where coupling takes place
         :param mesh: fenics mesh
         :param dimension: problem dimension
         """
-
         self._fenics_dimensions = dimension
 
         if self._fenics_dimensions != self._dimensions:
@@ -200,15 +198,13 @@ class Adapter:
 
     def initialize_data(self, read_function, write_function, function_space):
         """
-        Data initialization and initial boundary conditions
-        :param read_function:
-        :param write_function:
-        :param function_space:
+        Set initial conditions and boundary conditions
+        :param read_function: FEniCS function
+        :param write_function: FEniCS function
+        :param function_space: FEniCS space
         :return:
         """
-        # Set read_function and read_data
         self._read_function_type = determine_function_type(read_function)
-
         self._function_space = function_space
 
         if self._interface.is_action_required(action_write_initial_data()):
@@ -218,7 +214,6 @@ class Adapter:
         self._interface.initialize_data()
 
         coupling_expression = self.create_coupling_expression()
-
         read_data = None
 
         if self._interface.is_read_data_available():
@@ -229,14 +224,14 @@ class Adapter:
         return coupling_expression
 
     def set_coupling_mesh(self, mesh, subdomain):
-        """Sets the coupling mesh. Called by initalize() function at the
-        beginning of the simulation.
-        :param mesh: fenics mesh
-        :param: subdomain: subdomain which will be computed by this coupling instance
         """
-        self._coupling_subdomain = subdomain
+        Sets up the coupling mesh. This function is called by initalize() function at the
+        beginning of the simulation.
+        :param mesh: FEniCS mesh
+        :param: subdomain: Part of FEniCS mesh which which will be computed by this participant
+        """
         fenics_vertices, self._coupling_mesh_vertices, self._n_vertices \
-            = extract_coupling_boundary_vertices(mesh, self._coupling_subdomain, self._fenics_dimensions, self._dimensions)
+            = extract_coupling_boundary_vertices(mesh, subdomain, self._fenics_dimensions, self._dimensions)
         self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
         """ Define a mapping between coupling vertices and their IDs in preCICE """
@@ -244,7 +239,7 @@ class Adapter:
         for i in range(self._n_vertices):
             id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, self._coupling_subdomain, id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, subdomain, id_mapping)
 
         """ Set mesh edges in preCICE to allow nearest-projection mapping"""
         for i in range(len(edge_vertex_ids1)):
@@ -262,7 +257,11 @@ class Adapter:
         return get_forces_as_point_sources(Dirichlet_Boundary, function_space, self._coupling_mesh_vertices, self._read_data)
 
     def store_checkpoint(self, user_u, t, n):
-        """Stores the current solver state to a checkpoint.
+        """
+        Defines an object of class SolverState which stores the current state of the variable and the time stamp
+        :param user_u: Variable being computed
+        :param t: Physical time
+        :param n: Simulation iteration counter
         """
         if self._first_advance_done:
             assert(self.is_time_window_complete())
@@ -274,7 +273,9 @@ class Adapter:
         self._interface.mark_action_fulfilled(self.action_write_checkpoint())
 
     def retrieve_checkpoint(self):
-        """Resets the solver's state to the checkpoint's state.
+        """
+        Resets the solver's state to the checkpoint's state.
+        :return: State stored as a checkpoint
         """
         assert (not self.is_time_window_complete())  # avoids invalid control flow
         logger.debug("Restore solver state")
@@ -282,48 +283,54 @@ class Adapter:
         return self._checkpoint.get_state()
 
     def advance(self, dt):
+        """
+        Advances coupling
+        :param dt: Current used time step
+        :return: time step recommended by preCICE
+        """
         self._first_advance_done = True
         max_dt = self._interface.advance(dt)
         return max_dt
 
     def finalize(self):
-        """Finalizes the coupling interface."""
+        """
+        Finalizes the coupling interface. To be called at the end of the simulation
+        """
         self._interface.finalize()
 
     def get_solver_name(self):
-        """Returns name of this solver as defined in config file.
-        :return: Solver name.
+        """
+        :return: Solver name
         """
         return self._solver_name
 
     def is_coupling_ongoing(self):
-        """Determines whether simulation should continue. Called from the
-        simulation loop in the solver.
+        """
         :return: True if the coupling is ongoing, False otherwise
         """
         return self._interface.is_coupling_ongoing()
 
     def is_time_window_complete(self):
         """
-        :return: preCICE call if timestep is complete or not
+        :return: True if implicit coupling has converged, False otherwise
         """
         return self._interface.is_time_window_complete()
 
     def is_action_required(self, action):
         """
-        :param action:
+        :param action: preCICE action
         :return: preCICE call which returns true if provided action is required
         """
         return self._interface.is_action_required(action)
 
     def action_write_checkpoint(self):
         """
-        :return: preCICE call to write checkpoint
+        :return: True if checkpoint needs to be written, False otherwise
         """
         return action_write_iteration_checkpoint()
 
     def action_read_checkpoint(self):
         """
-        :return:
+        :return: True if checkpoint needs to be read, False otherwise
         """
         return action_read_iteration_checkpoint()
