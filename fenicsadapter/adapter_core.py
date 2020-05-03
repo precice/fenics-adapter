@@ -141,6 +141,9 @@ class CustomExpression(UserExpression):
 
         :return: whether function is scalar valued
         """
+        if self._is_empty:
+            return False
+
         if self._vals.ndim == 1:
             return True
         elif self._vals.ndim > 1:
@@ -153,6 +156,9 @@ class CustomExpression(UserExpression):
 
         :return: whether function is scalar valued
         """
+        if self._is_empty:
+            return False
+
         if self._vals.ndim > 1:
             return True
         elif self._vals.ndim == 1:
@@ -275,8 +281,15 @@ def convert_fenics_to_precice(data, sample_points):
     :raise Exception: if type of data cannot be handled
     :return: array of FEniCS function values at each point on the boundary
     """
+    print("convert_fenics_to_precice")
     if type(data) is dolfin.Function:
+        print("more")
         x_all, y_all = sample_points[:, 0], sample_points[:, 1]
+        print(x_all)
+        print(y_all)
+        for x, y in zip(x_all, y_all):
+            print((x,y))
+            print(data(x,y))
         return np.array([data(x, y) for x, y in zip(x_all, y_all)])
     else:
         raise Exception("Cannot handle data type %s" % type(data))
@@ -309,7 +322,7 @@ def extract_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_d
             else:
                 raise Exception("Dimensions do not match!")
 
-    assert (n != 0), "No coupling boundary vertices detected"
+    # assert (n != 0), "No coupling boundary vertices detected" -> Is actually allowed for parallel runs
 
     if dimensions == 2:
         return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1), n

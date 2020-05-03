@@ -12,6 +12,7 @@ from .adapter_core import FunctionType, GeneralInterpolationExpression, ExactInt
     InterpolationType, can_apply_2d_3d_coupling, convert_fenics_to_precice, extract_coupling_boundary_vertices, \
     extract_coupling_boundary_edges, extract_coupling_boundary_coordinates, get_forces_as_point_sources
 from .solverstate import SolverState
+from fenics import MPI
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -34,7 +35,8 @@ class Adapter:
 
         self._solver_name = self._config.get_solver_name()
 
-        self._interface = precice.Interface(self._solver_name, self._config.get_config_file_name(), 0, 1)
+        self._interface = precice.Interface(self._solver_name, self._config.get_config_file_name(),
+                                            MPI.rank(MPI.comm_world), MPI.size(MPI.comm_world))
         self._dimensions = self._interface.get_dimensions()
 
         # FEniCS related quantities
@@ -92,8 +94,7 @@ class Adapter:
         :return: coupling_expression: Return the reference to created FEniCS Expression object
         """
         try:  # works with dolfin 1.6.0
-            coupling_expression = self._my_expression(
-                element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+            coupling_expression = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
@@ -108,7 +109,19 @@ class Adapter:
         """
         x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
                                                                self._dimensions)
-        coupling_expression.update_boundary_data(data, x_vert, y_vert)
+        if self._n_vertices > 0:
+            coupling_expression._is_empty = False
+            coupling_expression.update_boundary_data(data, x_vert, y_vert)
+
+        else:
+            # having participants without coupling mesh nodes is only accepted for parallel runs
+            assert (MPI.size(MPI.comm_world) > 1)
+            # todo: this whole branch is currently a very ugly hack to make sure the coupling expression knows about
+            # its dimension, even if no data is provided.
+            coupling_expression._is_empty = True
+            coupling_expression._vals = data
+            coupling_expression._dimension = self._interface.get_dimensions()
+
 
     def read(self):
         """
@@ -121,22 +134,31 @@ class Adapter:
 
         read_data = []
 
-        if self._read_function_type is FunctionType.SCALAR:
-            read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
-        elif self._read_function_type is FunctionType.VECTOR:
-            if self._fenics_dimensions == self._dimensions:
-                read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
-            elif can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
-                precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
-                read_data[:, 0] = precice_read_data[:, 0]
-                read_data[:, 1] = precice_read_data[:, 1]
-                # z is the dead direction so it is supposed that the data is close to zero
-                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
-                assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
+        if self._n_vertices == 0:
+            assert (MPI.size(MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
+
+        if self._n_vertices > 0:
+            if self._read_function_type is FunctionType.SCALAR:
+                read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
+            elif self._read_function_type is FunctionType.VECTOR:
+                if self._fenics_dimensions == self._dimensions:
+                    read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
+                elif can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
+                    precice_read_data = self._interface.read_block_vector_data(self._read_data_id, self._vertex_ids)
+                    read_data[:, 0] = precice_read_data[:, 0]
+                    read_data[:, 1] = precice_read_data[:, 1]
+                    # z is the dead direction so it is supposed that the data is close to zero
+                    np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
+                    assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
+                else:
+                    raise Exception("Dimensions don't match.")
             else:
-                raise Exception("Dimensions don't match.")
-        else:
-            raise Exception("Rank of function space is neither 0 nor 1")
+                raise Exception("Rank of function space is neither 0 nor 1")
+        else:  # even, if there are no vertices, we have to make sure that the coupling expression knows its dimension
+            if self._read_function_type is FunctionType.SCALAR:
+                read_data = np.empty(shape=(1))
+            elif self._read_function_type is FunctionType.VECTOR:
+                read_data = np.empty(shape=(self._interface.get_dimensions()))
 
         return read_data
 
@@ -146,26 +168,32 @@ class Adapter:
         Scalar/Vector write function) write_data is first converted.
         :param write_function: FEniCS function
         """
-        write_function_type = determine_function_type(write_function)
-        assert (write_function_type in list(FunctionType))
 
-        write_data = convert_fenics_to_precice(write_function, self._coupling_mesh_vertices)
+        print('{rank}: has n_vertices={n}'.format(rank=MPI.rank(MPI.comm_world), n=self._n_vertices))
+        if self._n_vertices > 0:
+            print('{rank}: alive'.format(rank=MPI.rank(MPI.comm_world)))
+            write_function_type = determine_function_type(write_function)
+            assert (write_function_type in list(FunctionType))
+            print('{rank}: alive'.format(rank=MPI.rank(MPI.comm_world)))
+            write_data = convert_fenics_to_precice(write_function, self._coupling_mesh_vertices)
+            print('{rank}: alive'.format(rank=MPI.rank(MPI.comm_world)))
+            if write_function_type is FunctionType.SCALAR:
+                self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, write_data)
+            elif write_function_type is FunctionType.VECTOR:
+                if can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
+                    # in 2d-3d coupling z dimension is set to zero
+                    precice_write_data = np.column_stack(write_data[:, 0], write_data[:, 1], np.zeros(self._n_vertices))
 
-        if write_function_type is FunctionType.SCALAR:
-            self._interface.write_block_scalar_data(self._write_data_id, self._vertex_ids, write_data)
-        elif write_function_type is FunctionType.VECTOR:
-            if can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
-                # in 2d-3d coupling z dimension is set to zero
-                precice_write_data = np.column_stack(write_data[:, 0], write_data[:, 1], np.zeros(self._n_vertices))
-                assert (precice_write_data.shape[0] == self._n_vertices and
-                        precice_write_data.shape[1] == self._dimensions)
-                self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
-            elif self._fenics_dimensions == self._dimensions:
-                self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, write_data)
+                    assert (precice_write_data.shape[0] == self._n_vertices and
+                            precice_write_data.shape[1] == self._dimensions)
+
+                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
+                elif self._fenics_dimensions == self._dimensions:
+                    self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, write_data)
+                else:
+                    raise Exception("Dimensions don't match.")
             else:
-                raise Exception("Dimensions don't match.")
-        else:
-            raise Exception("Rank of function space is neither 0 nor 1")
+                raise Exception("Rank of function space is neither 0 nor 1")
 
     def initialize(self, coupling_subdomain, mesh, dimension=2):
         """
@@ -208,15 +236,23 @@ class Adapter:
         self._function_space = function_space
 
         if self._interface.is_action_required(action_write_initial_data()):
+            print('{rank} of {size}: is_action_required(action_write_initial_data())'.format(
+                rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
             self.write(write_function)
             self._interface.mark_action_fulfilled(action_write_initial_data())
 
+        print('{rank} of {size}: initialize_data()'.format(
+            rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
         self._interface.initialize_data()
 
+        print('{rank} of {size}: create_coupling_expression()'.format(
+            rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
         coupling_expression = self.create_coupling_expression()
         read_data = None
 
         if self._interface.is_read_data_available():
+            print('{rank} of {size}: is_read_data_available()'.format(
+                rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
             read_data = self.read()
 
         self.update_coupling_expression(coupling_expression, read_data)
@@ -232,19 +268,26 @@ class Adapter:
         """
         fenics_vertices, self._coupling_mesh_vertices, self._n_vertices \
             = extract_coupling_boundary_vertices(mesh, subdomain, self._fenics_dimensions, self._dimensions)
-        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
 
-        """ Define a mapping between coupling vertices and their IDs in preCICE """
-        id_mapping = dict()
-        for i in range(self._n_vertices):
-            id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
+        if self._n_vertices > 0:
+            self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
+            """ Define a mapping between coupling vertices and their IDs in preCICE """
+            id_mapping = dict()
+            for i in range(self._n_vertices):
+                id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, subdomain, id_mapping)
+            if MPI.size(MPI.comm_world) == 1:  # nearest-projection is only supported for non-parallel runs
+                edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, subdomain, id_mapping)
 
-        """ Set mesh edges in preCICE to allow nearest-projection mapping"""
-        for i in range(len(edge_vertex_ids1)):
-            assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-            self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
+                """ Set mesh edges in preCICE to allow nearest-projection mapping"""
+                for i in range(len(edge_vertex_ids1)):
+                    assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
+                    self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
+            else:
+                print("Parallel FEniCS runs only support nearest neighbor.")
+
+        if self._n_vertices == 0:
+            assert (MPI.size(MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
 
     def create_force_boundary_condition(self, Dirichlet_Boundary, function_space):
         """
