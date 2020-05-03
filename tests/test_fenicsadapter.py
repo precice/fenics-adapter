@@ -54,21 +54,6 @@ class TestCheckpointing(TestCase):
     # t_cp_mocked = MagicMock()  # time for the checkpoint
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
 
-    def setUp(self):
-        warnings.simplefilter('ignore', category=ImportWarning)
-
-    def mock_the_adapter(self, precice):
-        """
-        We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
-        necessary to test checkpointing.
-        :param precice: the fenicsadapter
-        """
-        mesh = MagicMock()
-        coupling_subdomain = MagicMock()
-        precice._dimensions = 2
-        precice.set_coupling_mesh = MagicMock()
-        precice_dt = precice.initialize(mesh, coupling_subdomain, dimension=2)
-
     def test_checkpoint_mechanism(self):
         """
         Test correct checkpoint storing
@@ -84,17 +69,19 @@ class TestCheckpointing(TestCase):
 
         Interface.initialize = MagicMock(return_value=self.dt)
         Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
-        Interface.is_time_window_complete = MagicMock(return_value=False)
-        Interface.advance = MagicMock(return_value=self.dt)
-        Interface.mark_action_fulfilled = MagicMock()
-        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock()
-
+        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_time_window_complete = MagicMock(return_value=True)
+        Interface.advance = MagicMock()
         precice = fenicsadapter.Adapter(self.dummy_config)
-        self.mock_the_adapter(precice)
 
         precice.store_checkpoint(self.u_n_mocked, self.t, self.n)
+
+        # Replicating valid control work flow
+        precice.advance(self.dt)
+        Interface.is_time_window_complete = MagicMock(return_value=False)
 
         # Check if the checkpoint is stored correctly in the adapter
         self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
@@ -105,32 +92,19 @@ class TestIsCouplingOngoing(TestCase):
 
     dummy_config = "tests/precice-adapter-config.json"
 
-    def setUp(self):
-        warnings.simplefilter('ignore', category=ImportWarning)
-
-    def mock_the_adapter(self, precice):
-        """
-        We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
-        necessary to test checkpointing.
-        :param precice: the fenicsadapter
-        """
-        mesh = MagicMock()
-        coupling_subdomain = MagicMock()
-        precice._dimensions = 2
-        precice.set_coupling_mesh = MagicMock()
-        precice_dt = precice.initialize(mesh, coupling_subdomain, dimension=2)
-
     def test_isCouplingOngoing(self):
+        """
+        A unit test to check if the isCouplingOngoing boolean is correctly communicated to the Interface
+        :return:
+        """
         import fenicsadapter
         from precice import Interface
 
         Interface.is_coupling_ongoing = MagicMock(return_value=True)
-        Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
-        self.mock_the_adapter(precice)
 
         self.assertEqual(precice.is_coupling_ongoing(), True)
