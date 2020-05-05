@@ -8,7 +8,8 @@ from .config import Config
 import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
-from .adapter_core import FunctionType, GeneralInterpolationExpression, ExactInterpolationExpression, determine_function_type,\
+from .adapter_core import FunctionType, GeneralInterpolationExpression, ExactInterpolationExpression, \
+    determine_function_type, \
     InterpolationType, can_apply_2d_3d_coupling, convert_fenics_to_precice, extract_coupling_boundary_vertices, \
     extract_coupling_boundary_edges, extract_coupling_boundary_coordinates, get_forces_as_point_sources
 from .solverstate import SolverState
@@ -28,6 +29,7 @@ class Adapter:
 
     :param adapter_config_filename: Name of .json config file
     """
+
     def __init__(self, adapter_config_filename='precice-adapter-config.json'):
 
         self._config = Config(adapter_config_filename)
@@ -56,6 +58,7 @@ class Adapter:
         self._read_data_name = self._config.get_read_data_name()
         self._read_data_id = self._interface.get_data_id(self._read_data_name, self._mesh_id)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
+        self._read_function = None # Store the FEniCS function (initialized later)
 
         # Interpolation strategy as provided by the user
         self._my_expression = None  # initalized later
@@ -69,7 +72,7 @@ class Adapter:
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
         self._has_force_boundary = None  # stores whether force_boundary exists
 
-        # Controlling the store checkpoint
+        # Necessary flag in checkpoint storing function
         self._first_advance_done = None
 
     def set_interpolation_type(self, interpolation_type):
@@ -110,6 +113,25 @@ class Adapter:
                                                                self._dimensions)
         coupling_expression.update_boundary_data(data, x_vert, y_vert)
 
+    def create_point_sources(self, fixed_boundary, data):
+        """
+        Create point sources with reference to fixed boundary in a FSI simulation
+        :return: lists containing point source values in X and Y directions respectively
+        """
+        self._Dirichlet_Boundary = fixed_boundary
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, self._coupling_mesh_vertices,
+                                           data)
+
+    def update_point_sources(self, data):
+        """
+        Update values of point sources using new data
+        This function only works for 2D-pseudo3D coupling.
+        :param data: 2D data from preCICE
+        :return:
+        """
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, self._coupling_mesh_vertices,
+                                           data)
+
     def read(self):
         """
         Reads data from preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
@@ -119,7 +141,7 @@ class Adapter:
         """
         assert (self._read_function_type in list(FunctionType))
 
-        read_data = []
+        read_data = convert_fenics_to_precice(self._read_function, self._coupling_mesh_vertices)
 
         if self._read_function_type is FunctionType.SCALAR:
             read_data = self._interface.read_block_scalar_data(self._read_data_id, self._vertex_ids)
@@ -134,7 +156,7 @@ class Adapter:
                 np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
                 assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
             else:
-                raise Exception("Dimensions don't match.")
+                raise Exception("Dimensions do not match.")
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
@@ -188,7 +210,7 @@ class Adapter:
                     self._fenics_dimensions,
                     self._dimensions))
 
-        self.set_coupling_mesh(mesh, coupling_subdomain)
+        self._set_coupling_mesh(mesh, coupling_subdomain)
         precice_tau = self._interface.initialize()
 
         # Adapter is initialized but first advance is yet to be called
@@ -205,6 +227,7 @@ class Adapter:
         :return:
         """
         self._read_function_type = determine_function_type(read_function)
+        self._read_function = read_function
         self._function_space = function_space
 
         if self._interface.is_action_required(action_write_initial_data()):
@@ -213,17 +236,13 @@ class Adapter:
 
         self._interface.initialize_data()
 
-        coupling_expression = self.create_coupling_expression()
         read_data = None
-
         if self._interface.is_read_data_available():
             read_data = self.read()
 
-        self.update_coupling_expression(coupling_expression, read_data)
+        return read_data
 
-        return coupling_expression
-
-    def set_coupling_mesh(self, mesh, subdomain):
+    def _set_coupling_mesh(self, mesh, subdomain):
         """
         Sets up the coupling mesh. This function is called by initalize() function at the
         beginning of the simulation.
@@ -246,16 +265,6 @@ class Adapter:
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-    def create_force_boundary_condition(self, Dirichlet_Boundary, function_space):
-        """
-        Initializes force-coupling via PointSource.
-        This function only works for 2D-pseudo3D coupling.
-        :param Dirichlet_Boundary:
-        :param function_space: The Function Space used for the Test and Trial functions
-        """
-        self._has_force_boundary = True
-        return get_forces_as_point_sources(Dirichlet_Boundary, function_space, self._coupling_mesh_vertices, self._read_data)
-
     def store_checkpoint(self, user_u, t, n):
         """
         Defines an object of class SolverState which stores the current state of the variable and the time stamp
@@ -264,11 +273,11 @@ class Adapter:
         :param n: Simulation iteration counter
         """
         if self._first_advance_done:
-            assert(self.is_time_window_complete())
+            assert (self.is_time_window_complete())
 
         logger.debug("Store checkpoint")
         my_u = user_u.copy()
-        assert(my_u != user_u)  # wrt to pointer
+        assert (my_u != user_u)  # wrt to pointer
         self._checkpoint = SolverState(my_u, t, n)
         self._interface.mark_action_fulfilled(self.action_write_checkpoint())
 
