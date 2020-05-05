@@ -156,10 +156,13 @@ print('{rank} of {size}:stupid loop done'.format(rank=MPI.rank(MPI.comm_world), 
 print('{rank} of {size}: calls initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 # Initialize data to non-standard initial values according to which problem is being solved
 if problem is ProblemType.DIRICHLET:
-    coupling_expression = precice.initialize_data(u_D_function, f_N_function, V)
+    initial_data = precice.initialize_data(u_D_function, f_N_function, V)
 elif problem is ProblemType.NEUMANN:
-    coupling_expression = precice.initialize_data(f_N_function, u_D_function, V_g)
+    initial_data = precice.initialize_data(f_N_function, u_D_function, V_g)
 print('{rank} of {size}: exit initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+
+coupling_expression = precice.create_coupling_expression()
+precice.update_coupling_expression(coupling_expression, initial_data)
 
 # Assigning appropriate dt
 dt = Constant(0)

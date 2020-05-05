@@ -373,13 +373,12 @@ def extract_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping)
     return vertices1_ids, vertices2_ids
 
 
-def get_forces_as_point_sources(Dirichlet_Boundary, coupling_mesh_vertices, read_data, function_space=None):
+def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data):
     """
     Creates 2 dicts of PointSources that can be applied to the assembled system.
     Applies filter_point_source to avoid forces being applied to already existing Dirichlet BC, since this would
     lead to an overdetermined system that cannot be solved.
     :return: Returns lists of PointSources
-    TODO: get rid of this legacy code, dicts should be used for a PointSource, since they can provide the location of the PointSouce, as well. Even, inside the FEniCS user code.
     """
     # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
     # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
@@ -395,12 +394,12 @@ def get_forces_as_point_sources(Dirichlet_Boundary, coupling_mesh_vertices, read
     for i in range(n_vertices):
         px, py = vertices_x[i], vertices_y[i]
         key = (px, py)
-        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), read_data[i, 0])
-        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), read_data[i, 1])
+        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), data[i, 0])
+        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), data[i, 1])
 
     # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-    x_forces = filter_point_sources(x_forces, Dirichlet_Boundary)
-    y_forces = filter_point_sources(y_forces, Dirichlet_Boundary)
+    x_forces = filter_point_sources(x_forces, fixed_boundary)
+    y_forces = filter_point_sources(y_forces, fixed_boundary)
 
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
