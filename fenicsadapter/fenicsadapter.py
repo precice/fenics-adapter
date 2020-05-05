@@ -153,7 +153,7 @@ class Adapter:
                 read_data[:, 0] = precice_read_data[:, 0]
                 read_data[:, 1] = precice_read_data[:, 1]
                 # z is the dead direction so it is supposed that the data is close to zero
-                np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]), )
+                # np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]))
                 assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
             else:
                 raise Exception("Dimensions do not match.")
@@ -178,7 +178,7 @@ class Adapter:
         elif write_function_type is FunctionType.VECTOR:
             if can_apply_2d_3d_coupling(self._fenics_dimensions, self._dimensions):
                 # in 2d-3d coupling z dimension is set to zero
-                precice_write_data = np.column_stack(write_data[:, 0], write_data[:, 1], np.zeros(self._n_vertices))
+                precice_write_data = np.column_stack((write_data[:, 0], write_data[:, 1], np.zeros(self._n_vertices)))
                 assert (precice_write_data.shape[0] == self._n_vertices and
                         precice_write_data.shape[1] == self._dimensions)
                 self._interface.write_block_vector_data(self._write_data_id, self._vertex_ids, precice_write_data)
