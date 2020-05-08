@@ -40,7 +40,10 @@ class Config:
         self._config_file_name = os.path.join(folder, data["config_file_name"])
         self._solver_name = data["solver_name"]
         self._coupling_mesh_name = data["interface"]["coupling_mesh_name"]
-        self._write_data_name = data["interface"]["write_data_name"]
+        try:
+            self._write_data_name = data["interface"]["write_data_name"]
+        except:
+               self._write_data_name = None 
         self._read_data_name = data["interface"]["read_data_name"]
 
         read_file.close()

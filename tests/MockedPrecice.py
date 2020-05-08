@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock
-import numpy as np
 
 action_read_iteration_checkpoint = MagicMock(return_value=1)
 action_write_iteration_checkpoint = MagicMock(return_value=2)
@@ -7,7 +6,6 @@ action_write_initial_data = MagicMock()
 
 
 class Interface:
-
     def __init__(self, name, config_file, rank, procs):
         pass
 

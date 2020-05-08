@@ -2,7 +2,6 @@
 Adapter to FEniCS solver handles CustomExpression and initialization of the FEniCS adapter.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
-
 import numpy as np
 from .config import Config
 import logging
@@ -52,7 +51,8 @@ class Adapter:
 
         # write data related quantities (write data is written by user from FEniCS to preCICE)
         self._write_data_name = self._config.get_write_data_name()
-        self._write_data_id = self._interface.get_data_id(self._write_data_name, self._mesh_id)
+        if self._write_data_name:
+            self._write_data_id = self._interface.get_data_id(self._write_data_name, self._mesh_id)
 
         # read data related quantities (read data is read by use to FEniCS from preCICE)
         self._read_data_name = self._config.get_read_data_name()

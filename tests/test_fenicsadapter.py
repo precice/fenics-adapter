@@ -8,10 +8,12 @@ import tests.MockedPrecice
 
 fake_dolfin = MagicMock()
 
+
 class MockedArray:
     """
     mock of dolfin.Function
     """
+
     def __init__(self):
         self.value = MagicMock()
 
@@ -49,6 +51,7 @@ class TestCheckpointing(TestCase):
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
     dummy_config = "tests/precice-adapter-config.json"
+
     # todo if we support multirate, we should use the lines below for checkpointing
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
@@ -75,6 +78,7 @@ class TestCheckpointing(TestCase):
         Interface.mark_action_fulfilled = MagicMock()
         Interface.is_time_window_complete = MagicMock(return_value=True)
         Interface.advance = MagicMock()
+
         precice = fenicsadapter.Adapter(self.dummy_config)
 
         precice.store_checkpoint(self.u_n_mocked, self.t, self.n)
@@ -89,7 +93,6 @@ class TestCheckpointing(TestCase):
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestIsCouplingOngoing(TestCase):
-
     dummy_config = "tests/precice-adapter-config.json"
 
     def test_isCouplingOngoing(self):

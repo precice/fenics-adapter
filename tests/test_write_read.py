@@ -50,6 +50,16 @@ class TestWriteandReadData(TestCase):
 
         Interface.write_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
+<<<<<<< HEAD
+=======
+        Interface.set_mesh_vertices = MagicMock(side_effect=dummy_set_mesh_vertices)
+        Interface.initialize = MagicMock()
+        Interface.initialize_data = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
+        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_time_window_complete = MagicMock()
+        Interface.advance = MagicMock()
+>>>>>>> develop
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=fake_id)
 
@@ -83,6 +93,22 @@ class TestWriteandReadData(TestCase):
         import fenicsadapter
 
         Interface.write_block_vector_data = MagicMock()
+<<<<<<< HEAD
+=======
+        Interface.read_block_scalar_data = MagicMock()
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock(side_effect=dummy_set_mesh_vertices)
+        Interface.initialize = MagicMock()
+        Interface.initialize_data = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
+        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_time_window_complete = MagicMock()
+        Interface.advance = MagicMock()
+        Interface.get_mesh_id = MagicMock()
+        Interface.get_data_id = MagicMock(return_value=15)
+        Interface.is_read_data_available = MagicMock(return_value=False)
+        Interface.set_mesh_edge = MagicMock()
+>>>>>>> develop
 
         write_u = self.vector_function
         n_vertices = 11
@@ -138,8 +164,22 @@ class TestWriteandReadData(TestCase):
             vertex_ids = np.arange(len(positions))
             return vertex_ids
 
+<<<<<<< HEAD
         Interface.read_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
+=======
+        Interface.configure = MagicMock()
+        Interface.write_block_vector_data = MagicMock()
+        Interface.read_block_scalar_data = MagicMock(side_effect=return_dummy_data)
+        Interface.get_dimensions = MagicMock(return_value=self.dimension)
+        Interface.set_mesh_vertices = MagicMock(side_effect=dummy_set_mesh_vertices)
+        Interface.initialize = MagicMock()
+        Interface.initialize_data = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
+        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_time_window_complete = MagicMock()
+        Interface.advance = MagicMock()
+>>>>>>> develop
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=fake_id)
 
@@ -186,8 +226,8 @@ class TestWriteandReadData(TestCase):
         Interface.initialize = MagicMock()
         Interface.initialize_data = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
-        Interface.fulfilled_action = MagicMock()
-        Interface.is_timestep_complete = MagicMock()
+        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_time_window_complete = MagicMock()
         Interface.advance = MagicMock()
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=15)
