@@ -191,7 +191,7 @@ class Adapter:
 
     def initialize(self, coupling_subdomain, mesh, dimension=2):
         """
-        Initializes remaining attributes. Called once, from the solver.
+        Initializes the coupling interface and sets up the mesh in preCICE.
         :param coupling_subdomain: domain where coupling takes place
         :param mesh: fenics mesh
         :param dimension: problem dimension
@@ -210,7 +210,23 @@ class Adapter:
                     self._fenics_dimensions,
                     self._dimensions))
 
-        self._set_coupling_mesh(mesh, coupling_subdomain)
+        fenics_vertices, self._coupling_mesh_vertices, self._n_vertices \
+            = extract_coupling_boundary_vertices(mesh, coupling_subdomain, self._fenics_dimensions, self._dimensions)
+
+        """ Set up mesh in preCICE """
+        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
+
+        """ Define a mapping between coupling vertices and their IDs in preCICE """
+        id_mapping = dict()
+        for i in range(self._n_vertices):
+            id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
+        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, coupling_subdomain, id_mapping)
+
+        """ Set mesh edges in preCICE to allow nearest-projection mapping"""
+        for i in range(len(edge_vertex_ids1)):
+            assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
+            self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
+
         precice_tau = self._interface.initialize()
 
         # Adapter is initialized but first advance is yet to be called
@@ -241,29 +257,6 @@ class Adapter:
             read_data = self.read()
 
         return read_data
-
-    def _set_coupling_mesh(self, mesh, subdomain):
-        """
-        Sets up the coupling mesh. This function is called by initalize() function at the
-        beginning of the simulation.
-        :param mesh: FEniCS mesh
-        :param: subdomain: Part of FEniCS mesh which which will be computed by this participant
-        """
-        fenics_vertices, self._coupling_mesh_vertices, self._n_vertices \
-            = extract_coupling_boundary_vertices(mesh, subdomain, self._fenics_dimensions, self._dimensions)
-        self._vertex_ids = self._interface.set_mesh_vertices(self._mesh_id, self._coupling_mesh_vertices)
-
-        """ Define a mapping between coupling vertices and their IDs in preCICE """
-        id_mapping = dict()
-        for i in range(self._n_vertices):
-            id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
-
-        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, subdomain, id_mapping)
-
-        """ Set mesh edges in preCICE to allow nearest-projection mapping"""
-        for i in range(len(edge_vertex_ids1)):
-            assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-            self._interface.set_mesh_edge(self._mesh_id, edge_vertex_ids1[i], edge_vertex_ids2[i])
 
     def store_checkpoint(self, user_u, t, n):
         """
