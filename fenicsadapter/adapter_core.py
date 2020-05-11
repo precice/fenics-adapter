@@ -258,16 +258,6 @@ class ExactInterpolationExpression(CustomExpression):
         return return_value
 
 
-def can_apply_2d_3d_coupling(fenics_dimensions, dimensions):
-    """ In certain situations a 2D-3D coupling is applied. This means that the y-dimension of data and nodes
-    received from preCICE is ignored. If FEniCS sends data to preCICE, the y-dimension of data and node coordinates
-    is set to zero.
-
-    :return: True, if the 2D-3D coupling can be applied
-    """
-    return fenics_dimensions == 2 and dimensions == 3
-
-
 def convert_fenics_to_precice(data, sample_points):
     """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -303,7 +293,7 @@ def extract_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_d
             vertices_x.append(v.x(0))
             if dimensions == 2:
                 vertices_y.append(v.x(1))
-            elif can_apply_2d_3d_coupling(fenics_dimensions, dimensions):
+            elif fenics_dimensions == 2 and dimensions == 3:
                 vertices_y.append(v.x(1))
                 vertices_z.append(0)
             else:
@@ -402,7 +392,7 @@ def extract_coupling_boundary_coordinates(coupling_vertices, fenics_dimensions, 
     if dimensions == 3:
         vertices_z = coupling_vertices[2, :]
 
-    if dimensions == 2 or can_apply_2d_3d_coupling(fenics_dimensions, dimensions):
+    if dimensions == 2 or (fenics_dimensions == 2 and dimensions == 3):
         return vertices_x, vertices_y
     else:
         raise Exception("Error: These Dimensions are not supported by the adapter.")
