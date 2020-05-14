@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock
-import numpy as np
 
 action_read_iteration_checkpoint = MagicMock(return_value=1)
 action_write_iteration_checkpoint = MagicMock(return_value=2)
@@ -7,7 +6,6 @@ action_write_initial_data = MagicMock()
 
 
 class Interface:
-
     def __init__(self, name, config_file, rank, procs):
         pass
 
@@ -35,13 +33,13 @@ class Interface:
     def advance(self, foo):
         raise Exception("not implemented")
 
-    def is_action_required(self, py_action):
+    def is_action_required(self, action):
         raise Exception("not implemented")
 
     def is_coupling_ongoing(self):
         raise Exception("not implemented")
 
-    def mark_action_fulfilled(self, py_action):
+    def mark_action_fulfilled(self, action):
         raise Exception("not implemented")
 
     def get_dimensions(self):
