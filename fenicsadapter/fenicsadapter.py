@@ -7,10 +7,10 @@ from .config import Config
 import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
-from .adapter_core import FunctionType, GeneralInterpolationExpression, ExactInterpolationExpression, \
-    determine_function_type, \
-    InterpolationType, convert_fenics_to_precice, extract_coupling_boundary_vertices, \
-    extract_coupling_boundary_edges, extract_coupling_boundary_coordinates, get_forces_as_point_sources
+from .adapter_core import FunctionType, determine_function_type, InterpolationType, convert_fenics_to_precice,\
+    extract_coupling_boundary_vertices, extract_coupling_boundary_edges, extract_coupling_boundary_coordinates, \
+    get_forces_as_point_sources
+from .expression import GeneralInterpolationExpression, ExactInterpolationExpression
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
