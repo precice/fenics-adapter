@@ -7,8 +7,8 @@ from .config import Config
 import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
-from .adapter_core import FunctionType, determine_function_type, InterpolationType, convert_fenics_to_precice,\
-    extract_coupling_boundary_vertices, extract_coupling_boundary_edges, extract_coupling_boundary_coordinates, \
+from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice,\
+    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_coupling_boundary_coordinates, \
     get_forces_as_point_sources
 from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression
 from .solverstate import SolverState
@@ -49,7 +49,14 @@ class Adapter:
         self._read_function = None  # Store the FEniCS function (initialized later)
 
         # Interpolation strategy as provided by the user
-        self._my_expression = None  # initalized later
+        if self._config.get_interpolation_expression_type() == "cubic_spline":
+            self._my_expression = ExactInterpolationExpression
+            print("Using cubic spline interpolation")
+        elif self._config.get_interpolation_expression_type() == "rbf":
+            self._my_expression = GeneralInterpolationExpression
+            print("Using RBF interpolation")
+        else:
+            raise Exception("No valid interpolation strategy entered. Please check documentation.")
 
         # Solver state used by the Adapter internally to handle checkpointing
         self._checkpoint = None
@@ -65,19 +72,6 @@ class Adapter:
 
         # Flag to see if 2D - 3D coupling needs to be applied
         self._apply_2d_3d_coupling = False
-
-    def set_interpolation_type(self, interpolation_type):
-        """
-        Sets interpolation strategy according to choice of user
-        :param interpolation_type: Enum stating which interpolation strategy to be used
-        (Choices are 1. CUBIC_SPLINE  2. RBF)
-        """
-        if interpolation_type == InterpolationType.CUBIC_SPLINE:
-            self._my_expression = ExactInterpolationExpression
-            print("Using cubic spline interpolation")
-        elif interpolation_type == InterpolationType.RBF:
-            self._my_expression = GeneralInterpolationExpression
-            print("Using RBF interpolation")
 
     def create_coupling_expression(self):
         """
@@ -100,7 +94,7 @@ class Adapter:
         :param coupling_expression: FEniCS Expression object
         :param data: Data used to update the boundary values in the coupling expression
         """
-        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
+        x_vert, y_vert = get_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
                                                                self._interface.get_dimensions())
         coupling_expression.update_boundary_data(data, x_vert, y_vert)
 
@@ -213,7 +207,7 @@ class Adapter:
                     dimensions, self._interface.get_dimensions()))
 
         fenics_vertices, self._coupling_mesh_vertices, self._n_vertices \
-            = extract_coupling_boundary_vertices(mesh, coupling_subdomain, dimensions, self._interface.get_dimensions())
+            = get_coupling_boundary_vertices(mesh, coupling_subdomain, dimensions, self._interface.get_dimensions())
 
         """ Set up mesh in preCICE """
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
@@ -223,7 +217,7 @@ class Adapter:
         id_mapping = dict()
         for i in range(self._n_vertices):
             id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
-        edge_vertex_ids1, edge_vertex_ids2 = extract_coupling_boundary_edges(mesh, coupling_subdomain, id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(mesh, coupling_subdomain, id_mapping)
 
         """ Set mesh edges in preCICE to allow nearest-projection mapping"""
         for i in range(len(edge_vertex_ids1)):

@@ -13,12 +13,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 
 
-class InterpolationType(Enum):
-    """ Defines the type of interpolation strategy used"""
-    CUBIC_SPLINE = 1  # cubic splines used interpolation
-    RBF = 2  # Radial basis functions used for interpolation
-
-
 class FunctionType(Enum):
     """ Defines scalar- and vector-valued function """
     SCALAR = 0  # scalar valued function
@@ -63,6 +57,7 @@ def convert_fenics_to_precice(data, sample_points):
     """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
     :param data: FEniCS boundary function
+    :param sample_points: Vertices
     :raise Exception: if type of data cannot be handled
     :return: array of FEniCS function values at each point on the boundary
     """
@@ -73,7 +68,7 @@ def convert_fenics_to_precice(data, sample_points):
         raise Exception("Cannot handle data type %s" % type(data))
 
 
-def extract_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimensions, dimensions):
+def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimensions, dimensions):
     """Extracts vertices which lie on the boundary.
     :return: stack of vertices
     """
@@ -117,7 +112,7 @@ def are_connected_by_edge(v1, v2):
     return False
 
 
-def extract_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
+def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
     """Extracts edges of mesh which lie on the boundary.
     :return: two arrays of vertex IDs. Array 1 consists of first points of all edges
     and Array 2 consists of second points of all edges
@@ -182,7 +177,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def extract_coupling_boundary_coordinates(coupling_vertices, fenics_dimensions, dimensions):
+def get_coupling_boundary_coordinates(coupling_vertices, fenics_dimensions, dimensions):
     """Extracts the coordinates of vertices that lay on the boundary. 3D
     case currently handled as 2D.
 

@@ -1,10 +1,16 @@
-"""This is configuration module of fenicsadapter."""
+"""
+This is the configuration module of fenicsadapter
+"""
 
-import os, sys, json
+import json
+import os
+import sys
+
 
 class Config:
-    """Handles reading of config. parameters of the fenicsadapter based on JSON
-    configuration file. Initializer calls readJSON() method. Instance attributes
+    """
+    Handles reading of config. parameters of the fenicsadapter based on JSON
+    configuration file. Initializer calls read_json() method. Instance attributes
     can be accessed by provided getter functions.
 
     :param adapter_config_filename: name of the adapter configuration file
@@ -13,6 +19,7 @@ class Config:
     :ivar _coupling_mesh_name: name of mesh as defined in preCICE config
     :ivar _read_data_name: name of read data as defined in preCICE config
     :ivar _write_data_name: name of write data as defined in preCICE config
+    :ivar _interpolation_type: Type of interpolation strategy used to construct FEniCS Expression
     """
 
     def __init__(self, adapter_config_filename):
@@ -22,10 +29,11 @@ class Config:
         self._coupling_mesh_name = None
         self._read_data_name = None
         self._write_data_name = None
+        self._interpolation_type = None
 
-        self.readJSON(adapter_config_filename)
+        self.read_json(adapter_config_filename)
 
-    def readJSON(self, adapter_config_filename):
+    def read_json(self, adapter_config_filename):
         """ Reads JSON adapter configuration file and saves the data to
         the respective instance attributes.
 
@@ -43,8 +51,12 @@ class Config:
         try:
             self._write_data_name = data["interface"]["write_data_name"]
         except:
-               self._write_data_name = None 
+            self._write_data_name = None
         self._read_data_name = data["interface"]["read_data_name"]
+        try:
+            self._interpolation_type = data["interface"]["interpolation_type"]
+        except:
+            self._interpolation_type = None
 
         read_file.close()
 
@@ -63,6 +75,5 @@ class Config:
     def get_write_data_name(self):
         return self._write_data_name
 
-    def get_n_substeps(self):
-        return self._n_substeps
-
+    def get_interpolation_expression_type(self):
+        return self._interpolation_type
