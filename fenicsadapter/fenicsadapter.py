@@ -10,7 +10,7 @@ from precice import action_write_initial_data, action_write_iteration_checkpoint
 from .adapter_core import FunctionType, determine_function_type, InterpolationType, convert_fenics_to_precice,\
     extract_coupling_boundary_vertices, extract_coupling_boundary_edges, extract_coupling_boundary_coordinates, \
     get_forces_as_point_sources
-from .expression import GeneralInterpolationExpression, ExactInterpolationExpression
+from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression
 from .solverstate import SolverState
 
 logger = logging.getLogger(__name__)
@@ -186,7 +186,7 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-    def initialize(self, coupling_subdomain, mesh, dimensions=2):
+    def initialize(self, coupling_subdomain, mesh, read_function, function_space, dimensions=2):
         """
         Initializes the coupling interface and sets up the mesh in preCICE.
         :param coupling_subdomain: domain where coupling takes place
@@ -231,19 +231,19 @@ class Adapter:
             self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-        return self._interface.initialize()
-
-    def initialize_data(self, read_function, write_function, function_space):
-        """
-        Set initial conditions and boundary conditions
-        :param read_function: FEniCS function
-        :param write_function: FEniCS function
-        :param function_space: FEniCS space
-        :return:
-        """
+        """ Set read functionality parameters """
         self._read_function_type = determine_function_type(read_function)
         self._read_function = read_function
         self._function_space = function_space
+
+        return self._interface.initialize()
+
+    def initialize_data(self, write_function):
+        """
+        Set initial conditions and boundary conditions
+        :param write_function: FEniCS function
+        :return:
+        """
 
         if self._interface.is_action_required(action_write_initial_data()):
             self.write(write_function)

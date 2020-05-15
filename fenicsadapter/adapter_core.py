@@ -59,8 +59,6 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-
-
 def convert_fenics_to_precice(data, sample_points):
     """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
