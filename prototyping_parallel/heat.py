@@ -29,7 +29,7 @@ from fenics import Function, FunctionSpace, Expression, Constant, DirichletBC, T
     File, solve, lhs, rhs, grad, inner, dot, dx, ds, interpolate, VectorFunctionSpace, MeshFunction
 from fenics import MPI
 import fenics
-from fenicsadapter import Adapter, InterpolationType
+from fenicsadapter import Adapter
 from errorcomputation import compute_errors
 from my_enums import ProblemType, Subcycling
 import argparse
@@ -135,8 +135,6 @@ u_n.rename("Temperature", "")
 
 # Adapter definition and initialization
 precice = Adapter(adapter_config_filename)
-# Selecting interpolation strategy
-precice.set_interpolation_type(InterpolationType.CUBIC_SPLINE)
 
 print('{rank} of {size}: calls initialize'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 # Initialize adapter according to which problem is being solved
