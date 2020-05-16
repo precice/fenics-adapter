@@ -95,6 +95,8 @@ class CustomExpression(UserExpression):
 
         :return: whether function is scalar valued
         """
+        if self._is_empty:
+            return False
         if self._vals.ndim == 1:
             return True
         elif self._vals.ndim > 1:
@@ -107,6 +109,8 @@ class CustomExpression(UserExpression):
 
         :return: whether function is scalar valued
         """
+        if self._is_empty:
+            return False
         if self._vals.ndim > 1:
             return True
         elif self._vals.ndim == 1:
