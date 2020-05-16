@@ -12,6 +12,7 @@ from .adapter_core import FunctionType, determine_function_type, convert_fenics_
     get_forces_as_point_sources
 from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression
 from .solverstate import SolverState
+from warnings import warn
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -56,7 +57,8 @@ class Adapter:
             self._my_expression = GeneralInterpolationExpression
             print("Using RBF interpolation")
         else:
-            raise Exception("No valid interpolation strategy entered. Please check documentation.")
+            warn("No valid interpolation strategy entered. It is assumed that the user does "
+                 "not wish to use FEniCS Expressions on the coupling boundary.")
 
         # Solver state used by the Adapter internally to handle checkpointing
         self._checkpoint = None
