@@ -181,16 +181,29 @@ class ExactInterpolationExpression(CustomExpression):
     def create_interpolant(self):
         interpolant = []
         if self._dimension == 2:
+            n_samples = len(self._coords_y)
+            if n_samples > 3:
+                kind = "cubic"
+            else:
+                logger.warning("Only {n_samples} nodes for interpolation provided. This may reduce the accuracy. "
+                                "Consider refining your mesh.".format(n_samples=n_samples))
+                if n_samples == 3:
+                    kind = "quadratic"
+                elif n_samples == 2:
+                    kind = "linear"
+                else:
+                    raise Exception("Not sufficient number nodes for interpolation provided!")
+
             if self.is_scalar_valued():  # check if scalar or vector-valued
                 interpolant.append(
-                    interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind="cubic"))
+                    interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind=kind))
             elif self.is_vector_valued():
                 interpolant.append(
                     interp1d(self._coords_y, self._vals[:, 0].flatten(), bounds_error=False, fill_value="extrapolate",
-                             kind="cubic"))
+                             kind=kind))
                 interpolant.append(
                     interp1d(self._coords_y, self._vals[:, 1].flatten(), bounds_error=False, fill_value="extrapolate",
-                             kind="cubic"))
+                             kind=kind))
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         else:
