@@ -10,7 +10,7 @@ from precice import action_write_initial_data, action_write_iteration_checkpoint
 from .adapter_core import FunctionType, determine_function_type, InterpolationType, convert_fenics_to_precice,\
     extract_coupling_boundary_vertices, extract_coupling_boundary_edges, extract_coupling_boundary_coordinates, \
     get_forces_as_point_sources
-from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression
+from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import MPI
 
@@ -81,16 +81,33 @@ class Adapter:
             self._my_expression = GeneralInterpolationExpression
             print("Using RBF interpolation")
 
-    def create_coupling_expression(self):
+    def create_coupling_expression(self, data):
         """
         Creates an object of class GeneralInterpolationExpression or ExactInterpolationExpression which does
         not carry any data. The adapter will hold this object till the coupling is on going.
         :return: coupling_expression: Return the reference to created FEniCS Expression object
         """
-        try:  # works with dolfin 1.6.0
-            coupling_expression = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
-        except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
+
+        x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
+                                                               self._interface.get_dimensions())
+
+        if self._n_vertices > 0:
+
+            try:  # works with dolfin 1.6.0
+                coupling_expression = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+            except (TypeError, KeyError):  # works with dolfin 2017.2.0
+                coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
+        else:
+            try:  # works with dolfin 1.6.0
+                coupling_expression = EmptyExpression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+            except (TypeError, KeyError):  # works with dolfin 2017.2.0
+                coupling_expression = EmptyExpression(element=self._function_space.ufl_element(), degree=0)
+            if self._read_function_type == FunctionType.SCALAR:
+                coupling_expression._vals = np.empty(shape=0)  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+            elif self._read_function_type == FunctionType.VECTOR:
+                coupling_expression._vals = np.empty(shape=(0, 0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+
+        coupling_expression.update_boundary_data(data, x_vert, y_vert)
 
         return coupling_expression
 
@@ -103,18 +120,7 @@ class Adapter:
         """
         x_vert, y_vert = extract_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
                                                                self._interface.get_dimensions())
-        if self._n_vertices > 0:
-            coupling_expression._is_empty = False
-            coupling_expression.update_boundary_data(data, x_vert, y_vert)
-
-        else:
-            # having participants without coupling mesh nodes is only accepted for parallel runs
-            assert (MPI.size(MPI.comm_world) > 1)
-            # todo: this whole branch is currently a very ugly hack to make sure the coupling expression knows about
-            # its dimension, even if no data is provided.
-            coupling_expression._is_empty = True
-            coupling_expression._vals = data
-            coupling_expression._dimension = self._interface.get_dimensions()
+        coupling_expression.update_boundary_data(data, x_vert, y_vert)
 
     def create_point_sources(self, fixed_boundary, data):
         """
@@ -169,11 +175,8 @@ class Adapter:
                     raise Exception("Dimensions don't match.")
             else:
                 raise Exception("Rank of function space is neither 0 nor 1")
-        else:  # even, if there are no vertices, we have to make sure that the coupling expression knows its dimension
-            if self._read_function_type is FunctionType.SCALAR:
-                read_data = np.empty(shape=(1))
-            elif self._read_function_type is FunctionType.VECTOR:
-                read_data = np.empty(shape=(self._interface.get_dimensions()))
+        else:  # if there are no vertices, we return empty data
+            read_data = None
 
         return read_data
 
@@ -284,9 +287,6 @@ class Adapter:
             rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
         self._interface.initialize_data()
 
-        print('{rank} of {size}: create_coupling_expression()'.format(
-            rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-        coupling_expression = self.create_coupling_expression()
         read_data = None
 
         if self._interface.is_read_data_available():

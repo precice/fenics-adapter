@@ -7,6 +7,7 @@ from dolfin import UserExpression
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
+from fenics import MPI
 
 import logging
 
@@ -18,17 +19,6 @@ class CustomExpression(UserExpression):
     """Creates functional representation (for FEniCS) of nodal data
     provided by preCICE.
     """
-
-    def set_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
-        """ initialize data stored by expression.
-
-        :param vals: data values on nodes
-        :param coords_x: x coordinates of nodes
-        :param coords_y: y coordinates of nodes
-        :param coords_z: z coordinates of nodes
-        """
-
-        self.update_boundary_data(vals, coords_x, coords_y, coords_z)
 
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         """ update the data stored by expression.
@@ -95,8 +85,6 @@ class CustomExpression(UserExpression):
 
         :return: whether function is scalar valued
         """
-        if self._is_empty:
-            return False
         if self._vals.ndim == 1:
             return True
         elif self._vals.ndim > 1:
@@ -109,8 +97,6 @@ class CustomExpression(UserExpression):
 
         :return: whether function is scalar valued
         """
-        if self._is_empty:
-            return False
         if self._vals.ndim > 1:
             return True
         elif self._vals.ndim == 1:
@@ -228,3 +214,28 @@ class ExactInterpolationExpression(CustomExpression):
             raise Exception("invalid dimensionality!")
         return return_value
 
+
+class EmptyExpression(CustomExpression):
+    """A dummy expression that can be used for implementing a coupling boundary condition, if the participant's mesh has
+    no vertices on the coupling domain. Only used for parallel runs.
+
+    Example:
+    We want solve
+    F = u * v / dt * dx + dot(grad(u), grad(v)) * dx - (u_n / dt + f) * v * dx + v * coupling_expression * ds
+    The user defines F, but does not know whether the rank even has vertices on the Neumann coupling boundary.
+    If the rank does not have any vertices on the Neumann coupling boundary the coupling_expression is an
+    EmptyExpression. This "deactivates" the Neumann BC for that specific rank.
+    """
+
+    def eval(self, value, x):
+        """ Evaluates expression at x. For EmptyExpression always returns zero.
+
+        :param x: coordinate where expression has to be evaluated
+        :param value: buffer where result has to be returned to
+        """
+        assert(MPI.size(MPI.comm_world) > 1)
+        for i in range(self._vals.ndim):
+            value[i] = 0
+
+    def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
+        pass  # an EmptyExpression is never updated

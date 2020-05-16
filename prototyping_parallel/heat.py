@@ -168,8 +168,7 @@ elif problem is ProblemType.NEUMANN:
     initial_data = precice.initialize_data(u_D_function)
 print('{rank} of {size}: exit initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 
-coupling_expression = precice.create_coupling_expression()
-precice.update_coupling_expression(coupling_expression, initial_data)
+coupling_expression = precice.create_coupling_expression(initial_data)
 
 # Assigning appropriate dt
 dt = Constant(0)
@@ -194,12 +193,8 @@ if problem is ProblemType.NEUMANN:
         elif coupling_expression.is_vector_valued():
             normal = FacetNormal(mesh)
             F += -v * dot(normal, coupling_expression) * dolfin.ds
-        elif MPI.size(MPI.comm_world) > 1:  # for parallel cases there may be no coupling BC
-            pass
-        else:  # there MUST be a coupling BC for serial cases
+        else:  # there MUST be a coupling BC for all cases
             raise Exception("invalid!")
-
-
     else:  # For multiple Neumann BCs integration should only be performed over the respective domain.
         # TODO: fix the problem here
         raise Exception("Boundary markers are not implemented yet")
