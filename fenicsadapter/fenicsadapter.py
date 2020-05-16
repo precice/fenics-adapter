@@ -7,7 +7,7 @@ from .config import Config
 import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
-from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice,\
+from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_coupling_boundary_coordinates, \
     get_forces_as_point_sources
 from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression
@@ -47,7 +47,6 @@ class Adapter:
 
         # read data related quantities (read data is read by use to FEniCS from preCICE)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
-        self._read_function = None  # Store the FEniCS function (initialized later)
 
         # Interpolation strategy as provided by the user
         if self._config.get_interpolation_expression_type() == "cubic_spline":
@@ -97,7 +96,7 @@ class Adapter:
         :param data: Data used to update the boundary values in the coupling expression
         """
         x_vert, y_vert = get_coupling_boundary_coordinates(self._coupling_mesh_vertices, self._fenics_dimensions,
-                                                               self._interface.get_dimensions())
+                                                           self._interface.get_dimensions())
         coupling_expression.update_boundary_data(data, x_vert, y_vert)
 
     def create_point_sources(self, fixed_boundary, data):
@@ -128,7 +127,7 @@ class Adapter:
         """
         assert (self._read_function_type in list(FunctionType))
 
-        read_data = convert_fenics_to_precice(self._read_function, self._coupling_mesh_vertices)
+        read_data = None
 
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -185,6 +184,8 @@ class Adapter:
     def initialize(self, coupling_subdomain, mesh, read_function, function_space, dimensions=2):
         """
         Initializes the coupling interface and sets up the mesh in preCICE.
+        :param function_space:
+        :param read_function:
         :param coupling_subdomain: domain where coupling takes place
         :param mesh: fenics mesh
         :param dimensions: FEniCS problem dimension
@@ -229,7 +230,6 @@ class Adapter:
 
         """ Set read functionality parameters """
         self._read_function_type = determine_function_type(read_function)
-        self._read_function = read_function
         self._function_space = function_space
 
         return self._interface.initialize()
