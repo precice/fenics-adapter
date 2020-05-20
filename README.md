@@ -37,6 +37,11 @@ As a first test, try to import the adapter via `python3 -c "import fenicsadapter
 
 You can run the other tests via `python3 setup.py test`.
 
+Single tests can be also be run. For example the test `test_vector_write` in the file `test_write_read.py` can be run as follows:
+```
+python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
+```
+
 ## Use the adapter
 
 Add ``from fenicsadapter import Adapter`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples:

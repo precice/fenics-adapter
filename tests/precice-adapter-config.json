@@ -4,6 +4,7 @@
   "interface": {
       "coupling_mesh_name": "Dummy-Mesh",
       "write_data_name": "Dummy-Write",
-      "read_data_name": "Dummy-Read"
+      "read_data_name": "Dummy-Read",
+      "interpolation_type": "cubic_spline"
     }
 }
