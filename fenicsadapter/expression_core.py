@@ -19,17 +19,6 @@ class CustomExpression(UserExpression):
     provided by preCICE.
     """
 
-    def set_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
-        """ initialize data stored by expression.
-
-        :param vals: data values on nodes
-        :param coords_x: x coordinates of nodes
-        :param coords_y: y coordinates of nodes
-        :param coords_z: z coordinates of nodes
-        """
-
-        self.update_boundary_data(vals, coords_x, coords_y, coords_z)
-
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         """ update the data stored by expression.
 
