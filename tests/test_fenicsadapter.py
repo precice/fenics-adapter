@@ -1,12 +1,15 @@
 # comments on test layout: https://docs.pytest.org/en/latest/goodpractices.html
-# run with python -m unittest tests.test_fenicsadapter
 
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
-import warnings
 import tests.MockedPrecice
+import numpy as np
+from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, inner, assemble, dx,\
+    project, sqrt
 
 fake_dolfin = MagicMock()
+x_left, x_right = 0, 1
+y_bottom, y_top = 0, 1
 
 
 class MockedArray:
@@ -37,10 +40,8 @@ class MockedArray:
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
     """
-    Test suite to check whether checkpointing is done correctly, if the advance function is called. We use the mock
-    pattern, for mocking the desired state of precice.
+    Test suite to check if Checkpointing functionality of the Adapter is working.
     """
-
     dt = 1  # timestep size
     n = 0  # current iteration count
     t = 0  # current time
@@ -83,7 +84,8 @@ class TestCheckpointing(TestCase):
 
         precice.store_checkpoint(self.u_n_mocked, self.t, self.n)
 
-        # Replicating valid control work flow
+        # Replicating control flow where implicit iteration has not converged and solver state needs to be restored
+        # to a checkpoint
         precice.advance(self.dt)
         Interface.is_time_window_complete = MagicMock(return_value=False)
 
@@ -92,22 +94,59 @@ class TestCheckpointing(TestCase):
 
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
-class TestIsCouplingOngoing(TestCase):
+class TestExpressionHandling(TestCase):
+    """
+    Test Expression creating mechanism based on data provided by user.
+    """
     dummy_config = "tests/precice-adapter-config.json"
 
-    def test_isCouplingOngoing(self):
-        """
-        A unit test to check if the isCouplingOngoing boolean is correctly communicated to the Interface
-        :return:
-        """
-        import fenicsadapter
-        from precice import Interface
+    mesh = UnitSquareMesh(10, 10)
+    dimension = 2
 
-        Interface.is_coupling_ongoing = MagicMock(return_value=True)
-        Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
+    scalar_expr = Expression("x[0]*x[0] + x[1]*x[1]", degree=2)
+    scalar_V = FunctionSpace(mesh, "P", 2)
+    scalar_function = interpolate(scalar_expr, scalar_V)
+
+    vector_expr = Expression(("x[0] + x[1]*x[1]", "x[0] - x[1]*x[1]"), degree=2)
+    vector_V = VectorFunctionSpace(mesh, "P", 2)
+    vector_function = interpolate(vector_expr, vector_V)
+
+    n_vertices = 11
+    fake_id = 15
+    vertices_x = [x_right for _ in range(n_vertices)]
+    vertices_y = np.linspace(y_bottom, y_top, n_vertices)
+
+    def test_update_expression(self):
+        """
+
+        Returns
+        -------
+
+        """
+        from precice import Interface
+        import fenicsadapter
+
+        dummy_scalar_data = np.arange(self.n_vertices)
 
         precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._interface = Interface(None, None, None, None)
+        precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
+        precice._function_space = self.scalar_V
 
-        self.assertEqual(precice.is_coupling_ongoing(), True)
+        scalar_coupling_expr = precice.create_coupling_expression(dummy_scalar_data)
+
+        error_normalized = (self.scalar_function - scalar_coupling_expr) / self.scalar_function
+        error_pointwise = project(abs(error_normalized), self.scalar_V)
+        error_total = sqrt(assemble(inner(error_pointwise, error_pointwise) * dx))
+
+        assert (error_total < 10 ** -4)
+
+        precice._function_space = self.vector_V
+        dummy_vector_data = np.arange(self.n_vertices * self.dimension).reshape(self.n_vertices, self.dimension)
+        vector_coupling_expr = precice.create_coupling_expression(dummy_vector_data)
+
+        error_normalized = (self.vector_function - vector_coupling_expr) / self.vector_function
+        error_pointwise = project(abs(error_normalized), self.vector_V)
+        error_total = sqrt(assemble(inner(error_pointwise, error_pointwise) * dx))
+
+        assert (error_total < 10 ** 4)

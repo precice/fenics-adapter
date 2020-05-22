@@ -1,5 +1,5 @@
 """
-Provide two types of FEniCS Expressions as coupling boundary Expressions to the user.
+This module provides a mechanism to imterpolate point data acquired from preCICE into FEniCS Expressions.
 """
 
 import dolfin
@@ -15,19 +15,25 @@ logger.setLevel(level=logging.INFO)
 
 
 class CustomExpression(UserExpression):
-    """Creates functional representation (for FEniCS) of nodal data
-    provided by preCICE.
+    """
+    Creates functional representation (for FEniCS) of nodal data provided by preCICE.
     """
 
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
-        """ update the data stored by expression.
-
-        :param vals: data values on nodes
-        :param coords_x: x coordinates of nodes
-        :param coords_y: y coordinates of nodes
-        :param coords_z: z coordinates of nodes
         """
+        Update object of this class of type FEniCS UserExpression with given point data.
 
+        Parameters
+        ----------
+        vals : double
+            Point data to be used to update the Expression.
+        coords_x : double
+            X coordinate of points of which point data is proviced.
+        coords_y : double
+            Y coordinate of points of which point data is provided.
+        coords_z : double
+            Z coordinate of points of which point data is provided.
+        """
         self._coords_x = coords_x
         self._dimension = 3
         if coords_y is None:
@@ -50,39 +56,67 @@ class CustomExpression(UserExpression):
             assert (self._vals.shape[0] == self._coords_x.shape[0])
 
     def interpolate(self, x):
-        # TODO: the correct way to deal with this would be using an abstract class. Since this is technically more complex and the current implementation is a workaround anyway, we do not use the proper solution, but this hack.
-        """ Interpolates at x. Uses buffered interpolant self._f.
+        # TODO: the correct way to deal with this would be using an abstract class. Since this is technically more
+        #  complex and the current implementation is a workaround anyway, we do not use the proper solution, but this hack.
+        """
+        Interpolates at x. Uses buffered interpolant self._f.
+        Parameters
+        ----------
+        x : double
+            Point.
 
-        :return: returns a list containing the interpolated values. If scalar function is interpolated this list has a
-        single element. If a vector function is interpolated the list has self._dimensions elements.
+        Returns
+        -------
+        list : python list
+            A list containing the interpolated values. If scalar function is interpolated this list has a single
+            element. If a vector function is interpolated the list has self._dimensions elements.
         """
         raise Exception("Please use one of the classes derived from this class, that implements an actual strategy for"
                         "interpolation.")
 
     def create_interpolant(self, x):
-        # TODO: the correct way to deal with this would be using an abstract class. Since this is technically more complex and the current implementation is a workaround anyway, we do not use the proper solution, but this hack.
-        """ Creates interpolant from boundary data that has been provided before.
+        # TODO: the correct way to deal with this would be using an abstract class. Since this is technically more
+        #  complex and the current implementation is a workaround anyway, we do not use the proper solution, but this hack.
+        """
+        Creates interpolant from boundary data that has been provided before.
 
-        :return: returns interpolant as list. If scalar function is interpolated this list has a single element. If a
-        vector function is interpolated the list has self._dimensions elements.
+        Parameters
+        ----------
+        x : double
+            Point.
+
+        Returns
+        -------
+        list : python list
+            Interpolant as a list. If scalar function is interpolated this list has a single
+            element. If a vector function is interpolated the list has self._dimensions elements.
         """
         raise Exception("Please use one of the classes derived from this class, that implements an actual strategy for"
                         "interpolation.")
 
     def eval(self, value, x):
-        """ Evaluates expression at x using self.interpolate(x) and stores result to value.
+        """
+        Evaluates expression at x using self.interpolate(x) and stores result to value.
 
-        :param x: coordinate where expression has to be evaluated
-        :param value: buffer where result has to be returned to
+        Parameters
+        ----------
+        value : double
+            Buffer where result has to be returned to.
+        x : double
+            Coordinate where expression has to be evaluated.
         """
         return_value = self.interpolate(x)
         for i in range(self._vals.ndim):
             value[i] = return_value[i]
 
     def is_scalar_valued(self):
-        """ Determines if function being interpolated is scalar-valued based on dimension of provided vector self._vals.
+        """
+        Determines if function being interpolated is scalar-valued based on dimension of provided vector self._vals.
 
-        :return: whether function is scalar valued
+        Returns
+        -------
+        tag : bool
+            True if function being interpolated is scalar-valued, False otherwise.
         """
         if self._vals.ndim == 1:
             return True
@@ -92,9 +126,13 @@ class CustomExpression(UserExpression):
             raise Exception("Dimension of the function is 0 or negative!")
 
     def is_vector_valued(self):
-        """ Determines if function being interpolated is vector-valued based on dimension of provided vector self._vals.
+        """
+        Determines if function being interpolated is vector-valued based on dimension of provided vector self._vals.
 
-        :return: whether function is scalar valued
+        Returns
+        -------
+        tag : bool
+            True if function being interpolated is vector-valued, False otherwise.
         """
         if self._vals.ndim > 1:
             return True
@@ -105,11 +143,15 @@ class CustomExpression(UserExpression):
 
 
 class GeneralInterpolationExpression(CustomExpression):
-    """Uses RBF interpolation for implementation of CustomExpression.interpolate. Allows for arbitrary coupling
+    """
+    Uses RBF interpolation for implementation of CustomExpression.interpolate. Allows for arbitrary coupling
     interfaces, but has limited accuracy.
     """
 
     def create_interpolant(self):
+        """
+        See base class description.
+        """
         interpolant = []
         if self._dimension == 1:
             assert (
@@ -141,6 +183,9 @@ class GeneralInterpolationExpression(CustomExpression):
         return interpolant
 
     def interpolate(self, x):
+        """
+        See base class description.
+        """
         assert ((self.is_scalar_valued() and self._vals.ndim == 1) or
                 (self.is_vector_valued() and self._vals.ndim == self._dimension))
 
@@ -159,7 +204,8 @@ class GeneralInterpolationExpression(CustomExpression):
 
 
 class ExactInterpolationExpression(CustomExpression):
-    """Uses cubic spline interpolation for implementation of CustomExpression.interpolate. Only allows interpolation on
+    """
+    Uses cubic spline interpolation for implementation of CustomExpression.interpolate. Only allows interpolation on
     coupling that are parallel to the y axis, and if the coordinates in self._coords_y are ordered such that the nodes
     on the coupling mesh are traversed w.r.t their connectivity.
     However, this method allows to exactly recover the solution at the coupling interface, if it is a polynomial of
@@ -168,6 +214,9 @@ class ExactInterpolationExpression(CustomExpression):
     """
 
     def create_interpolant(self):
+        """
+        See base class description.
+        """
         interpolant = []
         if self._dimension == 2:
             if self.is_scalar_valued():  # check if scalar or vector-valued
@@ -188,6 +237,9 @@ class ExactInterpolationExpression(CustomExpression):
         return interpolant
 
     def interpolate(self, x):
+        """
+        See base class description.
+        """
         assert ((self.is_scalar_valued() and self._vals.ndim == 1) or
                 (self.is_vector_valued() and self._vals.ndim == self._dimension))
 
@@ -199,4 +251,3 @@ class ExactInterpolationExpression(CustomExpression):
         else:
             raise Exception("invalid dimensionality!")
         return return_value
-

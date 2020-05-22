@@ -6,6 +6,10 @@ action_write_initial_data = MagicMock()
 
 
 class Interface:
+    """
+    Mock representation of preCICE to be used in all mock tests. Dummy implementation of all functions below are
+    to be used where the preCICE API calls via the python bindings are done in the FEniCS Adapter
+    """
     def __init__(self, name, config_file, rank, procs):
         pass
 

@@ -88,11 +88,10 @@ class Adapter:
         -------
         coupling_expression : object of FEniCS class CustomExpression
             Reference to object of FEniCS class CustomExpression.
-
         """
         try:  # works with dolfin 1.6.0
-            coupling_expression = self._my_expression(
-                element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+            # element information must be provided, else DOLFIN assumes scalar function
+            coupling_expression = self._my_expression(element=self._function_space.ufl_element())
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
