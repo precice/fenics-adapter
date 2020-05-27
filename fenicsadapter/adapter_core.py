@@ -128,7 +128,7 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
     vertices_z = []
 
     if not issubclass(type(coupling_subdomain), SubDomain):
-        raise Exception("no correct coupling interface defined!")
+        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
     for v in dolfin.vertices(mesh_fenics):
         if coupling_subdomain.inside(v.point(), True):
@@ -141,7 +141,8 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
                 vertices_y.append(v.x(1))
                 vertices_z.append(0)
             else:
-                raise Exception("Dimensions do not match!")
+                raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
+                                .format(dimensions, fenics_dimensions))
 
     assert (n != 0), "No coupling boundary vertices detected"
 

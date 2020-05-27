@@ -156,7 +156,7 @@ class Adapter:
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, self._coupling_mesh_vertices,
                                            data)
 
-    def read(self):
+    def read_data(self):
         """
         Read data from preCICE. Data is generated in an appropriate form depending on the dimensions of the
         simulation (2D-3D Coupling, 2D-2D coupling or Scalar/Vector write function).
@@ -193,7 +193,7 @@ class Adapter:
 
         return read_data
 
-    def write(self, write_function):
+    def write_data(self, write_function):
         """
         Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
         Scalar/Vector write function) write_data is first converted into a format needed for preCICE.
@@ -310,14 +310,14 @@ class Adapter:
         """
 
         if self._interface.is_action_required(action_write_initial_data()):
-            self.write(write_function)
+            self.write_data(write_function)
             self._interface.mark_action_fulfilled(action_write_initial_data())
 
         self._interface.initialize_data()
 
         read_data = None
         if self._interface.is_read_data_available():
-            read_data = self.read()
+            read_data = self.read_data()
 
         return read_data
 
@@ -339,7 +339,7 @@ class Adapter:
 
         logger.debug("Store checkpoint")
         my_u = user_u.copy()
-        assert (my_u != user_u)  # wrt to pointer
+        assert (my_u != user_u)  # wrt to pointer, make sure the direct function reference is not stored
         self._checkpoint = SolverState(my_u, t, n)
         self._interface.mark_action_fulfilled(self.action_write_checkpoint())
 
