@@ -60,7 +60,7 @@ class TestWriteandReadData(TestCase):
         precice._write_data_id = self.fake_id
         precice._vertex_ids = np.arange(self.n_vertices)
 
-        precice.write(self.scalar_function)
+        precice.write_data(self.scalar_function)
 
         expected_data_id = self.fake_id
         expected_values = np.array([self.scalar_expr(x_right, y) for y in self.vertices_y])
@@ -92,7 +92,7 @@ class TestWriteandReadData(TestCase):
         precice._vertex_ids = np.arange(self.n_vertices)
         precice._fenics_dimensions = self.dimension
 
-        precice.write(self.vector_function)
+        precice.write_data(self.vector_function)
 
         expected_data_id = self.fake_id
         expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
@@ -133,7 +133,7 @@ class TestWriteandReadData(TestCase):
         precice._read_data_id = self.fake_id
         precice._vertex_ids = np.arange(self.n_vertices)
 
-        read_data = precice.read()
+        read_data = precice.read_data()
 
         expected_data_id = self.fake_id
         expected_ids = np.arange(self.n_vertices)
@@ -173,7 +173,7 @@ class TestWriteandReadData(TestCase):
         precice._vertex_ids = np.arange(self.n_vertices)
         precice._fenics_dimensions = self.dimension
 
-        read_data = precice.read()
+        read_data = precice.read_data()
 
         expected_data_id = self.fake_id
         expected_ids = np.arange(self.n_vertices)

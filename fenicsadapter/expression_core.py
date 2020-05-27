@@ -28,7 +28,7 @@ class CustomExpression(UserExpression):
         vals : double
             Point data to be used to update the Expression.
         coords_x : double
-            X coordinate of points of which point data is proviced.
+            X coordinate of points of which point data is provided.
         coords_y : double
             Y coordinate of points of which point data is provided.
         coords_z : double

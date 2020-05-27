@@ -63,9 +63,8 @@ class Adapter:
 
         self._dss = None  # measure for boundary integral
 
-        # Nodes with Dirichlet and Force-boundary
+        # Dirichlet boundary for FSI Simulations
         self._Dirichlet_Boundary = None  # stores a dirichlet boundary (if provided)
-        self._has_force_boundary = None  # stores whether force_boundary exists
 
         # Necessary flag in checkpoint storing function
         self._first_advance_done = False
@@ -73,7 +72,7 @@ class Adapter:
         # Flag to see if 2D - 3D coupling needs to be applied
         self._apply_2d_3d_coupling = False
 
-    def create_coupling_expression(self, data):
+    def create_coupling_expression(self, data=None):
         """
         Creates an object of class GeneralInterpolationExpression or ExactInterpolationExpression which does
         not carry any data. The adapter will hold this object till the coupling is on going.
@@ -95,7 +94,10 @@ class Adapter:
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
-        coupling_expression.update_boundary_data(data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
+        if not data:
+            data = np.zeros((self._n_vertices, self._fenics_dimensions))
+
+        self.update_coupling_expression(coupling_expression, data)
 
         return coupling_expression
 
@@ -114,7 +116,7 @@ class Adapter:
         """
         coupling_expression.update_boundary_data(data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
 
-    def create_point_sources(self, fixed_boundary, data):
+    def create_point_sources(self, fixed_boundary, data=None):
         """
         Create point sources with reference to fixed boundary in a FSI simulation.
 
@@ -133,9 +135,11 @@ class Adapter:
         y_forces : list
             List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
+        if not data:
+            data = np.zeros((self._n_vertices, self._fenics_dimensions))
+
         self._Dirichlet_Boundary = fixed_boundary
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, self._coupling_mesh_vertices,
-                                           data)
+        return self.update_point_sources(data)
 
     def update_point_sources(self, data):
         """
@@ -169,8 +173,6 @@ class Adapter:
         """
         assert (self._read_function_type in list(FunctionType))
 
-        read_data = None
-
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
@@ -181,10 +183,10 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
             elif self._apply_2d_3d_coupling:
                 precice_read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
+                read_data = np.zeros_like(precice_read_data)
                 read_data[:, 0] = precice_read_data[:, 0]
                 read_data[:, 1] = precice_read_data[:, 1]
-                # z is the dead direction so it is supposed that the data is close to zero
-                # np.testing.assert_allclose(precice_read_data[:, 2], np.zeros_like(precice_read_data[:, 2]))
+                # z is the dead direction so the data is not transferred to read_data array
                 assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
             else:
                 raise Exception("Dimensions do not match.")
