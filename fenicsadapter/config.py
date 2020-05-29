@@ -25,7 +25,7 @@ class Config:
     def __init__(self, adapter_config_filename):
 
         self._config_file_name = None
-        self._solver_name = None
+        self._participant_name = None
         self._coupling_mesh_name = None
         self._read_data_name = None
         self._write_data_name = None
@@ -46,7 +46,7 @@ class Config:
         read_file = open(path, "r")
         data = json.load(read_file)
         self._config_file_name = os.path.join(folder, data["config_file_name"])
-        self._solver_name = data["solver_name"]
+        self._participant_name = data["participant_name"]
         self._coupling_mesh_name = data["interface"]["coupling_mesh_name"]
         try:
             self._write_data_name = data["interface"]["write_data_name"]
@@ -63,8 +63,8 @@ class Config:
     def get_config_file_name(self):
         return self._config_file_name
 
-    def get_solver_name(self):
-        return self._solver_name
+    def get_participant_name(self):
+        return self._participant_name
 
     def get_coupling_mesh_name(self):
         return self._coupling_mesh_name

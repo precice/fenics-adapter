@@ -15,7 +15,7 @@ logger.setLevel(level=logging.INFO)
 class FunctionType(Enum):
     """
     Defines scalar- and vector-valued function.
-    Used in assertions to check if type of a FEniCS function type is wither SCALAR or VECTOR.
+    Used in assertions to check if a FEniCS function is scalar or vector.
     """
     SCALAR = 0  # scalar valued function
     VECTOR = 1  # vector valued function
@@ -147,9 +147,9 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
     assert (n != 0), "No coupling boundary vertices detected"
 
     if dimensions == 2:
-        return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1), n
+        return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
     elif dimensions == 3:
-        return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1), n
+        return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
 
 def are_connected_by_edge(v1, v2):
