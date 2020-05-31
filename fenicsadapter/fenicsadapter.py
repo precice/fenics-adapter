@@ -230,10 +230,14 @@ class Adapter:
         write_function : Object of class dolfin.functions.function.Function
             A FEniCS function consisting of the data which this participant will write to preCICE in every time step.
         """
-        write_function_type = determine_function_type(write_function)
+        w_func = write_function.copy()
+        # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
+        assert(w_func != write_function)
+
+        write_function_type = determine_function_type(w_func)
         assert (write_function_type in list(FunctionType))
 
-        write_data = convert_fenics_to_precice(write_function, self._coupling_mesh_vertices)
+        write_data = convert_fenics_to_precice(w_func, self._coupling_mesh_vertices)
 
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -369,7 +373,8 @@ class Adapter:
 
         logger.debug("Store checkpoint")
         my_u = user_u.copy()
-        assert (my_u != user_u)  # wrt to pointer, make sure the direct function reference is not stored
+        # making sure that the FEniCS function provided by user is not directly accessed by the Adapter
+        assert (my_u != user_u)
         self._checkpoint = SolverState(my_u, t, n)
         self._interface.mark_action_fulfilled(self.action_write_checkpoint())
 
@@ -415,7 +420,7 @@ class Adapter:
 
     def finalize(self):
         """
-        Completes the the coupling interface execution. To be called at the end of the simulation.
+        Completes the coupling interface execution. To be called at the end of the simulation.
 
         Notes
         -----
