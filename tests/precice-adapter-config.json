@@ -1,5 +1,5 @@
 {
-  "solver_name": "Test",
+  "participant_name": "Test",
   "config_file_name": "dummy.xml",
   "interface": {
       "coupling_mesh_name": "Dummy-Mesh",

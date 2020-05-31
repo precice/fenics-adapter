@@ -118,13 +118,11 @@ class TestExpressionHandling(TestCase):
 
     def test_update_expression(self):
         """
-
-        Returns
-        -------
-
+        Check analytical solution with evaluation of coupling expression on the same points
         """
         from precice import Interface
         import fenicsadapter
+        from fenicsadapter.expression_core import ExactInterpolationExpression, GeneralInterpolationExpression
 
         dummy_scalar_data = np.arange(self.n_vertices)
 
@@ -132,6 +130,10 @@ class TestExpressionHandling(TestCase):
         precice._interface = Interface(None, None, None, None)
         precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
         precice._function_space = self.scalar_V
+        precice._my_expression = ExactInterpolationExpression
+
+        # Still outputs a mocked form of precice._my_expression in spite of manual initialization above
+        print("my_expression initialized as: {}".format(precice._my_expression))
 
         scalar_coupling_expr = precice.create_coupling_expression(dummy_scalar_data)
 

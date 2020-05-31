@@ -19,7 +19,7 @@ logger.setLevel(level=logging.INFO)
 class Adapter:
     """
     This adapter class provides an interface to the preCICE coupling library for setting up a coupling case which has
-    FEniCS as a participant.
+    FEniCS as a participant for 2D problems.
     The user can create and manage a dolfin.UserExpression and/or dolfin.PointSource at the coupling boundary.
     Reading data from preCICE and writing data to preCICE is also managed via functions of this class.
     If the user wants to perform implicit coupling then a steering mechanism for checkpointing is also provided.
@@ -86,7 +86,8 @@ class Adapter:
         Parameters
         ----------
         data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of geometry.
+            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
+            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
             If no data is provided then a numpy array of shape (N, D) with zero values is used.
 
         Returns
@@ -123,7 +124,8 @@ class Adapter:
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
         data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of geometry.
+            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
+            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
         """
         coupling_expression.update_boundary_data(data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
 
@@ -137,7 +139,8 @@ class Adapter:
             SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
             is fixed at one end (fixed end of a flexible beam).
         data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of geometry.
+            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
+            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
             If no data is provided then a numpy array of shape (N, D) with zero values is used.
 
         Returns
@@ -165,7 +168,8 @@ class Adapter:
         Parameters
         ----------
         data : array_like
-            The coupling data. A numpy array of shape (N, D) where N = number of vertices and D = dimensions of geometry.
+            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
+            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
 
         Returns
         -------
@@ -274,6 +278,9 @@ class Adapter:
         dt : double
             Recommended time step value from preCICE.
         """
+
+        if not read_function:
+            raise Exception("Please provide a read_function. Explicit coupling is not yet supported for the FEniCS adapter.")
 
         self._fenics_dimensions = dimensions
 
@@ -393,6 +400,10 @@ class Adapter:
         dt : double
             Length of timestep used by the solver.
 
+        Notes
+        -----
+        Refer advance() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+
         Returns
         -------
         max_dt : double
@@ -405,6 +416,10 @@ class Adapter:
     def finalize(self):
         """
         Completes the the coupling interface execution. To be called at the end of the simulation.
+
+        Notes
+        -----
+        Refer finalize() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
         """
         self._interface.finalize()
 
@@ -412,8 +427,8 @@ class Adapter:
         """
         Returns
         -------
-        solver_name : string
-            Name of the solver.
+        participant_name : string
+            Name of the participant.
         """
         return self._config.get_participant_name()
 
