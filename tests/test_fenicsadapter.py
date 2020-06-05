@@ -140,7 +140,8 @@ class TestExpressionHandling(TestCase):
         precice._function_space = self.scalar_V
         precice._read_function_type = FunctionType.SCALAR
 
-        scalar_coupling_expr = precice.create_coupling_expression()
+        data = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+        scalar_coupling_expr = precice.create_coupling_expression(data)
 
         error_normalized = (self.scalar_function - scalar_coupling_expr) / self.scalar_function
         error_pointwise = project(abs(error_normalized), self.scalar_V)
@@ -168,10 +169,12 @@ class TestExpressionHandling(TestCase):
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
+        precice._fenics_dimensions = 2
         precice._function_space = self.vector_V
         precice._read_function_type = FunctionType.VECTOR
 
-        vector_coupling_expr = precice.create_coupling_expression()
+        data = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+        vector_coupling_expr = precice.create_coupling_expression(data)
 
         error_normalized = (self.vector_function - vector_coupling_expr) / self.vector_function
         error_pointwise = project(abs(error_normalized), self.vector_V)
