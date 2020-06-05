@@ -254,10 +254,13 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     x_forces = dict()  # dict of PointSources for Forces in x direction
     y_forces = dict()  # dict of PointSources for Forces in y direction
 
+    # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
+    n_vertices, dims = coupling_mesh_vertices.shape
+
+    assert (dims != 2, "This Adapter can create Point Sources only from 2D data, 3D data was supplied")
+
     vertices_x = coupling_mesh_vertices[:, 0]
     vertices_y = coupling_mesh_vertices[:, 1]
-
-    n_vertices, _ = coupling_mesh_vertices.shape
 
     for i in range(n_vertices):
         px, py = vertices_x[i], vertices_y[i]

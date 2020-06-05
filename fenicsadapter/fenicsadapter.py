@@ -106,9 +106,16 @@ class Adapter:
 
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
+        # Check read_function_type and then create Scalar or Vector data accordingly
+
         if data is None:
             # standard initialization with zero valued data
-            data = np.zeros((n_vertices, self._fenics_dimensions))
+            if self._read_function_type is FunctionType.SCALAR:
+                data = np.zeros(n_vertices)
+            elif self._read_function_type is FunctionType.VECTOR:
+                data = np.zeros((n_vertices, self._fenics_dimensions))
+            else:
+                raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
 
         self.update_coupling_expression(coupling_expression, data)
 
@@ -156,7 +163,13 @@ class Adapter:
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
         if data is None:
-            data = np.zeros((n_vertices, self._fenics_dimensions))
+            # standard initialization with zero valued data
+            if self._read_function_type is FunctionType.SCALAR:
+                data = np.zeros(n_vertices)
+            elif self._read_function_type is FunctionType.VECTOR:
+                data = np.zeros((n_vertices, self._fenics_dimensions))
+            else:
+                raise Exception("No valid read_function is provided in initialization. Cannot create point sources")
 
         self._Dirichlet_Boundary = fixed_boundary
         return self.update_point_sources(data)
@@ -312,6 +325,7 @@ class Adapter:
         n_vertices, _ = self._coupling_mesh_vertices.shape
         for i in range(n_vertices):
             id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
+
         edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(mesh, coupling_subdomain, id_mapping)
 
         # Set mesh edges in preCICE to allow nearest-projection mapping

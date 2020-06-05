@@ -12,16 +12,7 @@ class Config:
     Handles reading of config. parameters of the fenicsadapter based on JSON
     configuration file. Initializer calls read_json() method. Instance attributes
     can be accessed by provided getter functions.
-
-    :param adapter_config_filename: name of the adapter configuration file
-    :ivar _config_file_name: name of the preCICE configuration file
-    :ivar _solver_name : name of the solver
-    :ivar _coupling_mesh_name: name of mesh as defined in preCICE config
-    :ivar _read_data_name: name of read data as defined in preCICE config
-    :ivar _write_data_name: name of write data as defined in preCICE config
-    :ivar _interpolation_type: Type of interpolation strategy used to construct FEniCS Expression
     """
-
     def __init__(self, adapter_config_filename):
 
         self._config_file_name = None
@@ -34,12 +25,14 @@ class Config:
         self.read_json(adapter_config_filename)
 
     def read_json(self, adapter_config_filename):
-        """ Reads JSON adapter configuration file and saves the data to
+        """
+        Reads JSON adapter configuration file and saves the data to
         the respective instance attributes.
 
-        :var path: stores path to the JSON config file
-        :var data: data decoded from JSON files
-        :var read_file: stores file path
+        Parameters
+        ----------
+        adapter_config_filename : string
+            Name of the JSON configuration file
         """
         folder = os.path.dirname(os.path.join(os.getcwd(), os.path.dirname(sys.argv[0]), adapter_config_filename))
         path = os.path.join(folder, os.path.basename(adapter_config_filename))

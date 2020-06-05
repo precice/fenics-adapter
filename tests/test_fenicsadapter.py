@@ -93,18 +93,18 @@ class TestCheckpointing(TestCase):
         self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
 class TestExpressionHandling(TestCase):
     """
-    Test Expression creating mechanism based on data provided by user.
+    Test Expression creation and updating mechanism based on data provided by user.
     """
     dummy_config = "tests/precice-adapter-config.json"
 
     mesh = UnitSquareMesh(10, 10)
     dimension = 2
 
-    scalar_expr = Expression("x[0]*x[0] + x[1]*x[1]", degree=2)
-    scalar_V = FunctionSpace(mesh, "P", 2)
+    scalar_expr = Expression("x[0] + x[1]", degree=1)
+    scalar_V = FunctionSpace(mesh, "P", 1)
     scalar_function = interpolate(scalar_expr, scalar_V)
 
     vector_expr = Expression(("x[0] + x[1]*x[1]", "x[0] - x[1]*x[1]"), degree=2)
@@ -116,36 +116,62 @@ class TestExpressionHandling(TestCase):
     vertices_x = [x_right for _ in range(n_vertices)]
     vertices_y = np.linspace(y_bottom, y_top, n_vertices)
 
-    def test_update_expression(self):
+    def test_update_expression_scalar(self):
         """
-        Check analytical solution with evaluation of coupling expression on the same points
+        Check error between FEniCS interpolation and Adapter interpolation of a scalar FEniCS Expression
         """
         from precice import Interface
         import fenicsadapter
-        from fenicsadapter.expression_core import ExactInterpolationExpression, GeneralInterpolationExpression
+        from fenicsadapter.adapter_core import FunctionType
 
-        dummy_scalar_data = np.arange(self.n_vertices)
+        # Evaluate scalar_function at particular points
+        eval_scalar_data = np.zeros(self.n_vertices)
+        for i in range(self.n_vertices):
+            x = self.vertices_x[i]
+            y = self.vertices_y[i]
+            eval_scalar_data[i] = self.scalar_function(x, y)
+
+        print("Evaluated scalar data is: ")
+        print(eval_scalar_data)
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
         precice._function_space = self.scalar_V
-        precice._my_expression = ExactInterpolationExpression
+        precice._read_function_type = FunctionType.SCALAR
 
-        # Still outputs a mocked form of precice._my_expression in spite of manual initialization above
-        print("my_expression initialized as: {}".format(precice._my_expression))
-
-        scalar_coupling_expr = precice.create_coupling_expression(dummy_scalar_data)
+        scalar_coupling_expr = precice.create_coupling_expression()
 
         error_normalized = (self.scalar_function - scalar_coupling_expr) / self.scalar_function
         error_pointwise = project(abs(error_normalized), self.scalar_V)
         error_total = sqrt(assemble(inner(error_pointwise, error_pointwise) * dx))
 
-        assert (error_total < 10 ** -4)
+        print("Total error = {}".format(error_total))
 
+        assert (error_total < 1E-4)
+
+    def test_update_expression_vector(self):
+        """
+         Check error between FEniCS interpolation and Adapter interpolation of a vector FEniCS Expression
+         """
+        from precice import Interface
+        import fenicsadapter
+        from fenicsadapter.adapter_core import FunctionType
+
+        # Evaluate scalar_function at particular points
+        eval_vector_data = np.zeros((self.n_vertices, self.dimension))
+        for i in range(self.n_vertices):
+            x = self.vertices_x[i]
+            y = self.vertices_y[i]
+            eval_vector_data[i] = self.vector_function(x, y)
+
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._interface = Interface(None, None, None, None)
+        precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
         precice._function_space = self.vector_V
-        dummy_vector_data = np.arange(self.n_vertices * self.dimension).reshape(self.n_vertices, self.dimension)
-        vector_coupling_expr = precice.create_coupling_expression(dummy_vector_data)
+        precice._read_function_type = FunctionType.VECTOR
+
+        vector_coupling_expr = precice.create_coupling_expression()
 
         error_normalized = (self.vector_function - vector_coupling_expr) / self.vector_function
         error_pointwise = project(abs(error_normalized), self.vector_V)
