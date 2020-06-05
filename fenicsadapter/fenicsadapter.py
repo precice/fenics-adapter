@@ -106,8 +106,6 @@ class Adapter:
 
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
-        # Check read_function_type and then create Scalar or Vector data accordingly
-
         if data is None:
             # standard initialization with zero valued data
             if self._read_function_type is FunctionType.SCALAR:
@@ -208,8 +206,6 @@ class Adapter:
         read_data : array_like
             Numpy array containing the read data.
         """
-        assert (self._read_function_type in list(FunctionType))
-
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
@@ -273,7 +269,7 @@ class Adapter:
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
-    def initialize(self, coupling_subdomain, mesh, read_function, function_space, dimensions=2):
+    def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2):
         """
         Initializes the coupling interface and sets up the mesh in preCICE.
 
@@ -283,8 +279,6 @@ class Adapter:
             SubDomain of mesh which is the physical coupling boundary.
         mesh : Object of class dolfin.cpp.mesh.Mesh
             SubDomain of mesh of the complete region.
-        read_function : Object of class dolfin.functions.function.Function
-            FEniCS function related to the quantity to be read by FEniCS during each coupling iteration.
         function_space : Object of class dolfin.functions.functionspace.FunctionSpace
             Function space on which the finite element formulation of the problem lives.
         dimensions : int
@@ -295,10 +289,6 @@ class Adapter:
         dt : double
             Recommended time step value from preCICE.
         """
-
-        if not read_function:
-            raise Exception("Please provide a read_function. Explicit coupling is not yet supported for the FEniCS adapter.")
-
         self._fenics_dimensions = dimensions
 
         if dimensions != self._interface.get_dimensions():
@@ -335,7 +325,7 @@ class Adapter:
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
 
         # Set read functionality parameters
-        self._read_function_type = determine_function_type(read_function)
+        self._read_function_type = determine_function_type(function_space)
         self._function_space = function_space
 
         return self._interface.initialize()

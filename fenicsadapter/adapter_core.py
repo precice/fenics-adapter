@@ -4,6 +4,7 @@ This module consists of helper functions used in the Adapter class. Names of the
 
 import dolfin
 from dolfin import SubDomain, Point, PointSource
+from fenics import FunctionSpace, VectorFunctionSpace, Function
 import numpy as np
 from enum import Enum
 import logging
@@ -21,13 +22,13 @@ class FunctionType(Enum):
     VECTOR = 1  # vector valued function
 
 
-def determine_function_type(input_function):
+def determine_function_type(input_obj):
     """
     Determines if the function is scalar- or vector-valued based on rank evaluation.
 
     Parameters
     ----------
-    input_function : FEniCS function
+    input_obj :
         A FEniCS function.
 
     Returns
@@ -35,12 +36,20 @@ def determine_function_type(input_function):
     tag : bool
         0 if input_function is SCALAR and 1 if input_function is VECTOR.
     """
-    if input_function.value_rank() == 0:  # scalar-valued functions have rank 0 is FEniCS
-        return FunctionType.SCALAR
-    elif input_function.value_rank() == 1:  # vector-valued functions have rank 1 in FEniCS
-        return FunctionType.VECTOR
+    if type(input_obj) == FunctionSpace:  # scalar-valued functions have rank 0 is FEniCS
+        if input_obj.num_sub_spaces() == 0:
+            return FunctionType.SCALAR
+        elif input_obj.num_sub_spaces() == 2:
+            return FunctionType.VECTOR
+    elif type(input_obj) == Function:
+        if input_obj.value_rank() == 0:
+            return FunctionType.SCALAR
+        elif input_obj.value_rank() == 1:
+            return FunctionType.VECTOR
+        else:
+            raise Exception("Error determining type of given dolfin Function")
     else:
-        raise Exception("Error determining function type")
+        raise Exception("Error determining type of given dolfin FunctionSpace")
 
 
 def filter_point_sources(point_sources, filter_out):
