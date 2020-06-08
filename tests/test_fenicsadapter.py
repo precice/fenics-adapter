@@ -5,11 +5,9 @@ from unittest import TestCase
 import tests.MockedPrecice
 import numpy as np
 from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, inner, assemble, dx,\
-    project, sqrt
+    project, sqrt, ds, SubDomain, near
 
 fake_dolfin = MagicMock()
-x_left, x_right = 0, 1
-y_bottom, y_top = 0, 1
 
 
 class MockedArray:
@@ -113,8 +111,13 @@ class TestExpressionHandling(TestCase):
 
     n_vertices = 11
     fake_id = 15
-    vertices_x = [x_right for _ in range(n_vertices)]
-    vertices_y = np.linspace(y_bottom, y_top, n_vertices)
+    vertices_x = [1 for _ in range(n_vertices)]
+    vertices_y = np.linspace(0, 1, n_vertices)
+    vertex_ids = np.arange(n_vertices)
+
+    class Right(SubDomain):
+        def inside(self, x, on_boundary):
+            return near(x[0], 1.0)
 
     def test_update_expression_scalar(self):
         """
@@ -122,25 +125,20 @@ class TestExpressionHandling(TestCase):
         """
         from precice import Interface
         import fenicsadapter
-        from fenicsadapter.adapter_core import FunctionType
 
-        # Evaluate scalar_function at particular points
-        eval_scalar_data = np.zeros(self.n_vertices)
-        for i in range(self.n_vertices):
-            x = self.vertices_x[i]
-            y = self.vertices_y[i]
-            eval_scalar_data[i] = self.scalar_function(x, y)
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Interface.get_mesh_id = MagicMock()
+        Interface.set_mesh_edge = MagicMock()
+        Interface.initialize = MagicMock()
 
-        print("Evaluated scalar data is: ")
-        print(eval_scalar_data)
+        right_boundary = self.Right()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
-        precice._function_space = self.scalar_V
-        precice._read_function_type = FunctionType.SCALAR
-
+        precice.initialize(right_boundary, self.mesh, self.scalar_V)
         data = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+
         scalar_coupling_expr = precice.create_coupling_expression(data)
 
         error_normalized = (self.scalar_function - scalar_coupling_expr) / self.scalar_function
@@ -157,27 +155,24 @@ class TestExpressionHandling(TestCase):
          """
         from precice import Interface
         import fenicsadapter
-        from fenicsadapter.adapter_core import FunctionType
 
-        # Evaluate scalar_function at particular points
-        eval_vector_data = np.zeros((self.n_vertices, self.dimension))
-        for i in range(self.n_vertices):
-            x = self.vertices_x[i]
-            y = self.vertices_y[i]
-            eval_vector_data[i] = self.vector_function(x, y)
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Interface.get_mesh_id = MagicMock()
+        Interface.set_mesh_edge = MagicMock()
+        Interface.initialize = MagicMock()
+
+        right_boundary = self.Right()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
-        precice._fenics_dimensions = 2
-        precice._function_space = self.vector_V
-        precice._read_function_type = FunctionType.VECTOR
-
+        precice.initialize(right_boundary, self.mesh, self.vector_V)
         data = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+
         vector_coupling_expr = precice.create_coupling_expression(data)
 
         error_normalized = (self.vector_function - vector_coupling_expr) / self.vector_function
         error_pointwise = project(abs(error_normalized), self.vector_V)
-        error_total = sqrt(assemble(inner(error_pointwise, error_pointwise) * dx))
+        error_total = sqrt(assemble(inner(error_pointwise, error_pointwise) * ds))
 
         assert (error_total < 10 ** 4)
