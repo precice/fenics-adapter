@@ -53,6 +53,6 @@ matrix:
       - pip3 install scipy
 
 script: 
-  - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='pyprecice', version='0.1.0')" > precice/setup.py
+  - mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='pyprecice', version='2.0.2.1')" > precice/setup.py
   - $PY -m pip install ./precice/
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then  $PY setup.py test ; else $PY setup.py test -s tests.test_fenicsadapter ; fi
