@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 from unittest import TestCase
 import tests.MockedPrecice
 import numpy as np
-from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, inner, assemble, dx,\
-    project, sqrt, ds, SubDomain, near
+from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
+    SubDomain, near
 
 fake_dolfin = MagicMock()
 
@@ -115,13 +115,18 @@ class TestExpressionHandling(TestCase):
     vertices_y = np.linspace(0, 1, n_vertices)
     vertex_ids = np.arange(n_vertices)
 
+    n_samples = 1000
+    samplepts_x = [1 for _ in range(n_samples)]
+    samplepts_y = np.linspace(0, 1, n_samples)
+
     class Right(SubDomain):
         def inside(self, x, on_boundary):
             return near(x[0], 1.0)
 
     def test_update_expression_scalar(self):
         """
-        Check error between FEniCS interpolation and Adapter interpolation of a scalar FEniCS Expression
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
         """
         from precice import Interface
         import fenicsadapter
@@ -141,18 +146,16 @@ class TestExpressionHandling(TestCase):
 
         scalar_coupling_expr = precice.create_coupling_expression(data)
 
-        error_normalized = (self.scalar_function - scalar_coupling_expr) / self.scalar_function
-        error_pointwise = project(abs(error_normalized), self.scalar_V)
-        error_total = sqrt(assemble(inner(error_pointwise, error_pointwise) * dx))
+        expr_samples = np.array([scalar_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+        func_samples = np.array([self.scalar_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
 
-        print("Total error = {}".format(error_total))
-
-        assert (error_total < 1E-4)
+        assert (np.allclose(expr_samples, func_samples, 1E-10))
 
     def test_update_expression_vector(self):
         """
-         Check error between FEniCS interpolation and Adapter interpolation of a vector FEniCS Expression
-         """
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
+        """
         from precice import Interface
         import fenicsadapter
 
@@ -171,8 +174,7 @@ class TestExpressionHandling(TestCase):
 
         vector_coupling_expr = precice.create_coupling_expression(data)
 
-        error_normalized = (self.vector_function - vector_coupling_expr) / self.vector_function
-        error_pointwise = project(abs(error_normalized), self.vector_V)
-        error_total = sqrt(assemble(inner(error_pointwise, error_pointwise) * ds))
+        expr_samples = np.array([vector_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+        func_samples = np.array([self.vector_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
 
-        assert (error_total < 10 ** 4)
+        assert (np.allclose(expr_samples, func_samples, 1E-10))
