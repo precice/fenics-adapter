@@ -1,2 +1,1 @@
-from .fenicsadapter import Adapter, GeneralInterpolationExpression, ExactInterpolationExpression
-
+from .fenicsadapter import Adapter
