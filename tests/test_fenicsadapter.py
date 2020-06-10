@@ -1,17 +1,20 @@
 # comments on test layout: https://docs.pytest.org/en/latest/goodpractices.html
-# run with python -m unittest tests.test_fenicsadapter
 
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
-import warnings
 import tests.MockedPrecice
+import numpy as np
+from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
+    SubDomain, near
 
 fake_dolfin = MagicMock()
+
 
 class MockedArray:
     """
     mock of dolfin.Function
     """
+
     def __init__(self):
         self.value = MagicMock()
 
@@ -35,10 +38,8 @@ class MockedArray:
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
     """
-    Test suite to check whether checkpointing is done correctly, if the advance function is called. We use the mock
-    pattern, for mocking the desired state of precice.
+    Test suite to check if Checkpointing functionality of the Adapter is working.
     """
-
     dt = 1  # timestep size
     n = 0  # current iteration count
     t = 0  # current time
@@ -49,172 +50,131 @@ class TestCheckpointing(TestCase):
     t_cp_mocked = t  # time for the checkpoint
     n_cp_mocked = n  # iteration count for the checkpoint
     dummy_config = "tests/precice-adapter-config.json"
+
     # todo if we support multirate, we should use the lines below for checkpointing
     # for the general case the checkpoint u_cp (and t_cp and n_cp) can differ from u_n and u_np1
     # t_cp_mocked = MagicMock()  # time for the checkpoint
     # n_cp_mocked = nMagicMock()  # iteration count for the checkpoint
 
-    def setUp(self):
-        warnings.simplefilter('ignore', category=ImportWarning)
-
-    def mock_the_adapter(self, precice):
-        from fenicsadapter.fenicsadapter import FunctionType, SolverState
+    def test_checkpoint_mechanism(self):
         """
-        We partially mock the fenicsadapter, since proper configuration and initialization of the adapter is not
-        necessary to test checkpointing.
-        :param precice: the fenicsadapter
-        """
-        # define functions that are called by advance, but not necessary for the test
-        precice._extract_coupling_boundary_coordinates = MagicMock(return_value=(None, None))
-        precice._convert_fenics_to_precice = MagicMock()
-        precice._coupling_bc_expression = MagicMock()
-        precice._coupling_bc_expression.update_boundary_data = MagicMock()
-        # initialize checkpointing manually
-        mocked_state = SolverState(self.u_cp_mocked, self.t_cp_mocked, self.n_cp_mocked)
-        precice._checkpoint.write(mocked_state)
-        precice._write_function_type = FunctionType.SCALAR
-        precice._read_function_type = FunctionType.SCALAR
-
-    def test_advance_success(self):
-        """
-        Test correct checkpointing, if advance succeeded
+        Test correct checkpoint storing
         """
         import fenicsadapter
-        from precice import Interface, action_read_iteration_checkpoint, \
-            action_write_iteration_checkpoint
+        from precice import Interface, action_write_iteration_checkpoint
 
         def is_action_required_behavior(py_action):
-            if py_action == action_read_iteration_checkpoint():
-                return False
-            elif py_action == action_write_iteration_checkpoint():
+            if py_action == action_write_iteration_checkpoint():
                 return True
+            else:
+                return False
 
+        Interface.initialize = MagicMock(return_value=self.dt)
         Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
-        Interface.configure = MagicMock()
         Interface.get_dimensions = MagicMock()
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock()
-        Interface.write_block_scalar_data = MagicMock()
-        Interface.read_block_scalar_data = MagicMock()
+        Interface.mark_action_fulfilled = MagicMock()
         Interface.is_time_window_complete = MagicMock(return_value=True)
-        Interface.advance = MagicMock(return_value=self.dt)
-        Interface.mark_action_fulfilled = MagicMock()
+        Interface.advance = MagicMock()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
-        self.mock_the_adapter(precice)
 
-        value_u_np1 = self.u_np1_mocked.value
+        precice.store_checkpoint(self.u_n_mocked, self.t, self.n)
 
-        precice_step_complete = True
-        # time and iteration count should be increased by a successful call of advance
-        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
-        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
-                         desired_output)
-
-        # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
-        self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
-
-        # we expect that the value of the checkpoint has been updated to value_u_np1
-        self.assertEqual(precice._checkpoint.get_state().u.value, value_u_np1)
-
-    def test_advance_rollback(self):
-        """
-        Test correct checkpointing, if advance did not succeed and we have to rollback
-        """
-        import fenicsadapter
-        from precice import Interface, action_write_iteration_checkpoint, \
-            action_read_iteration_checkpoint
-
-        def is_action_required_behavior(py_action):
-            if py_action == action_read_iteration_checkpoint():
-                return True
-            elif py_action == action_write_iteration_checkpoint():
-                return False
-
-        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
-        Interface.configure = MagicMock()
-        Interface.get_dimensions = MagicMock()
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
-        Interface.write_block_scalar_data = MagicMock()
-        Interface.read_block_scalar_data = MagicMock()
+        # Replicating control flow where implicit iteration has not converged and solver state needs to be restored
+        # to a checkpoint
+        precice.advance(self.dt)
         Interface.is_time_window_complete = MagicMock(return_value=False)
-        Interface.advance = MagicMock(return_value=self.dt)
-        Interface.mark_action_fulfilled = MagicMock()
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
-        self.mock_the_adapter(precice)
-
-        precice_step_complete = False
-        # time and iteration count should be rolled back by a not successful call of advance
-        desired_output = (self.t_cp_mocked, self.n_cp_mocked, precice_step_complete, self.dt)
-        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
-                         desired_output)
-
-        # we expect that self.u_n_mocked.value has been rolled back to self.u_cp_mocked.value
-        self.assertEqual(self.u_n_mocked.value, self.u_cp_mocked.value)
-
-        # we expect that precice._checkpoint.get_state().u has not been updated
-        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
-
-    def test_advance_continue(self):
-        """
-        Test correct checkpointing, if advance did succeed, but we do not write a checkpoint (for example, if we do subcycling)
-        :param fake_PySolverInterface_PySolverInterface: mock instance of PySolverInterface.PySolverInterface
-        """
-        import fenicsadapter
-        from precice import Interface, action_read_iteration_checkpoint, \
-            action_write_iteration_checkpoint
-
-        def is_action_required_behavior(py_action):
-            if py_action == action_read_iteration_checkpoint():
-                return False
-            elif py_action == action_write_iteration_checkpoint():
-                return False
-
-        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
-        Interface.configure = MagicMock()
-        Interface.get_dimensions = MagicMock()
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
-        Interface.is_time_window_complete = MagicMock(return_value=False)
-        Interface.write_block_scalar_data = MagicMock()
-        Interface.read_block_scalar_data = MagicMock()
-        Interface.advance = MagicMock(return_value=self.dt)
-        Interface.mark_action_fulfilled = MagicMock()
-
-        precice = fenicsadapter.Adapter(self.dummy_config)
-        self.mock_the_adapter(precice)
-
-        precice_step_complete = False
-        # time and iteration count should be rolled back by a not successful call of advance
-        desired_output = (self.t + self.dt, self.n + 1, precice_step_complete, self.dt)
-        self.assertEqual(precice.advance(None, self.u_np1_mocked, self.u_n_mocked, self.t, self.dt, self.n),
-                         desired_output)
-
-        # we expect that self.u_n_mocked.value has been updated to self.u_np1_mocked.value
-        self.assertEqual(self.u_n_mocked.value, self.u_np1_mocked.value)
-
-        # we expect that the value of the checkpoint has not been updated
-        self.assertEqual(precice._checkpoint.get_state().u.value, self.u_cp_mocked.value)
+        # Check if the checkpoint is stored correctly in the adapter
+        self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
-class TestIsCouplingOngoing(TestCase):
-
+@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
+class TestExpressionHandling(TestCase):
+    """
+    Test Expression creation and updating mechanism based on data provided by user.
+    """
     dummy_config = "tests/precice-adapter-config.json"
 
-    def setUp(self):
-        warnings.simplefilter('ignore', category=ImportWarning)
+    mesh = UnitSquareMesh(10, 10)
+    dimension = 2
 
-    def test_isCouplingOngoing(self):
-        import fenicsadapter
+    scalar_expr = Expression("x[0] + x[1]", degree=1)
+    scalar_V = FunctionSpace(mesh, "P", 1)
+    scalar_function = interpolate(scalar_expr, scalar_V)
+
+    vector_expr = Expression(("x[0] + x[1]*x[1]", "x[0] - x[1]*x[1]"), degree=2)
+    vector_V = VectorFunctionSpace(mesh, "P", 2)
+    vector_function = interpolate(vector_expr, vector_V)
+
+    n_vertices = 11
+    fake_id = 15
+    vertices_x = [1 for _ in range(n_vertices)]
+    vertices_y = np.linspace(0, 1, n_vertices)
+    vertex_ids = np.arange(n_vertices)
+
+    n_samples = 1000
+    samplepts_x = [1 for _ in range(n_samples)]
+    samplepts_y = np.linspace(0, 1, n_samples)
+
+    class Right(SubDomain):
+        def inside(self, x, on_boundary):
+            return near(x[0], 1.0)
+
+    def test_update_expression_scalar(self):
+        """
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
+        """
         from precice import Interface
-        Interface.is_coupling_ongoing = MagicMock(return_value=True)
-        Interface.configure = MagicMock()
-        Interface.get_dimensions = MagicMock()
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        import fenicsadapter
 
-        self.assertEqual(precice.is_coupling_ongoing(), True)
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Interface.get_mesh_id = MagicMock()
+        Interface.set_mesh_edge = MagicMock()
+        Interface.initialize = MagicMock()
+
+        right_boundary = self.Right()
+
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._interface = Interface(None, None, None, None)
+        precice.initialize(right_boundary, self.mesh, self.scalar_V)
+        data = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+
+        scalar_coupling_expr = precice.create_coupling_expression(data)
+
+        expr_samples = np.array([scalar_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+        func_samples = np.array([self.scalar_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+
+        assert (np.allclose(expr_samples, func_samples, 1E-10))
+
+    def test_update_expression_vector(self):
+        """
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
+        """
+        from precice import Interface
+        import fenicsadapter
+
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Interface.get_mesh_id = MagicMock()
+        Interface.set_mesh_edge = MagicMock()
+        Interface.initialize = MagicMock()
+
+        right_boundary = self.Right()
+
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._interface = Interface(None, None, None, None)
+        precice.initialize(right_boundary, self.mesh, self.vector_V)
+        data = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+
+        vector_coupling_expr = precice.create_coupling_expression(data)
+
+        expr_samples = np.array([vector_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+        func_samples = np.array([self.vector_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+
+        assert (np.allclose(expr_samples, func_samples, 1E-10))
