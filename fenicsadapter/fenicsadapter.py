@@ -380,7 +380,7 @@ class Adapter:
         # making sure that the FEniCS function provided by user is not directly accessed by the Adapter
         assert (my_u != user_u)
         self._checkpoint = SolverState(my_u, t, n)
-        self._interface.mark_action_fulfilled(self.action_write_checkpoint())
+        self._interface.mark_action_fulfilled(self.action_write_iteration_checkpoint())
 
     def retrieve_checkpoint(self):
         """
@@ -397,7 +397,7 @@ class Adapter:
         """
         assert (not self.is_time_window_complete())
         logger.debug("Restore solver state")
-        self._interface.mark_action_fulfilled(self.action_read_checkpoint())
+        self._interface.mark_action_fulfilled(self.action_read_iteration_checkpoint())
         return self._checkpoint.get_state()
 
     def advance(self, dt):
@@ -491,7 +491,7 @@ class Adapter:
         """
         return self._interface.is_action_required(action)
 
-    def action_write_checkpoint(self):
+    def action_write_iteration_checkpoint(self):
         """
         Get name of action to convey to preCICE that a checkpoint has been written.
 
@@ -506,7 +506,7 @@ class Adapter:
         """
         return action_write_iteration_checkpoint()
 
-    def action_read_checkpoint(self):
+    def action_read_iteration_checkpoint(self):
         """
         Get name of action to convey to preCICE that a checkpoint has been read and the state of the system has been
         restored to that checkpoint.
