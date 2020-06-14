@@ -135,7 +135,6 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
     n : int
         Number of vertices on the coupling interface.
     """
-    n = 0
     fenics_vertices = []
     vertices_x = []
     vertices_y = []
@@ -146,7 +145,6 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
 
     for v in dolfin.vertices(mesh_fenics):
         if coupling_subdomain.inside(v.point(), True):
-            n += 1
             fenics_vertices.append(v)
             vertices_x.append(v.x(0))
             if dimensions == 2:
@@ -157,8 +155,6 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
             else:
                 raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
                                 .format(dimensions, fenics_dimensions))
-
-    # assert (n != 0), "No coupling boundary vertices detected" -> Is actually allowed for parallel runs
 
     if dimensions == 2:
         return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
