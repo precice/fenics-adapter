@@ -268,8 +268,6 @@ class Adapter:
         write_function_type = determine_function_type(w_func)
         assert (write_function_type in list(FunctionType))
 
-        write_data = convert_fenics_to_precice(w_func, self._coupling_mesh_vertices)
-
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 

@@ -52,6 +52,7 @@ def determine_gradient(V_g, u, flux):
 
     a = inner(w, v) * dx
     L = inner(grad(u), v) * dx
+
     print('{rank} of {size}:starts solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
     solve(a == L, flux)
     print('{rank} of {size}:done solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
@@ -148,17 +149,6 @@ print('{rank} of {size}: exit initialize'.format(rank=MPI.rank(MPI.comm_world), 
 boundary_marker = False
 coupling_expression = None
 
-print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
-    print('{rank} of {size}: evaluates u_D_function at {vertex}'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world), vertex=(vertex.x(0), vertex.x(1))))
-    u_D_function(vertex.x(0), vertex.x(1))
-print('{rank} of {size}:stupid loop done'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
-    print('{rank} of {size}: evaluates f_N_function at {vertex}'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world), vertex=(vertex.x(0), vertex.x(1))))
-    f_N_function(vertex.x(0), vertex.x(1))
-print('{rank} of {size}:stupid loop done'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-
 print('{rank} of {size}: calls initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 # Initialize data to non-standard initial values according to which problem is being solved
 if problem is ProblemType.DIRICHLET:
@@ -198,14 +188,6 @@ if problem is ProblemType.NEUMANN:
         # TODO: fix the problem here
         raise Exception("Boundary markers are not implemented yet")
         # return dot(coupling_bc_expression, v) * dolfin.dss(boundary_marker)
-
-"""
-print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
-    print('{rank} of {size}: evaluates coupling_expression at {vertex}'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world), vertex=(vertex.x(0), vertex.x(1))))
-    coupling_expression(vertex.x(0), vertex.x(1))
-print('{rank} of {size}:stupid loop done'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-"""
 
 a, L = lhs(F), rhs(F)
 
@@ -281,7 +263,7 @@ while precice.is_coupling_ongoing():
     elif problem is ProblemType.NEUMANN:
         # Neumann problem reads flux and writes temperature on boundary to Dirichlet problem
         print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-        for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
+        for vertex in fenics.vertices(mesh):
             u_np1(vertex.x(0), vertex.x(1))
         precice.write_data(u_np1)
 
