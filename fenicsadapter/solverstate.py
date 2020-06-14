@@ -2,9 +2,15 @@ class SolverState:
     def __init__(self, u, t, n):
         """
         Solver state consists of a value u, associated time t and the timestep n
-        :param u: value
-        :param t: time
-        :param n: timestep
+
+        Parameters
+        ----------
+        u : Object of class dolfin.functions.function.Function
+            FEniCS function related to the field during each coupling iteration.
+        t : double
+            Time stamp.
+        n : int
+            Iteration number.
         """
         self.u = u
         self.t = t
@@ -12,8 +18,16 @@ class SolverState:
 
     def get_state(self):
         """
-        returns the state variables value u, associated time t and timestep n
-        :return:
+        Returns the state variables value u, associated time t and timestep n
+
+        Returns
+        -------
+        u : Object of class dolfin.functions.function.Function
+            A copy of FEniCS function related to the field during each coupling iteration.
+        t : double
+            Time stamp.
+        n : int
+            Iteration number.
         """
         return self.u.copy(), self.t, self.n
 

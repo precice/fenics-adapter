@@ -1,10 +1,10 @@
 """
-This module consists of all core functionality of the FEniCS adapter .
-The module also consists of additional helper functions for the user
+This module consists of helper functions used in the Adapter class. Names of the functions are self explanatory
 """
 
 import dolfin
 from dolfin import SubDomain, Point, PointSource
+from fenics import FunctionSpace, VectorFunctionSpace, Function
 import numpy as np
 from enum import Enum
 import logging
@@ -14,33 +14,61 @@ logger.setLevel(level=logging.INFO)
 
 
 class FunctionType(Enum):
-    """ Defines scalar- and vector-valued function """
+    """
+    Defines scalar- and vector-valued function.
+    Used in assertions to check if a FEniCS function is scalar or vector.
+    """
     SCALAR = 0  # scalar valued function
     VECTOR = 1  # vector valued function
 
 
-def determine_function_type(input_function):
-    """ Determines if the function is scalar- or vector-valued based on
-    rank evaluation.
+def determine_function_type(input_obj):
     """
-    if input_function.value_rank() == 0:  # scalar-valued functions have rank 0 is FEniCS
-        return FunctionType.SCALAR
-    elif input_function.value_rank() == 1:  # vector-valued functions have rank 1 in FEniCS
-        return FunctionType.VECTOR
+    Determines if the function is scalar- or vector-valued based on rank evaluation.
+
+    Parameters
+    ----------
+    input_obj :
+        A FEniCS function.
+
+    Returns
+    -------
+    tag : bool
+        0 if input_function is SCALAR and 1 if input_function is VECTOR.
+    """
+    if type(input_obj) == FunctionSpace:  # scalar-valued functions have rank 0 is FEniCS
+        if input_obj.num_sub_spaces() == 0:
+            return FunctionType.SCALAR
+        elif input_obj.num_sub_spaces() == 2:
+            return FunctionType.VECTOR
+    elif type(input_obj) == Function:
+        if input_obj.value_rank() == 0:
+            return FunctionType.SCALAR
+        elif input_obj.value_rank() == 1:
+            return FunctionType.VECTOR
+        else:
+            raise Exception("Error determining type of given dolfin Function")
     else:
-        raise Exception("Error determining function type")
+        raise Exception("Error determining type of given dolfin FunctionSpace")
 
 
 def filter_point_sources(point_sources, filter_out):
     """
     Filter dictionary of PointSources (point_sources) with respect to a given domain (filter_out). If a PointSource
     is applied at a point inside of the given domain (filter_out), this PointSource will be removed from dictionary.
-    :param point_sources: dictionary containing coordinates and associated PointSources;
-      {(point_x, point_y): PointSource, ...}
-    :param filter_out: defines the domain where PointSources should be filtered out
-    :return: A dictionary with the filtered PointSources
-    """
 
+    Parameters
+    ----------
+    point_sources : python dictionary
+        Dictionary containing coordinates and associated PointSources {(point_x, point_y): PointSource, ...}.
+    filter_out: FEniCS domain
+        Defines the domain where PointSources should be filtered out.
+
+    Returns
+    -------
+    filtered_point_sources : python dictionary
+        A dictionary with the filtered PointSources.
+    """
     filtered_point_sources = dict()
 
     for point in point_sources.keys():
@@ -54,12 +82,21 @@ def filter_point_sources(point_sources, filter_out):
 
 
 def convert_fenics_to_precice(data, sample_points):
-    """Converts FEniCS data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
+    """
+    Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
-    :param data: FEniCS boundary function
-    :param sample_points: Vertices
-    :raise Exception: if type of data cannot be handled
-    :return: array of FEniCS function values at each point on the boundary
+    Parameters
+    ----------
+    data : FEniCS function
+        A FEniCS function referring to a physical variable in the problem.
+    sample_points : array_like
+        The coordinates of the vertices in a numpy array [N x D] where
+        N = number of vertices and D = dimensions of geometry.
+
+    Returns
+    -------
+    array : array_like
+        Array of FEniCS function values at each point on the boundary.
     """
     print("convert_fenics_to_precice")
     if type(data) is dolfin.Function:
@@ -76,18 +113,38 @@ def convert_fenics_to_precice(data, sample_points):
 
 
 def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimensions, dimensions):
-    """Extracts vertices which lie on the boundary.
-    :return: stack of vertices
+    """
+    Extracts vertices from a given mesh which lie on the  given coupling domain.
+
+    Parameters
+    ----------
+    mesh_fenics : FEniCS Mesh
+        Mesh of complete domain.
+    coupling_subdomain : FeniCS Domain
+        Subdomain consists of only the coupling interface region.
+    fenics_dimensions : int
+        Dimensions of FEniCS case setup.
+    dimensions : int
+        Dimensions of coupling case setup.
+
+    Returns
+    -------
+    fenics_vertices : numpy array
+        Array consisting of all vertices lying on the coupling interface.
+    coordinates : array_like
+        The coordinates of the vertices in a numpy array [N x D] where
+        N = number of vertices and D = dimensions of geometry.
+    n : int
+        Number of vertices on the coupling interface.
     """
     n = 0
     fenics_vertices = []
     vertices_x = []
     vertices_y = []
-    if dimensions == 3:
-        vertices_z = []
+    vertices_z = []
 
     if not issubclass(type(coupling_subdomain), SubDomain):
-        raise Exception("no correct coupling interface defined!")
+        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
     for v in dolfin.vertices(mesh_fenics):
         if coupling_subdomain.inside(v.point(), True):
@@ -100,18 +157,33 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
                 vertices_y.append(v.x(1))
                 vertices_z.append(0)
             else:
-                raise Exception("Dimensions do not match!")
+                raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
+                                .format(dimensions, fenics_dimensions))
 
     # assert (n != 0), "No coupling boundary vertices detected" -> Is actually allowed for parallel runs
 
     if dimensions == 2:
-        return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1), n
+        return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
     elif dimensions == 3:
-        return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1), n
+        return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
 
 def are_connected_by_edge(v1, v2):
-    """Returns true if both vertices are connected by an edge. """
+    """
+    Checks if vertices are connected by an edge.
+
+    Parameters
+    ----------
+    v1 : dolfin.vertex
+        Vertex 1 of the edge
+    v2 : dolfin.vertex
+        Vertex 2 of the edge
+
+    Returns
+    -------
+    tag : bool
+        True is v1 and v2 are connected by edge and False if not connected
+    """
     for edge1 in dolfin.edges(v1):
         for edge2 in dolfin.edges(v2):
             if edge1.index() == edge2.index():  # Vertices are connected by edge
@@ -120,13 +192,25 @@ def are_connected_by_edge(v1, v2):
 
 
 def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
-    """Extracts edges of mesh which lie on the boundary.
-    :return: two arrays of vertex IDs. Array 1 consists of first points of all edges
-    and Array 2 consists of second points of all edges
-
-    NOTE: Edge calculation is only relevant in 2D cases.
     """
+    Extracts edges of mesh which lie on the coupling boundary.
 
+    Parameters
+    ----------
+    mesh_fenics : FEniCS Mesh
+        FEniCS mesh of the complete region.
+    coupling_subdomain : FEniCS Domain
+        FEniCS domain of the coupling interface region.
+    id_mapping : python dictionary
+        Dictionary mapping preCICE vertex IDs to FEniCS global vertex IDs.
+
+    Returns
+    -------
+    vertices1_ids : numpy array
+        Array of first vertex of each edge.
+    vertices2_ids : numpy array
+        Array of second vertex of each edge.
+    """
     vertices = dict()
 
     for v1 in dolfin.vertices(mesh_fenics):
@@ -155,10 +239,29 @@ def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
 
 def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data):
     """
-    Creates 2 dicts of PointSources that can be applied to the assembled system.
-    Applies filter_point_source to avoid forces being applied to already existing Dirichlet BC, since this would
-    lead to an overdetermined system that cannot be solved.
-    :return: Returns lists of PointSources
+    Creating two dicts of PointSources that can be applied to the assembled system. Appling filter_point_source to
+    avoid forces being applied to already existing Dirichlet BC, since this would lead to an overdetermined system
+    that cannot be solved.
+
+    Parameters
+    ----------
+    fixed_boundary : FEniCS domain
+        FEniCS domain consisting of a fixed boundary condition. For example in FSI cases usually the solid body is fixed
+        at one end.
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_mesh_vertices : numpy.ndarray
+        The coordinates of the vertices on the coupling interface. Coordinates of vertices are stored in a
+        numpy array [N x D] where N = number of vertices and D = dimensions of geometry
+    data : PointSource
+        FEniCS PointSource data carrying forces
+
+    Returns
+    -------
+    x_forces : list
+        Dictionary carrying X component of forces with reference to each point on the coupling interface.
+    y_forces : list
+        Dictionary carrying Y component of forces with reference to each point on the coupling interface.
     """
     # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
     # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
@@ -166,10 +269,13 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     x_forces = dict()  # dict of PointSources for Forces in x direction
     y_forces = dict()  # dict of PointSources for Forces in y direction
 
+    # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
+    n_vertices, dims = coupling_mesh_vertices.shape
+
+    assert (dims != 2, "This Adapter can create Point Sources only from 2D data, 3D data was supplied")
+
     vertices_x = coupling_mesh_vertices[:, 0]
     vertices_y = coupling_mesh_vertices[:, 1]
-
-    n_vertices, _ = coupling_mesh_vertices.shape
 
     for i in range(n_vertices):
         px, py = vertices_x[i], vertices_y[i]
@@ -183,19 +289,3 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
 
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
-
-def get_coupling_boundary_coordinates(coupling_vertices, fenics_dimensions, dimensions):
-    """Extracts the coordinates of vertices that lay on the boundary. 3D
-    case currently handled as 2D.
-
-    :return: x and y cooridinates.
-    """
-    vertices_x = coupling_vertices[:, 0]
-    vertices_y = coupling_vertices[:, 1]
-    if dimensions == 3:
-        vertices_z = coupling_vertices[2, :]
-
-    if dimensions == 2 or (fenics_dimensions == 2 and dimensions == 3):
-        return vertices_x, vertices_y
-    else:
-        raise Exception("Error: These Dimensions are not supported by the adapter.")

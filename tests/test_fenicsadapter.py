@@ -1,10 +1,11 @@
 # comments on test layout: https://docs.pytest.org/en/latest/goodpractices.html
-# run with python -m unittest tests.test_fenicsadapter
 
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
-import warnings
 import tests.MockedPrecice
+import numpy as np
+from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
+    SubDomain, near
 
 fake_dolfin = MagicMock()
 
@@ -37,10 +38,8 @@ class MockedArray:
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
     """
-    Test suite to check whether checkpointing is done correctly, if the advance function is called. We use the mock
-    pattern, for mocking the desired state of precice.
+    Test suite to check if Checkpointing functionality of the Adapter is working.
     """
-
     dt = 1  # timestep size
     n = 0  # current iteration count
     t = 0  # current time
@@ -83,7 +82,8 @@ class TestCheckpointing(TestCase):
 
         precice.store_checkpoint(self.u_n_mocked, self.t, self.n)
 
-        # Replicating valid control work flow
+        # Replicating control flow where implicit iteration has not converged and solver state needs to be restored
+        # to a checkpoint
         precice.advance(self.dt)
         Interface.is_time_window_complete = MagicMock(return_value=False)
 
@@ -91,23 +91,90 @@ class TestCheckpointing(TestCase):
         self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
-class TestIsCouplingOngoing(TestCase):
+@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
+class TestExpressionHandling(TestCase):
+    """
+    Test Expression creation and updating mechanism based on data provided by user.
+    """
     dummy_config = "tests/precice-adapter-config.json"
 
-    def test_isCouplingOngoing(self):
-        """
-        A unit test to check if the isCouplingOngoing boolean is correctly communicated to the Interface
-        :return:
-        """
-        import fenicsadapter
-        from precice import Interface
+    mesh = UnitSquareMesh(10, 10)
+    dimension = 2
 
-        Interface.is_coupling_ongoing = MagicMock(return_value=True)
+    scalar_expr = Expression("x[0] + x[1]", degree=1)
+    scalar_V = FunctionSpace(mesh, "P", 1)
+    scalar_function = interpolate(scalar_expr, scalar_V)
+
+    vector_expr = Expression(("x[0] + x[1]*x[1]", "x[0] - x[1]*x[1]"), degree=2)
+    vector_V = VectorFunctionSpace(mesh, "P", 2)
+    vector_function = interpolate(vector_expr, vector_V)
+
+    n_vertices = 11
+    fake_id = 15
+    vertices_x = [1 for _ in range(n_vertices)]
+    vertices_y = np.linspace(0, 1, n_vertices)
+    vertex_ids = np.arange(n_vertices)
+
+    n_samples = 1000
+    samplepts_x = [1 for _ in range(n_samples)]
+    samplepts_y = np.linspace(0, 1, n_samples)
+
+    class Right(SubDomain):
+        def inside(self, x, on_boundary):
+            return near(x[0], 1.0)
+
+    def test_update_expression_scalar(self):
+        """
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
+        """
+        from precice import Interface
+        import fenicsadapter
+
         Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
         Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
+        Interface.set_mesh_edge = MagicMock()
+        Interface.initialize = MagicMock()
+
+        right_boundary = self.Right()
 
         precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._interface = Interface(None, None, None, None)
+        precice.initialize(right_boundary, self.mesh, self.scalar_V)
+        data = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
 
-        self.assertEqual(precice.is_coupling_ongoing(), True)
+        scalar_coupling_expr = precice.create_coupling_expression(data)
+
+        expr_samples = np.array([scalar_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+        func_samples = np.array([self.scalar_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+
+        assert (np.allclose(expr_samples, func_samples, 1E-10))
+
+    def test_update_expression_vector(self):
+        """
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
+        """
+        from precice import Interface
+        import fenicsadapter
+
+        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Interface.get_mesh_id = MagicMock()
+        Interface.set_mesh_edge = MagicMock()
+        Interface.initialize = MagicMock()
+
+        right_boundary = self.Right()
+
+        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice._interface = Interface(None, None, None, None)
+        precice.initialize(right_boundary, self.mesh, self.vector_V)
+        data = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+
+        vector_coupling_expr = precice.create_coupling_expression(data)
+
+        expr_samples = np.array([vector_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+        func_samples = np.array([self.vector_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
+
+        assert (np.allclose(expr_samples, func_samples, 1E-10))

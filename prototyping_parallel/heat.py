@@ -38,6 +38,7 @@ from problem_setup import get_geometry, get_problem_setup
 import dolfin
 from dolfin import FacetNormal, dot
 
+
 def determine_gradient(V_g, u, flux):
     """
     compute flux following http://hplgit.github.io/INF5620/doc/pub/fenics_tutorial1.1/tu2.html#tut-poisson-gradu
@@ -139,9 +140,9 @@ precice = Adapter(adapter_config_filename)
 print('{rank} of {size}: calls initialize'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 # Initialize adapter according to which problem is being solved
 if problem is ProblemType.DIRICHLET:
-    precice_dt = precice.initialize(coupling_boundary, mesh, u_D_function, V)
+    precice_dt = precice.initialize(coupling_boundary, mesh, V)
 elif problem is ProblemType.NEUMANN:
-    precice_dt = precice.initialize(coupling_boundary, mesh, f_N_function, V_g)
+    precice_dt = precice.initialize(coupling_boundary, mesh, V_g)
 print('{rank} of {size}: exit initialize'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 
 boundary_marker = False
@@ -225,10 +226,10 @@ else:
     mesh_rank.set_all(MPI.rank(MPI.comm_world) + 0)
 mesh_rank.rename("myRank", "")
 
-temperature_out = File("out/%s.pvd" % precice.get_solver_name())
-ref_out = File("out/ref%s.pvd" % precice.get_solver_name())
-error_out = File("out/error%s.pvd" % precice.get_solver_name())
-ranks = File("out/ranks%s.pvd.pvd" % precice.get_solver_name())
+temperature_out = File("out/%s.pvd" % precice.get_participant_name())
+ref_out = File("out/ref%s.pvd" % precice.get_participant_name())
+error_out = File("out/error%s.pvd" % precice.get_participant_name())
+ranks = File("out/ranks%s.pvd.pvd" % precice.get_participant_name())
 
 # output solution and reference solution at t=0, n=0
 n = 0
@@ -249,11 +250,11 @@ flux.rename("Flux", "")
 
 while precice.is_coupling_ongoing():
 
-    if precice.is_action_required(precice.action_write_checkpoint()):  # write checkpoint
+    if precice.is_action_required(precice.action_write_iteration_checkpoint()):  # write checkpoint
         precice.store_checkpoint(u_n, t, n)
 
     # read data from preCICE and get a new coupling expression
-    read_data = precice.read()
+    read_data = precice.read_data()
 
     # Update the coupling expression with the new read data
     # Boundary conditions are modified implicitly via this coupling_expression
@@ -275,20 +276,20 @@ while precice.is_coupling_ongoing():
         for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
             flux(vertex.x(0), vertex.x(1))
         print('{rank}:starts writing'.format(rank=MPI.rank(MPI.comm_world)))
-        precice.write(flux.copy())
+        precice.write_data(flux)
         print('{rank}:done writing'.format(rank=MPI.rank(MPI.comm_world)))
     elif problem is ProblemType.NEUMANN:
         # Neumann problem reads flux and writes temperature on boundary to Dirichlet problem
         print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
         for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
             u_np1(vertex.x(0), vertex.x(1))
-        precice.write(u_np1.copy())
+        precice.write_data(u_np1)
 
     # Call to advance coupling, also returns the optimum time step value
     precice_dt = precice.advance(dt(0))
 
     # Either revert to old step if timestep has not converged or move to next timestep
-    if precice.is_action_required(precice.action_read_checkpoint()):  # roll back to checkpoint
+    if precice.is_action_required(precice.action_read_iteration_checkpoint()):  # roll back to checkpoint
         u_cp, t_cp, n_cp = precice.retrieve_checkpoint()
         u_n.assign(u_cp)
         t = t_cp

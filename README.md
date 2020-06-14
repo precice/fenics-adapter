@@ -21,10 +21,10 @@ This adapter was developed by [Benjamin Rüth](https://www5.in.tum.de/wiki/index
 
 Make sure to install 
 
-* preCICE (https://github.com/precice/precice/wiki)
+* [preCICE](https://github.com/precice/precice/wiki)
 * python3 (this adapter **only supports python3**)
-* the python language bindings for preCICE (https://github.com/precice/precice/blob/develop/src/precice/bindings/python/README.md)
-* fenics (https://fenicsproject.org/)
+* [the python language bindings for preCICE](https://github.com/precice/python-bindings)
+* [FEniCS](https://fenicsproject.org/)
 * and scipy (`pip3 install scipy`)
 
 ### Build and install the adapter
@@ -36,6 +36,11 @@ Run ``pip3 install --user .`` from your shell.
 As a first test, try to import the adapter via `python3 -c "import fenicsadapter"`.
 
 You can run the other tests via `python3 setup.py test`.
+
+Single tests can be also be run. For example the test `test_vector_write` in the file `test_write_read.py` can be run as follows:
+```
+python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
+```
 
 ## Use the adapter
 
