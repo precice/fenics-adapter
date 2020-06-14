@@ -1,29 +1,25 @@
 """
-Minimum working example of problem
+Minimum working example of problem of code hanging when evaluating a FEniCS Function inside an external adapter module
+Run: mpirun -np N python3 exec.py
+N = number of processes
 """
-from fenics import Expression, UnitSquareMesh, FunctionSpace, interpolate, Function
+from fenics import UnitSquareMesh, FunctionSpace, Function
 from fenics import MPI
 from adapter import Adapter
+import numpy as np
 
 mesh = UnitSquareMesh(10, 10)
+n_vertices = 11
+vertices_x = [0.5 for _ in range(n_vertices)]
+vertices_y = np.linspace(0, 1, n_vertices)
+points = np.stack([vertices_x, vertices_y], axis=1)
 
-expr = Expression("x[0] + x[1]", degree=1)
 V = FunctionSpace(mesh, "P", 1)
-function = interpolate(expr, V)
 
-function2 = Function(V)
-function2.rename("Function", "")
+function = Function(V)
+function.rename("Function", "")
 
 adapter = Adapter()
 
-# adapter.set_func(function)
-# print("{rank} of {size}:Setting function in Adapter".format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-#
-# updated_func = adapter.get_func()
-# print("{rank} of {size}:Getting function from Adapter".format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-
-adapter.set_func(function2)
-print("{rank} of {size}:Setting function2 in Adapter".format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-
-updated_func = adapter.get_func()
-print("{rank} of {size}:Getting function2 from Adapter".format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+adapter.eval_func(function, points)
+print("Process {rank}:Evaluated in Adapter".format(rank=MPI.rank(MPI.comm_world)))
