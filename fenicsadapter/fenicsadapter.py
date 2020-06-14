@@ -225,8 +225,7 @@ class Adapter:
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
         if n_vertices == 0:
-            assert (MPI.size(
-                MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
+            assert (MPI.size(MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
 
         if n_vertices > 0:
             if self._read_function_type is FunctionType.SCALAR:
@@ -273,9 +272,10 @@ class Adapter:
 
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
-        print('{rank}: has n_vertices={n}'.format(rank=MPI.rank(MPI.comm_world), n=n_vertices))
+        if n_vertices == 0:
+            assert (MPI.size(MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
+
         if n_vertices > 0:
-            print('{rank}: alive'.format(rank=MPI.rank(MPI.comm_world)))
             write_function_type = determine_function_type(write_function)
             assert (write_function_type in list(FunctionType))
             print('{rank}: alive'.format(rank=MPI.rank(MPI.comm_world)))
@@ -296,6 +296,8 @@ class Adapter:
                     raise Exception("Dimensions of FEniCS problem and coupling configuration do not match.")
             else:
                 raise Exception("write_function provided is neither VECTOR nor SCALAR type")
+        else:
+            print("Process {rank}: No data written as no coupling boundary detected".format(rank=MPI.rank(MPI.comm_world)))
 
     def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2):
         """
@@ -338,6 +340,8 @@ class Adapter:
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
             self._config.get_coupling_mesh_name()), self._coupling_mesh_vertices)
 
+        print("Rank {} self._coupling_mesh_vertices = {}".format(MPI.rank(MPI.comm_world), self._coupling_mesh_vertices))
+
         # Define a mapping between coupling vertices and their IDs in preCICE
         id_mapping = dict()
         n_vertices, _ = self._coupling_mesh_vertices.shape
@@ -375,20 +379,20 @@ class Adapter:
         self._non_standard_initialization = True
 
         if self._interface.is_action_required(action_write_initial_data()):
-            print('{rank} of {size}: is_action_required(action_write_initial_data())'.format(
-                rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+            # print('{rank} of {size}: is_action_required(action_write_initial_data())'.format(
+            #     rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
             self.write_data(write_function)
             self._interface.mark_action_fulfilled(action_write_initial_data())
 
-        print('{rank} of {size}: initialize_data()'.format(
-            rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+        # print('{rank} of {size}: initialize_data()'.format(
+        #     rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
         self._interface.initialize_data()
 
         read_data = None
 
         if self._interface.is_read_data_available():
-            print('{rank} of {size}: is_read_data_available()'.format(
-                rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+            # print('{rank} of {size}: is_read_data_available()'.format(
+            #     rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
             read_data = self.read_data()
 
         return read_data

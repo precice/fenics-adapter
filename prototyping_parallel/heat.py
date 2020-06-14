@@ -46,16 +46,16 @@ def determine_gradient(V_g, u, flux):
     :param u: solution where gradient is to be determined
     :return:
     """
-    print('{rank} of {size}:determine gradient'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+    # print('{rank} of {size}:determine gradient'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
     w = TrialFunction(V_g)
     v = TestFunction(V_g)
 
     a = inner(w, v) * dx
     L = inner(grad(u), v) * dx
 
-    print('{rank} of {size}:starts solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+    # print('{rank} of {size}:starts solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
     solve(a == L, flux)
-    print('{rank} of {size}:done solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+    # print('{rank} of {size}:done solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 
 
 parser = argparse.ArgumentParser(description='Solving heat equation for simple or complex interface case')
@@ -110,7 +110,7 @@ vertices = []
 for v in fenics.vertices(mesh):
     vertices.append((v.x(0), v.x(1)))
 
-print("Rank {} vertices: {}".format(MPI.rank(MPI.comm_world), vertices))
+# print("Rank {} vertices: {}".format(MPI.rank(MPI.comm_world), vertices))
 
 adapter_config_filename = None
 if problem is ProblemType.DIRICHLET:
@@ -138,7 +138,7 @@ u_n.rename("Temperature", "")
 # Adapter definition and initialization
 precice = Adapter(adapter_config_filename)
 
-print('{rank} of {size}: calls initialize'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+# print('{rank} of {size}: calls initialize'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 # Initialize adapter according to which problem is being solved
 if problem is ProblemType.DIRICHLET:
     precice_dt = precice.initialize(coupling_boundary, mesh, V)
@@ -149,7 +149,7 @@ print('{rank} of {size}: exit initialize'.format(rank=MPI.rank(MPI.comm_world), 
 boundary_marker = False
 coupling_expression = None
 
-print('{rank} of {size}: calls initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+# print('{rank} of {size}: calls initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 # Initialize data to non-standard initial values according to which problem is being solved
 if problem is ProblemType.DIRICHLET:
     initial_data = precice.initialize_data(f_N_function)
@@ -215,7 +215,7 @@ ranks = File("out/ranks%s.pvd.pvd" % precice.get_participant_name())
 
 # output solution and reference solution at t=0, n=0
 n = 0
-print('output u^%d and u_ref^%d' % (n, n))
+# print('output u^%d and u_ref^%d' % (n, n))
 temperature_out << u_n
 ref_out << u_ref
 ranks << mesh_rank
@@ -246,7 +246,7 @@ while precice.is_coupling_ongoing():
     dt.assign(np.min([fenics_dt, precice_dt]))
 
     # Compute solution u^n+1, use bcs u_D^n+1, u^n and coupling bcs
-    print('{rank} of {size}:starts solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+    # print('{rank} of {size}:starts solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
     solve(a == L, u_np1, bcs)
     print('{rank}:done solving'.format(rank=MPI.rank(MPI.comm_world)))
 
@@ -257,18 +257,16 @@ while precice.is_coupling_ongoing():
         print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
         for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
             flux(vertex.x(0), vertex.x(1))
-        print('{rank}:starts writing'.format(rank=MPI.rank(MPI.comm_world)))
         precice.write_data(flux)
-        print('{rank}:done writing'.format(rank=MPI.rank(MPI.comm_world)))
     elif problem is ProblemType.NEUMANN:
         # Neumann problem reads flux and writes temperature on boundary to Dirichlet problem
-        print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-        for vertex in fenics.vertices(mesh):
-            u_np1(vertex.x(0), vertex.x(1))
         precice.write_data(u_np1)
+
+    print('{rank}:done writing'.format(rank=MPI.rank(MPI.comm_world)))
 
     # Call to advance coupling, also returns the optimum time step value
     precice_dt = precice.advance(dt(0))
+    print('{rank}:Advance coupling done'.format(rank=MPI.rank(MPI.comm_world)))
 
     # Either revert to old step if timestep has not converged or move to next timestep
     if precice.is_action_required(precice.action_read_iteration_checkpoint()):  # roll back to checkpoint
@@ -284,11 +282,11 @@ while precice.is_coupling_ongoing():
     if precice.is_time_window_complete():
         u_ref = interpolate(u_D, V)
         u_ref.rename("reference", " ")
-        print('Computing error for: n = %d, t = %.2f' % (n, t))
+        # print('Computing error for: n = %d, t = %.2f' % (n, t))
         error, error_pointwise = compute_errors(u_n, u_ref, V, total_error_tol=error_tol)
-        print('n = %d, t = %.2f: L2 error on domain = %.3g' % (n, t, error))
+        # print('n = %d, t = %.2f: L2 error on domain = %.3g' % (n, t, error))
         # output solution and reference solution at t_n+1
-        print('output u^%d and u_ref^%d' % (n, n))
+        # print('output u^%d and u_ref^%d' % (n, n))
         temperature_out << u_n
         ref_out << u_ref
         error_out << error_pointwise

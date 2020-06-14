@@ -81,7 +81,7 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-def convert_fenics_to_precice(data, sample_points):
+def convert_fenics_to_precice(function, sample_points):
     """
     Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -98,18 +98,16 @@ def convert_fenics_to_precice(data, sample_points):
     array : array_like
         Array of FEniCS function values at each point on the boundary.
     """
-    print("convert_fenics_to_precice")
-    if type(data) is dolfin.Function:
-        print("more")
+    print("Entering convert_fenics_to_precice")
+    if type(function) is dolfin.Function:
         x_all, y_all = sample_points[:, 0], sample_points[:, 1]
-        print(x_all)
-        print(y_all)
         for x, y in zip(x_all, y_all):
-            print((x,y))
-            print(data(x,y))
-        return np.array([data(x, y) for x, y in zip(x_all, y_all)])
+            print((x, y))
+            print((function(x, y)))
+
+        return np.array([function(x, y) for x, y in zip(x_all, y_all)])
     else:
-        raise Exception("Cannot handle data type %s" % type(data))
+        raise Exception("Cannot handle data type {}".format(type(function)))
 
 
 def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimensions, dimensions):
