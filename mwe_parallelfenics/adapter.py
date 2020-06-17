@@ -5,6 +5,7 @@ import dolfin
 import numpy as np
 from fenics import MPI
 
+
 class Adapter:
     def __init__(self):
         self._function = None
@@ -18,14 +19,15 @@ class Adapter:
                 vertices_y.append(v.x(1))
         return np.stack([vertices_x, vertices_y], axis=1)
 
-    def eval_func(self, function, points):
-        if type(function) is dolfin.Function:
-            n_vertices, _ = points.shape
-            if n_vertices > 0:
-                x_all, y_all = points[:, 0], points[:, 1]
-                for x, y in zip(x_all, y_all):
-                    print("(x,y) = ({},{})".format(x, y))
-                    print("Process {}: function evaluation at ({},{}) = {}".format(MPI.rank(MPI.comm_world), x, y, function(x, y)))
-            else:
-                print("Process {} does not have any vertices".format(MPI.rank(MPI.comm_world)))
+    def eval_func(self, function, func_space, points):
+        n_vertices, _ = points.shape
+        if n_vertices > 0:
+            coupling_indices = []
+            for point in points:
+                coupling_indices.append(np.where(func_space.tabulate_dof_coordinates() == point))
+
+            if type(function) is dolfin.Function:
+                func_vals = function.vector().get_local()
+                for n in range(n_vertices):
+                    print("function eval at ({},{}) = {}".format(points[n, 0], points[n, 1], func_vals[n]))
 

@@ -3,7 +3,6 @@ Minimum working example of problem of code hanging when evaluating a FEniCS Func
 Run: mpirun -np N python3 exec.py
 N = number of processes
 """
-import fenics
 from fenics import UnitSquareMesh, FunctionSpace, Function, SubDomain, near
 from fenics import MPI
 from adapter import Adapter
@@ -22,12 +21,10 @@ function.rename("Function", "")
 adapter = Adapter()
 domain = Right()
 
+
 points = adapter.set_vertices(mesh, domain)
 print("Process {rank}: Set boundary vertices".format(rank=MPI.rank(MPI.comm_world)))
 print("({}): Points = {}".format(MPI.rank(MPI.comm_world), points))
 
-# for vertex in fenics.vertices(mesh):
-#     function(vertex.x(0), vertex.x(1))
-
-adapter.eval_func(function, points)
+adapter.eval_func(function, V, points)
 print("Process {rank}: Function evaluation inside adapter is done".format(rank=MPI.rank(MPI.comm_world)))
