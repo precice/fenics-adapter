@@ -10,7 +10,7 @@ from adapter import Adapter
 
 class Right(SubDomain):
     def inside(self, x, on_boundary):
-        return near(x[0], 1.0)
+        return near(x[0], 1.0, 1E-10)
 
 
 mesh = UnitSquareMesh(10, 10)
@@ -21,10 +21,8 @@ function.rename("Function", "")
 adapter = Adapter()
 domain = Right()
 
-
 points = adapter.set_vertices(mesh, domain)
-print("Process {rank}: Set boundary vertices".format(rank=MPI.rank(MPI.comm_world)))
-print("({}): Points = {}".format(MPI.rank(MPI.comm_world), points))
+print("Process {}: Boundary Points = {}".format(MPI.rank(MPI.comm_world), points))
 
 adapter.eval_func(function, V, points)
 print("Process {rank}: Function evaluation inside adapter is done".format(rank=MPI.rank(MPI.comm_world)))

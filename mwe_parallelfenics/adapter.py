@@ -23,11 +23,23 @@ class Adapter:
         n_vertices, _ = points.shape
         if n_vertices > 0:
             coupling_indices = []
-            for point in points:
-                coupling_indices.append(np.where(func_space.tabulate_dof_coordinates() == point))
+            ordered_coords = func_space.tabulate_dof_coordinates()
+            total_pts, _ = ordered_coords.shape
+            print("Process {}: ordered_coords = {}".format(MPI.rank(MPI.comm_world), ordered_coords))
+
+            for i in range(total_pts):
+                for n in range(n_vertices):
+                    if ordered_coords[i, 0] == points[n, 0] and ordered_coords[i, 1] == points[n, 1]:
+                        coupling_indices.append(i)
+
+            coupling_indices = np.array(coupling_indices)
+            print("Process {}: coupling_indices = {}".format(MPI.rank(MPI.comm_world), coupling_indices))
 
             if type(function) is dolfin.Function:
                 func_vals = function.vector().get_local()
+                vals = []
                 for n in range(n_vertices):
-                    print("function eval at ({},{}) = {}".format(points[n, 0], points[n, 1], func_vals[n]))
+                    vals.append(func_vals[coupling_indices[n]])
+        else:
+            print("Process {}: No function evaluation done as the rank has no boundary points".format(MPI.rank(MPI.comm_world)))
 
