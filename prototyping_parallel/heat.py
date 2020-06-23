@@ -80,7 +80,7 @@ error_tol = None
 # for all scenarios, we assume precice_dt == .1
 if subcycle is Subcycling.NONE and not args.arbitrary_coupling_interface:
     fenics_dt = .1  # time step size
-    error_tol = 10 ** -7  # Error is bounded by coupling accuracy. In theory we would obtain the analytical solution.
+    error_tol = 10 ** -6  # Error is bounded by coupling accuracy. In theory we would obtain the analytical solution.
     print("Subcycling = NO, Arbitrary coupling interface = NO, error tolerance = {}".format(error_tol))
 elif subcycle is Subcycling.NONE and args.arbitrary_coupling_interface:
     fenics_dt = .1  # time step size
@@ -129,8 +129,6 @@ u_D_function = interpolate(u_D, V)
 f_N = Expression(("2 * gamma*t*x[0] + 2 * (1-gamma)*x[0]", "2 * alpha*x[1]"), degree=1, gamma=gamma, alpha=alpha, t=0)
 f_N_function = interpolate(f_N, V_g)
 
-bcs = [DirichletBC(V, u_D, remaining_boundary)]
-
 # Define initial value
 u_n = interpolate(u_D, V)
 u_n.rename("Temperature", "")
@@ -169,11 +167,12 @@ v = TestFunction(V)
 f = Expression('beta + gamma * x[0] * x[0] - 2 * gamma * t - 2 * (1-gamma) - 2 * alpha', degree=2, alpha=alpha, beta=beta, gamma=gamma, t=0)
 F = u * v / dt * dx + dot(grad(u), grad(v)) * dx - (u_n / dt + f) * v * dx
 
+bcs = [DirichletBC(V, u_D, remaining_boundary)]
+
 # Set boundary conditions at coupling interface once wrt to the coupling expression
 if problem is ProblemType.DIRICHLET:
     # modify Dirichlet boundary condition on coupling interface
-    bcs = [DirichletBC(V, coupling_expression, coupling_boundary),
-           DirichletBC(V, u_D, remaining_boundary)]
+    bcs.append(DirichletBC(V, coupling_expression, coupling_boundary))
 if problem is ProblemType.NEUMANN:
     # modify Neumann boundary condition on coupling interface, modify weak form correspondingly
     if not boundary_marker:  # there is only 1 Neumann-BC which is at the coupling boundary -> integration over whole boundary
@@ -284,7 +283,7 @@ while precice.is_coupling_ongoing():
         u_ref.rename("reference", " ")
         # print('Computing error for: n = %d, t = %.2f' % (n, t))
         error, error_pointwise = compute_errors(u_n, u_ref, V, total_error_tol=error_tol)
-        # print('n = %d, t = %.2f: L2 error on domain = %.3g' % (n, t, error))
+        print('n = %d, t = %.2f: L2 error on domain = %.3g' % (n, t, error))
         # output solution and reference solution at t_n+1
         # print('output u^%d and u_ref^%d' % (n, n))
         temperature_out << u_n
