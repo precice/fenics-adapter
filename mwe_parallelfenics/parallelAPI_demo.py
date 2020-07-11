@@ -11,15 +11,19 @@ rank = MPI.rank(MPI.comm_world)
 parameters["ghost_mode"] = "shared_vertex"
 
 n_intervals = 4
-print("Mesh is defined to be 1D having {} vertices in unit interval [0.0, 0.1]".format(n_intervals+1))
+
+if rank == 0:
+    print("1D Mesh consisting of {} vertices in unit interval [0.0, 0.1]".format(n_intervals + 1))
 
 mesh = UnitIntervalMesh(n_intervals)
 V = FunctionSpace(mesh, "P", 1)
 dofmap = V.dofmap()
 
-print("DOFs in FEniCS are the global indices of points")
 first_dof, last_dof = dofmap.ownership_range()
 print("Rank {} : call dofmap.ownership_range() gives first and last dof as ({}, {})".format(rank, first_dof, last_dof))
+
+dof_coords = V.tabulate_dof_coordinates()
+print("Rank {} : dof coordinates = {}".format(rank, dof_coords))
 
 unowned = dofmap.local_to_global_unowned()
 print("Rank {}: local to global unowned: {}".format(rank, unowned))
@@ -45,7 +49,9 @@ print("Rank {}: vertex to dof map = {}".format(rank, v2d))
 print("Rank {}: dof to vertex map = {}".format(rank, d2v))
 
 function = project(Expression("x[0]", degree=1), V)
-print("Rank {}: Projecting function f = x[0] (x-coordinate value) on function space".format(rank))
+if rank == 0:
+    print("---------- Introducing function f = x ----------")
+    print("Projecting function f = x[0] (x-coordinate value) on function space".format(rank))
 
 vec = function.vector().get_local()
 
