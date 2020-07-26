@@ -3,7 +3,7 @@ This module consists of helper functions used in the Adapter class. Names of the
 """
 
 import dolfin
-from dolfin import SubDomain, Point, PointSource
+from dolfin import SubDomain, Point, PointSource, vertices
 from fenics import FunctionSpace, VectorFunctionSpace, Function
 import numpy as np
 from enum import Enum
@@ -87,7 +87,7 @@ def convert_fenics_to_precice(function, sample_points):
 
     Parameters
     ----------
-    data : FEniCS function
+    function : FEniCS function
         A FEniCS function referring to a physical variable in the problem.
     sample_points : array_like
         The coordinates of the vertices in a numpy array [N x D] where
@@ -110,7 +110,7 @@ def convert_fenics_to_precice(function, sample_points):
         raise Exception("Cannot handle data type {}".format(type(function)))
 
 
-def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimensions, dimensions):
+def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_dimensions, dimensions):
     """
     Extracts vertices from a given mesh which lie on the  given coupling domain.
 
@@ -143,7 +143,11 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
-    for v in dolfin.vertices(mesh_fenics):
+    # Refer: https://github.com/precice/precice/wiki/Dealing-with-distributed-meshes#use-a-single-mesh-and-communicate-ghost-vertices-inside-adapter
+    # preCICE only sees non-duplicate global vertices
+    vertices = function_space.dofmap().tabulate_dof_coordinates()
+
+    for v in vertices:
         if coupling_subdomain.inside(v.point(), True):
             fenics_vertices.append(v)
             vertices_x.append(v.x(0))
@@ -283,3 +287,38 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
 
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
+
+def determine_shared_nodes(function_space, mesh):
+    # Identify global vertices owned and shared by this participant
+    dofmap = function_space.dofmap()
+    shared_nodes_map = dofmap.shared_nodes()
+    ltog_unowned = dofmap.local_to_global_unowned()
+
+    global_indices = []
+    for vertex in vertices(mesh):
+        global_indices.append(dofmap.local_to_global_index(vertex.index()))
+
+    owned_global_ids = np.array(global_indices)
+
+    # Remove unowned global ids from total global ids list
+    for id in ltog_unowned:
+        owned_global_ids = owned_global_ids[owned_global_ids != id]
+
+    # Identify local ids of vertices which are not owned by this rank
+    unowned_local_ids = []
+    id_count = 0
+    for id in global_indices:
+        for unowned_id in ltog_unowned:
+            if id == unowned_id:
+                unowned_local_ids.append(id_count)
+
+    unowned_local_ids = np.array(unowned_local_ids)
+
+    return owned_global_ids, unowned_local_ids
+
+
+def modify_coupling_boundary_data(function_space, coupling_vertices, data):
+    dofmap = function_space.dofmap()
+    shared_nodes_map = dofmap.shared_nodes()
+
+    # MPI Communication

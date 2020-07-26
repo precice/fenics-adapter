@@ -8,7 +8,8 @@ import logging
 import precice
 from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
-    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
+    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, determine_shared_nodes, \
+    modify_coupling_boundary_data
 from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import MPI
@@ -81,6 +82,10 @@ class Adapter:
         self._apply_2d_3d_coupling = False
         self._non_standard_initialization = False
 
+        # Necessary data for parallel computations
+        self._owned_global_ids = None
+        self._unowned_local_ids = None
+
     def create_coupling_expression(self, data=None):
         """
         Creates a FEniCS Expression in the form of an object of class GeneralInterpolationExpression or
@@ -145,7 +150,9 @@ class Adapter:
             The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
             for scalar valued data D = 1 and for vector valued data D = dimension of problem.
         """
-        coupling_expression.update_boundary_data(data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
+        # Add communicated data to data read from preCICE
+        full_data = modify_coupling_boundary_data(self._function_space, self._coupling_mesh_vertices, data)
+        coupling_expression.update_boundary_data(full_data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
 
     def create_point_sources(self, fixed_boundary, data=None):
         """
@@ -359,6 +366,9 @@ class Adapter:
         # Set read functionality parameters
         self._read_function_type = determine_function_type(function_space)
         self._function_space = function_space
+
+        # Identify nodes which need to be shared
+        self._owned_global_ids, self._unowned_local_ids = determine_shared_nodes(function_space, mesh)
 
         return self._interface.initialize()
 
