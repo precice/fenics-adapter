@@ -5,7 +5,6 @@ import numpy as np
 from .config import Config
 import logging
 import precice
-from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
 from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression
@@ -347,9 +346,9 @@ class Adapter:
         self._non_standard_initialization = True
 
         if write_function:
-            if self._interface.is_action_required(action_write_initial_data()):
+            if self._interface.is_action_required(precice.action_write_initial_data()):
                 self.write_data(write_function)
-                self._interface.mark_action_fulfilled(action_write_initial_data())
+                self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
         self._interface.initialize_data()
 
@@ -504,7 +503,7 @@ class Adapter:
         action : string
             Name of action related to writing a checkpoint.
         """
-        return action_write_iteration_checkpoint()
+        return precice.action_write_iteration_checkpoint()
 
     def action_read_iteration_checkpoint(self):
         """
@@ -520,4 +519,4 @@ class Adapter:
         action : string
             Name of action related to reading a checkpoint.
         """
-        return action_read_iteration_checkpoint()
+        return precice.action_read_iteration_checkpoint()
