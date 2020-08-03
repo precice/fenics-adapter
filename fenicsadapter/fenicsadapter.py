@@ -306,7 +306,7 @@ class Adapter:
         else:
             print("Process {rank}: No data written as no coupling boundary detected".format(rank=MPI.rank(MPI.comm_world)))
 
-    def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2):
+    def initialize(self, coupling_subdomain, function_space, dimensions=2):
         """
         Initializes the coupling interface and sets up the mesh in preCICE.
 
@@ -314,8 +314,6 @@ class Adapter:
         ----------
         coupling_subdomain : Object of class dolfin.cpp.mesh.SubDomain
             SubDomain of mesh which is the physical coupling boundary.
-        mesh : Object of class dolfin.cpp.mesh.Mesh
-            SubDomain of mesh of the complete region.
         function_space : Object of class dolfin.functions.functionspace.FunctionSpace
             Function space on which the finite element formulation of the problem lives.
         dimensions : int
@@ -340,8 +338,8 @@ class Adapter:
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
                     dimensions, self._interface.get_dimensions()))
 
-        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
-            mesh, coupling_subdomain, dimensions, self._interface.get_dimensions())
+        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(coupling_subdomain,
+                                                            dimensions, self._interface.get_dimensions())
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
@@ -355,7 +353,7 @@ class Adapter:
         for i in range(n_vertices):
             id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(mesh, coupling_subdomain, id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping)
 
         # Set mesh edges in preCICE to allow nearest-projection mapping
         for i in range(len(edge_vertex_ids1)):
@@ -368,7 +366,7 @@ class Adapter:
         self._function_space = function_space
 
         # Identify nodes which need to be shared
-        self._owned_global_ids, self._unowned_local_ids = determine_shared_nodes(function_space, mesh)
+        self._owned_global_ids, self._unowned_local_ids = determine_shared_nodes(function_space)
 
         return self._interface.initialize()
 

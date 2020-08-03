@@ -189,14 +189,14 @@ def are_connected_by_edge(v1, v2):
     return False
 
 
-def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
+def get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping):
     """
     Extracts edges of mesh which lie on the coupling boundary.
 
     Parameters
     ----------
-    mesh_fenics : FEniCS Mesh
-        FEniCS mesh of the complete region.
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         FEniCS domain of the coupling interface region.
     id_mapping : python dictionary
@@ -209,22 +209,26 @@ def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
     vertices2_ids : numpy array
         Array of second vertex of each edge.
     """
-    vertices = dict()
+    # Refer: https://github.com/precice/precice/wiki/Dealing-with-distributed-meshes#use-a-single-mesh-and-communicate-ghost-vertices-inside-adapter
+    # preCICE only sees non-duplicate global vertices
+    vertices = function_space.dofmap().tabulate_dof_coordinates()
 
-    for v1 in dolfin.vertices(mesh_fenics):
+    points = dict()
+
+    for v1 in vertices:
         if coupling_subdomain.inside(v1.point(), True):
-            vertices[v1] = []
+            points[v1] = []
 
-    for v1 in vertices.keys():
-        for v2 in vertices.keys():
+    for v1 in points.keys():
+        for v2 in points.keys():
             if are_connected_by_edge(v1, v2):
-                vertices[v1] = v2
-                vertices[v2] = v1
+                points[v1] = v2
+                points[v2] = v1
 
     vertices1_ids = []
     vertices2_ids = []
 
-    for v1, v2 in vertices.items():
+    for v1, v2 in points.items():
         if v1 is not v2:
             vertices1_ids.append(id_mapping[v1.global_index()])
             vertices2_ids.append(id_mapping[v2.global_index()])
@@ -288,33 +292,28 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def determine_shared_nodes(function_space, mesh):
-    # Identify global vertices owned and shared by this participant
+def determine_shared_nodes(function_space):
+    # Identify owned global indices
     dofmap = function_space.dofmap()
-    shared_nodes_map = dofmap.shared_nodes()
-    ltog_unowned = dofmap.local_to_global_unowned()
-
-    global_indices = []
-    for vertex in vertices(mesh):
-        global_indices.append(dofmap.local_to_global_index(vertex.index()))
-
-    owned_global_ids = np.array(global_indices)
-
-    # Remove unowned global ids from total global ids list
-    for id in ltog_unowned:
-        owned_global_ids = owned_global_ids[owned_global_ids != id]
+    sharednodes_map = dofmap.shared_nodes()
+    shared_ids = list(sharednodes_map.keys())
+    unowned_ids = dofmap.local_to_global_unowned()
+    global_ids = dofmap.tabulate_local_to_global_dofs()
 
     # Identify local ids of vertices which are not owned by this rank
-    unowned_local_ids = []
-    id_count = 0
-    for id in global_indices:
-        for unowned_id in ltog_unowned:
-            if id == unowned_id:
-                unowned_local_ids.append(id_count)
+    unowned_shared_ids, owned_shared_ids = [], []
+    for sid in shared_ids:
+        for unid in unowned_ids:
+            if global_ids[sid] == unid:
+                unowned_shared_ids.append(sid)
 
-    unowned_local_ids = np.array(unowned_local_ids)
+    unowned_ids = np.array(unowned_shared_ids)
 
-    return owned_global_ids, unowned_local_ids
+    owned_ids = np.copy(shared_ids)
+    for unowned_id in unowned_ids:
+        owned_ids = owned_ids[owned_ids != unowned_id]
+
+    return owned_ids, unowned_ids
 
 
 def modify_coupling_boundary_data(function_space, coupling_vertices, data):
@@ -322,3 +321,7 @@ def modify_coupling_boundary_data(function_space, coupling_vertices, data):
     shared_nodes_map = dofmap.shared_nodes()
 
     # MPI Communication
+
+    # Modifying data to new data
+
+    # Return data
