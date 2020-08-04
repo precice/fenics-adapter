@@ -76,41 +76,27 @@ class Adapter:
         self._first_advance_done = False
         self._apply_2d_3d_coupling = False
 
-    def create_coupling_expression(self, data=None):
+    def create_coupling_expression(self):
         """
         Creates a FEniCS Expression in the form of an object of class GeneralInterpolationExpression or
         ExactInterpolationExpression. The adapter will hold this object till the coupling is on going.
-
-        Parameters
-        ----------
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
-            If no data is provided then a numpy array of shape (N, D) with zero values is used.
 
         Returns
         -------
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
         """
+
+        if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
+            raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
+
         try:  # works with dolfin 1.6.0
             # element information must be provided, else DOLFIN assumes scalar function
             coupling_expression = self._my_expression(element=self._function_space.ufl_element())
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
-        n_vertices, _ = self._coupling_mesh_vertices.shape
-
-        if data is None:
-            # standard initialization with zero valued data
-            if self._read_function_type is FunctionType.SCALAR:
-                data = np.zeros(n_vertices)
-            elif self._read_function_type is FunctionType.VECTOR:
-                data = np.zeros((n_vertices, self._fenics_dimensions))
-            else:
-                raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
-
-        self.update_coupling_expression(coupling_expression, data)
+        coupling_expression._function_type = self._read_function_type
 
         return coupling_expression
 
@@ -129,41 +115,17 @@ class Adapter:
         """
         coupling_expression.update_boundary_data(data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
 
-    def create_point_sources(self, fixed_boundary, data=None):
+    def create_point_sources(self, fixed_boundary):
         """
-        Create point sources with reference to fixed boundary in a FSI simulation.
+        Set reference to fixed boundary in a FSI simulation needed for point sources.
 
         Parameters
         ----------
         fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
             SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
             is fixed at one end (fixed end of a flexible beam).
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
-            If no data is provided then a numpy array of shape (N, D) with zero values is used.
-
-        Returns
-        -------
-        x_forces : list
-            List containing X component of forces with reference to respective point sources on the coupling interface.
-        y_forces : list
-            List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
-
-        n_vertices, _ = self._coupling_mesh_vertices.shape
-
-        if data is None:
-            # standard initialization with zero valued data
-            if self._read_function_type is FunctionType.SCALAR:
-                data = np.zeros(n_vertices)
-            elif self._read_function_type is FunctionType.VECTOR:
-                data = np.zeros((n_vertices, self._fenics_dimensions))
-            else:
-                raise Exception("No valid read_function is provided in initialization. Cannot create point sources")
-
         self._Dirichlet_Boundary = fixed_boundary
-        return self.update_point_sources(data)
 
     def update_point_sources(self, data):
         """

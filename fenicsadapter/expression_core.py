@@ -4,6 +4,7 @@ This module provides a mechanism to imterpolate point data acquired from preCICE
 
 import dolfin
 from dolfin import UserExpression
+from .adapter_core import FunctionType
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
 import numpy as np
@@ -118,12 +119,17 @@ class CustomExpression(UserExpression):
         tag : bool
             True if function being interpolated is scalar-valued, False otherwise.
         """
-        if self._vals.ndim == 1:
-            return True
-        elif self._vals.ndim > 1:
-            return False
-        else:
-            raise Exception("Dimension of the function is 0 or negative!")
+        try:
+            if self._vals.ndim == 1:
+                assert(self._function_type is FunctionType.SCALAR)
+                return True
+            elif self._vals.ndim > 1:
+                assert(self._function_type is FunctionType.VECTOR)
+                return False
+            else:
+                raise Exception("Dimension of the function is 0 or negative!")
+        except AttributeError:
+            return self._function_type is FunctionType.SCALAR
 
     def is_vector_valued(self):
         """
@@ -134,12 +140,17 @@ class CustomExpression(UserExpression):
         tag : bool
             True if function being interpolated is vector-valued, False otherwise.
         """
-        if self._vals.ndim > 1:
-            return True
-        elif self._vals.ndim == 1:
-            return False
-        else:
-            raise Exception("Dimension of the function is 0 or negative!")
+        try:
+            if self._vals.ndim > 1:
+                assert(self._function_type is FunctionType.VECTOR)
+                return True
+            elif self._vals.ndim == 1:
+                assert(self._function_type is FunctionType.SCALAR)
+                return False
+            else:
+                raise Exception("Dimension of the function is 0 or negative!")
+        except AttributeError:
+            return self._function_type is FunctionType.VECTOR
 
 
 class GeneralInterpolationExpression(CustomExpression):
