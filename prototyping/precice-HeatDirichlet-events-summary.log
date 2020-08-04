@@ -1,0 +1,65 @@
+Run finished at Tue Aug  4 17:29:00 2020
+Global runtime       = 20559ms / 20.559s
+Number of processors = 1
+# Rank: 0
+
+                                                                                 Event |      Count |  Total[ms] |    Max[ms] |    Min[ms] |    Avg[ms] | Time Ratio |
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                               _GLOBAL |          1 |      20559 |      20559 |      20559 |      20559 |          1 |
+                                                                               advance |        112 |       2881 |         75 |         22 |         25 |       0.14 |
+                                                               advance/m2n.receiveData |        112 |         10 |          0 |          0 |          0 |   0.000486 |
+                                                                  advance/m2n.sendData |        112 |         19 |          0 |          0 |          0 |   0.000924 |
+                               advance/map.np.mapData.FromDirichletNodesToNeumannNodes |        112 |          5 |          0 |          0 |          0 |   0.000243 |
+                               advance/map.np.mapData.FromNeumannNodesToDirichletNodes |        112 |          3 |          0 |          0 |          0 |   0.000146 |
+                                                                             configure |          1 |          0 |          0 |          0 |          0 |          0 |
+                                                                              finalize |          1 |         41 |         41 |         41 |         41 |    0.00199 |
+                                                                            initialize |          1 |      14266 |      14266 |      14266 |      14266 |      0.694 |
+                                           initialize/m2n.broadcastVertexDistributions |          1 |          0 |          0 |          0 |          0 |          0 |
+                                                  initialize/m2n.buildCommunicationMap |          1 |          0 |          0 |          0 |          0 |          0 |
+                                                   initialize/m2n.createCommunications |          1 |          5 |          5 |          5 |          5 |   0.000243 |
+                                             initialize/m2n.exchangeVertexDistribution |          1 |         46 |         46 |         46 |         46 |    0.00224 |
+                                                initialize/m2n.requestMasterConnection |          1 |      14162 |      14162 |      14162 |      14162 |      0.689 |
+                                                initialize/m2n.requestSlavesConnection |          1 |         53 |         53 |         53 |         53 |    0.00258 |
+                                       initialize/partition.prepareMesh.DirichletNodes |          1 |          0 |          0 |          0 |          0 |          0 |
+                                   initialize/partition.receiveGlobalMesh.NeumannNodes |          1 |         46 |         46 |         46 |         46 |    0.00224 |
+                                                                        initializeData |          1 |         32 |         32 |         32 |         32 |    0.00156 |
+                                                        initializeData/m2n.receiveData |          1 |          0 |          0 |          0 |          0 |          0 |
+                 initializeData/map.np.computeMapping.FromDirichletNodesToNeumannNodes |          1 |         19 |         19 |         19 |         19 |   0.000924 |
+ initializeData/map.np.computeMapping.FromDirichletNodesToNeumannNodes.getIndexOnEdges |          1 |          8 |          8 |          8 |          8 |   0.000389 |
+                 initializeData/map.np.computeMapping.FromNeumannNodesToDirichletNodes |          1 |          9 |          9 |          9 |          9 |   0.000438 |
+ initializeData/map.np.computeMapping.FromNeumannNodesToDirichletNodes.getIndexOnEdges |          1 |          0 |          0 |          0 |          0 |          0 |
+                        initializeData/map.np.mapData.FromDirichletNodesToNeumannNodes |          1 |          0 |          0 |          0 |          0 |          0 |
+                        initializeData/map.np.mapData.FromNeumannNodesToDirichletNodes |          1 |          0 |          0 |          0 |          0 |          0 |
+                                                                        solver.advance |        112 |       1470 |         22 |         10 |         13 |     0.0715 |
+                                                                     solver.initialize |          1 |       1860 |       1860 |       1860 |       1860 |     0.0905 |
+
+
+                                                                                  Name |        Max |  MaxOnRank |        Min |  MinOnRank |    Min/Max |
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                               _GLOBAL |      20559 |          0 |      20559 |          0 |          1 |
+                                                                               advance |         75 |          0 |         22 |          0 |   0.293333 |
+                                                               advance/m2n.receiveData |          0 |          0 |          0 |          0 |          0 |
+                                                                  advance/m2n.sendData |          0 |          0 |          0 |          0 |          0 |
+                               advance/map.np.mapData.FromDirichletNodesToNeumannNodes |          0 |          0 |          0 |          0 |          0 |
+                               advance/map.np.mapData.FromNeumannNodesToDirichletNodes |          0 |          0 |          0 |          0 |          0 |
+                                                                             configure |          0 |          0 |          0 |          0 |          0 |
+                                                                              finalize |         41 |          0 |         41 |          0 |          1 |
+                                                                            initialize |      14266 |          0 |      14266 |          0 |          1 |
+                                           initialize/m2n.broadcastVertexDistributions |          0 |          0 |          0 |          0 |          0 |
+                                                  initialize/m2n.buildCommunicationMap |          0 |          0 |          0 |          0 |          0 |
+                                                   initialize/m2n.createCommunications |          5 |          0 |          5 |          0 |          1 |
+                                             initialize/m2n.exchangeVertexDistribution |         46 |          0 |         46 |          0 |          1 |
+                                                initialize/m2n.requestMasterConnection |      14162 |          0 |      14162 |          0 |          1 |
+                                                initialize/m2n.requestSlavesConnection |         53 |          0 |         53 |          0 |          1 |
+                                       initialize/partition.prepareMesh.DirichletNodes |          0 |          0 |          0 |          0 |          0 |
+                                   initialize/partition.receiveGlobalMesh.NeumannNodes |         46 |          0 |         46 |          0 |          1 |
+                                                                        initializeData |         32 |          0 |         32 |          0 |          1 |
+                                                        initializeData/m2n.receiveData |          0 |          0 |          0 |          0 |          0 |
+                 initializeData/map.np.computeMapping.FromDirichletNodesToNeumannNodes |         19 |          0 |         19 |          0 |          1 |
+ initializeData/map.np.computeMapping.FromDirichletNodesToNeumannNodes.getIndexOnEdges |          8 |          0 |          8 |          0 |          1 |
+                 initializeData/map.np.computeMapping.FromNeumannNodesToDirichletNodes |          9 |          0 |          9 |          0 |          1 |
+ initializeData/map.np.computeMapping.FromNeumannNodesToDirichletNodes.getIndexOnEdges |          0 |          0 |          0 |          0 |          0 |
+                        initializeData/map.np.mapData.FromDirichletNodesToNeumannNodes |          0 |          0 |          0 |          0 |          0 |
+                        initializeData/map.np.mapData.FromNeumannNodesToDirichletNodes |          0 |          0 |          0 |          0 |          0 |
+                                                                        solver.advance |         22 |          0 |         10 |          0 |   0.454545 |
+                                                                     solver.initialize |       1860 |          0 |       1860 |          0 |          1 |
