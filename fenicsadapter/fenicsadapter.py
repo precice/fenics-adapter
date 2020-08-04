@@ -75,7 +75,6 @@ class Adapter:
         # Necessary bools for enforcing proper control flow / warnings to user
         self._first_advance_done = False
         self._apply_2d_3d_coupling = False
-        self._non_standard_initialization = False
 
     def create_coupling_expression(self, data=None):
         """
@@ -94,9 +93,6 @@ class Adapter:
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
         """
-        if self._non_standard_initialization and data is None:
-            warn("initialize_data() was called but the data was not supplied for creating the coupling expression")
-
         try:  # works with dolfin 1.6.0
             # element information must be provided, else DOLFIN assumes scalar function
             coupling_expression = self._my_expression(element=self._function_space.ufl_element())
@@ -154,8 +150,6 @@ class Adapter:
         y_forces : list
             List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
-        if self._non_standard_initialization and data is None:
-            warn("initialize_data() was called but the data was not supplied for creating the point sources")
 
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
@@ -268,9 +262,9 @@ class Adapter:
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
-    def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2):
+    def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2, write_function=None):
         """
-        Initializes the coupling interface and sets up the mesh in preCICE.
+        Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
 
         Parameters
         ----------
@@ -282,6 +276,8 @@ class Adapter:
             Function space on which the finite element formulation of the problem lives.
         dimensions : int
             Dimensions of the problem as defined in FEniCS.
+        write_function : Object of class dolfin.functions.function.Function
+            FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
 
         Returns
         -------
@@ -327,36 +323,16 @@ class Adapter:
         self._read_function_type = determine_function_type(function_space)
         self._function_space = function_space
 
-        return self._interface.initialize()
+        precice_dt = self._interface.initialize()
 
-    def initialize_data(self, write_function=None):
-        """
-        Set non-standard values as initial conditions to coupling problem
-
-        Parameters
-        ----------
-        write_function : Object of class dolfin.functions.function.Function
-            FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
-
-        Returns
-        -------
-        read_data = array_like
-            Numpy array containing the read data.
-        """
-        self._non_standard_initialization = True
-
-        if write_function:
-            if self._interface.is_action_required(precice.action_write_initial_data()):
-                self.write_data(write_function)
-                self._interface.mark_action_fulfilled(precice.action_write_initial_data())
+        if self._interface.is_action_required(precice.action_write_initial_data()):
+            assert(write_function)  # if action is required, write function MUST be given.
+            self.write_data(write_function)
+            self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
         self._interface.initialize_data()
 
-        read_data = None
-        if self._interface.is_read_data_available():
-            read_data = self.read_data()
-
-        return read_data
+        return precice_dt
 
     def store_checkpoint(self, user_u, t, n):
         """
