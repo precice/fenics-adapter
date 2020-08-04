@@ -125,15 +125,15 @@ precice, precice_dt, initial_data = None, 0.0, None
 if problem is ProblemType.DIRICHLET:
     precice = Adapter(adapter_config_filename="precice-adapter-config-D.json")
     precice_dt = precice.initialize(coupling_boundary, mesh, V)
-    initial_data = precice.initialize_data(f_N_function)
+    precice.initialize_data(f_N_function)
 elif problem is ProblemType.NEUMANN:
     precice = Adapter(adapter_config_filename="precice-adapter-config-N.json")
     precice_dt = precice.initialize(coupling_boundary, mesh, V_g)
-    initial_data = precice.initialize_data(u_D_function)
+    precice.initialize_data(u_D_function)
 
 boundary_marker = False
 
-coupling_expression = precice.create_coupling_expression(initial_data)
+coupling_expression = precice.create_coupling_expression()
 
 dt = Constant(0)
 dt.assign(np.min([fenics_dt, precice_dt]))
