@@ -115,19 +115,7 @@ class Adapter:
         """
         coupling_expression.update_boundary_data(data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
 
-    def create_point_sources(self, fixed_boundary):
-        """
-        Set reference to fixed boundary in a FSI simulation needed for point sources.
-
-        Parameters
-        ----------
-        fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
-            SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
-            is fixed at one end (fixed end of a flexible beam).
-        """
-        self._Dirichlet_Boundary = fixed_boundary
-
-    def update_point_sources(self, data):
+    def get_point_sources(self, data):
         """
         Update values of point sources using data.
 
@@ -224,7 +212,7 @@ class Adapter:
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
-    def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2, write_function=None):
+    def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2, write_function=None, fixed_boundary=None):
         """
         Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
 
@@ -247,6 +235,9 @@ class Adapter:
             Recommended time step value from preCICE.
         """
         self._fenics_dimensions = dimensions
+
+        if fixed_boundary:
+            self._Dirichlet_Boundary = fixed_boundary
 
         if dimensions != self._interface.get_dimensions():
             logger.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(
@@ -288,7 +279,7 @@ class Adapter:
         precice_dt = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
-            assert(write_function)  # if action is required, write function MUST be given.
+            assert write_function  # if action is required, write function MUST be given.
             self.write_data(write_function)
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
