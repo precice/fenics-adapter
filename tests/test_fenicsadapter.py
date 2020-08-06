@@ -143,7 +143,8 @@ class TestExpressionHandling(TestCase):
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice.initialize(right_boundary, self.mesh, self.scalar_V)
-        data = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+        values = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+        data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
 
         scalar_coupling_expr = precice.create_coupling_expression()
         precice.update_coupling_expression(scalar_coupling_expr, data)
@@ -173,7 +174,8 @@ class TestExpressionHandling(TestCase):
         precice = fenicsadapter.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice.initialize(right_boundary, self.mesh, self.vector_V)
-        data = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+        values = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
+        data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
 
         vector_coupling_expr = precice.create_coupling_expression()
         precice.update_coupling_expression(vector_coupling_expr, data)
