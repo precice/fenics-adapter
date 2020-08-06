@@ -232,14 +232,12 @@ class ExactInterpolationExpression(CustomExpression):
         if self._dimension == 2:
             if self.is_scalar_valued():  # check if scalar or vector-valued
                 interpolant.append(
-                    interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind="cubic"))
+                    interp1d(self._coords_y, self._vals, kind="cubic"))
             elif self.is_vector_valued():
                 interpolant.append(
-                    interp1d(self._coords_y, self._vals[:, 0].flatten(), bounds_error=False, fill_value="extrapolate",
-                             kind="cubic"))
+                    interp1d(self._coords_y, self._vals[:, 0].flatten(), kind="cubic"))
                 interpolant.append(
-                    interp1d(self._coords_y, self._vals[:, 1].flatten(), bounds_error=False, fill_value="extrapolate",
-                             kind="cubic"))
+                    interp1d(self._coords_y, self._vals[:, 1].flatten(), kind="cubic"))
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         else:

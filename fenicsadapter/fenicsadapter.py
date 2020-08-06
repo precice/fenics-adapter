@@ -109,11 +109,14 @@ class Adapter:
         ----------
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
+        data : dict_like
+            The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            value.
         """
-        coupling_expression.update_boundary_data(data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
+        x_coord = np.array([vertex[0] for vertex in data.keys()])
+        y_coord = np.array([vertex[1] for vertex in data.keys()])
+        nodal_data = np.array([data for data in data.values()])
+        coupling_expression.update_boundary_data(nodal_data, x_coord, y_coord)
 
     def get_point_sources(self, data):
         """
@@ -121,9 +124,9 @@ class Adapter:
 
         Parameters
         ----------
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
+        data : dict_like
+            The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            value.
 
         Returns
         -------
@@ -132,8 +135,9 @@ class Adapter:
         y_forces : list
             List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, self._coupling_mesh_vertices,
-                                           data)
+        vertices = np.array(data.keys())
+        nodal_data = np.array(data.values())
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, vertices, nodal_data)
 
     def read_data(self):
         """
@@ -146,8 +150,9 @@ class Adapter:
 
         Returns
         -------
-        read_data : array_like
-            Numpy array containing the read data.
+        data : dict_like
+            The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            value.
         """
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -170,7 +175,7 @@ class Adapter:
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-        return read_data
+        return {tuple(key): value for key, value in zip(self._coupling_mesh_vertices, read_data)}
 
     def write_data(self, write_function):
         """

@@ -32,7 +32,7 @@ from errorcomputation import compute_errors
 from my_enums import ProblemType, Subcycling
 import argparse
 import numpy as np
-from problem_setup import get_geometry, get_problem_setup
+from problem_setup import get_geometry, get_problem_setup, x_coupling, y_bottom, y_top
 import dolfin
 from dolfin import FacetNormal, dot
 
@@ -190,6 +190,7 @@ error_out << error_pointwise
 
 # set t_1 = t_0 + dt, this gives u_D^1
 u_D.t = t + dt(0)  # call dt(0) to evaluate FEniCS Constant. Todo: is there a better way?
+f_N.t = t + dt(0)  # call dt(0) to evaluate FEniCS Constant. Todo: is there a better way?
 f.t = t + dt(0)
 
 flux = Function(V_g)
@@ -201,6 +202,12 @@ while precice.is_coupling_ongoing():
         precice.store_checkpoint(u_n, t, n)
 
     read_data = precice.read_data()
+
+    for y in [y_bottom, y_top]:
+        if problem is ProblemType.DIRICHLET:
+            read_data[(x_coupling, y)] = u_D(x_coupling, y)
+        elif problem is ProblemType.NEUMANN:
+            read_data[(x_coupling, y)] = f_N(x_coupling, y)
 
     # Update the coupling expression with the new read data
     precice.update_coupling_expression(coupling_expression, read_data)
@@ -244,6 +251,7 @@ while precice.is_coupling_ongoing():
 
     # Update Dirichlet BC
     u_D.t = t + dt(0)
+    f_N.t = t + dt(0)
     f.t = t + dt(0)
 
 # Hold plot
