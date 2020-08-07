@@ -10,28 +10,57 @@ import numpy as np
 from mpi4py import MPI
 
 
-def determine_shared_nodes(function_space):
-    # Identify owned global indices
+def determine_shared_vertices(function_space):
     dofmap = function_space.dofmap()
     sharednodes_map = dofmap.shared_nodes()
-    shared_ids = list(sharednodes_map.keys())
-    unowned_ids = dofmap.local_to_global_unowned()
+
+    # Global IDs of vertices seen by this rank
     global_ids = dofmap.tabulate_local_to_global_dofs()
 
-    # Identify local ids of vertices which are not owned by this rank
+    # Local ids of vertices which are shared by this rank
+    shared_ids = list(sharednodes_map.keys())
+
+    # Global IDs of vertices which are not owned by this rank
+    unowned_ids = dofmap.local_to_global_unowned()
+
+    # Identify local IDs of vertices which are not owned by this rank
     unowned_shared_ids, owned_shared_ids = [], []
     for sid in shared_ids:
         for unid in unowned_ids:
             if global_ids[sid] == unid:
                 unowned_shared_ids.append(sid)
-
     unowned_ids = np.array(unowned_shared_ids)
 
+    # Identify local IDs of vertices which are owned by this rank
     owned_ids = np.copy(shared_ids)
     for unowned_id in unowned_ids:
         owned_ids = owned_ids[owned_ids != unowned_id]
 
     return owned_ids, unowned_ids
+
+
+def communicate_shared_vertices(dofmap, data, owned_ids, unowned_ids):
+    sharednodes_map = dofmap.shared_nodes()
+
+    if owned_ids.size != 0:
+        for point in owned_ids:
+            for dest in sharednodes_map[point]:
+                tag = 1000 + int(str(rank) + str(dofmap.local_to_global_index(point)) + str(dest))
+                print("Rank {} sending to Rank {} -- tag {}".format(rank, dest, tag))
+                req = comm.isend(data[point], dest=dest, tag=tag)
+                req.wait()
+    else:
+        print("Rank {}: Nothing to Send".format(rank))
+
+    if unowned_ids.size != 0:
+        for point in unowned_ids:
+            for source in sharednodes_map[point]:
+                tag = 1000 + int(str(source) + str(dofmap.local_to_global_index(point)) + str(rank))
+                req = comm.irecv(source=source, tag=tag)
+                data[point] = req.wait()
+                print("Rank {} receiving from Rank {} -- tag {}".format(rank, source, tag))
+    else:
+        print("Rank {}: Nothing to Receive".format(rank))
 
 
 comm = MPI.COMM_WORLD
@@ -73,76 +102,27 @@ comm.Barrier()
 
 if rank == 0:
     print()
-    print("----------- Extracting entities using Mesh ----------")
-
-global_indices = []
-x = []
-for vertex in vertices(mesh):
-    global_indices.append(dofmap.local_to_global_index(vertex.index()))
-    x.append(vertex.x(0))
-
-print("Rank {}: Global vertex indices are: {}".format(rank, global_indices))
-comm.Barrier()
-
-print("Rank {}: Vertex coordinates are: {}".format(rank, x))
-comm.Barrier()
-
-if rank == 0:
-    print()
     print("---------- Communicating shared node values ----------")
 
 n_vertices = len(dofmap.tabulate_local_to_global_dofs())
-owned_shared, unowned_shared = determine_shared_nodes(V)
+owned_shared, unowned_shared = determine_shared_vertices(V)
 if owned_shared.size == 0:
-    print("Rank {}: This process does not own any nodes it shares".format(rank))
+    print("Rank {}: This process does not own any vertices it shares".format(rank))
 else:
-    print("Rank {}: Indices of nodes which this process owns and shares are {}".format(rank, owned_shared))
+    print("Rank {}: Indices of vertices which this process owns and shares are {}".format(rank, owned_shared))
 comm.Barrier()
 
 if unowned_shared.size == 0:
-    print("Rank {}: This process does not have any shared nodes which it does not own".format(rank))
+    print("Rank {}: This process owns all the vertices it shares".format(rank))
 else:
-    print("Rank {}: Indices of nodes which this process does not own but share are {}".format(rank, unowned_shared))
+    print("Rank {}: Indices of vertices which this process does not own but shares are {}".format(rank, unowned_shared))
 comm.Barrier()
 
 data = np.full(n_vertices, rank)
 print("Rank {}: Data before communication: {}".format(rank, data))
 comm.Barrier()
 
-sharednodes_map = dofmap.shared_nodes()
-if rank % 2 == 0:
-    if owned_shared.size != 0:
-        for point in owned_shared:
-            dest_ranks = sharednodes_map[point]
-            for proc in dest_ranks:
-                comm.send(data[point], dest=proc, tag=11)
-    else:
-        print("Rank {}: Nothing to Send".format(rank))
-else:
-    if unowned_shared.size != 0:
-        for point in unowned_shared:
-            sources = sharednodes_map[point]
-            for proc in sources:
-                data[point] = comm.recv(source=proc, tag=11)
-    else:
-        print("Rank {}: Nothing to Receive".format(rank))
-
-if rank % 2 != 0:
-    if owned_shared.size != 0:
-        for point in owned_shared:
-            dest_ranks = sharednodes_map[point]
-            for proc in dest_ranks:
-                comm.send(data[point], dest=proc, tag=11)
-    else:
-        print("Rank {}: Nothing to Send".format(rank))
-else:
-    if unowned_shared.size != 0:
-        for point in unowned_shared:
-            sources = sharednodes_map[point]
-            for proc in sources:
-                data[point] = comm.recv(source=proc, tag=11)
-    else:
-        print("Rank {}: Nothing to Receive".format(rank))
+communicate_shared_vertices(dofmap, data, owned_shared, unowned_shared)
 
 print("Rank {}: Data after communication: {}".format(rank, data))
 
