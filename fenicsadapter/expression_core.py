@@ -20,6 +20,9 @@ class CustomExpression(UserExpression):
     Creates functional representation (for FEniCS) of nodal data provided by preCICE.
     """
 
+    def set_function_type(self, function_type):
+        self._function_type = function_type
+
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         """
         Update object of this class of type FEniCS UserExpression with given point data.

@@ -96,7 +96,7 @@ class Adapter:
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
-        coupling_expression._function_type = self._read_function_type
+        coupling_expression.set_function_type(self._read_function_type)
 
         return coupling_expression
 
@@ -237,28 +237,28 @@ class Adapter:
         """
 
         coords = function_space.tabulate_dof_coordinates()
-        _, dimensions = coords.shape
+        _, self._fenics_dimensions = coords.shape
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
-        if dimensions != 2:
+        if self._fenics_dimensions != 2:
             raise Exception("Currently the fenics-adapter only supports 2D cases")
 
-        if dimensions != self._interface.get_dimensions():
+        if self._fenics_dimensions != self._interface.get_dimensions():
             logger.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(
-                dimensions, self._interface.get_dimensions()))
+                self._fenics_dimensions, self._interface.get_dimensions()))
 
-            if dimensions == 2 and self._interface.get_dimensions() == 3:
+            if self._fenics_dimensions == 2 and self._interface.get_dimensions() == 3:
                 logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
                 self._apply_2d_3d_coupling = True
             else:
                 raise Exception("fenics_dimension = {}, precice_dimension = {}. "
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
-                    dimensions, self._interface.get_dimensions()))
+                    self._fenics_dimensions, self._interface.get_dimensions()))
 
         fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
-            mesh, coupling_subdomain, dimensions, self._interface.get_dimensions())
+            mesh, coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
