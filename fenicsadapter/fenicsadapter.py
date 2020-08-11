@@ -96,7 +96,7 @@ class Adapter:
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
             coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
 
-        coupling_expression._function_type = self._read_function_type
+        coupling_expression.set_function_type(self._read_function_type)
 
         return coupling_expression
 
@@ -217,7 +217,7 @@ class Adapter:
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
-    def initialize(self, coupling_subdomain, mesh, function_space, dimensions=2, write_function=None, fixed_boundary=None):
+    def initialize(self, coupling_subdomain, mesh, function_space, write_function=None, fixed_boundary=None):
         """
         Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
 
@@ -229,35 +229,41 @@ class Adapter:
             SubDomain of mesh of the complete region.
         function_space : Object of class dolfin.functions.functionspace.FunctionSpace
             Function space on which the finite element formulation of the problem lives.
-        dimensions : int
-            Dimensions of the problem as defined in FEniCS.
         write_function : Object of class dolfin.functions.function.Function
             FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
+        fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
+            SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
+            is fixed at one end (fixed end of a flexible beam).
 
         Returns
         -------
         dt : double
             Recommended time step value from preCICE.
         """
-        self._fenics_dimensions = dimensions
+
+        coords = function_space.tabulate_dof_coordinates()
+        _, self._fenics_dimensions = coords.shape
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
-        if dimensions != self._interface.get_dimensions():
-            logger.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(
-                dimensions, self._interface.get_dimensions()))
+        if self._fenics_dimensions != 2:
+            raise Exception("Currently the fenics-adapter only supports 2D cases")
 
-            if dimensions == 2 and self._interface.get_dimensions() == 3:
+        if self._fenics_dimensions != self._interface.get_dimensions():
+            logger.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(
+                self._fenics_dimensions, self._interface.get_dimensions()))
+
+            if self._fenics_dimensions == 2 and self._interface.get_dimensions() == 3:
                 logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
                 self._apply_2d_3d_coupling = True
             else:
                 raise Exception("fenics_dimension = {}, precice_dimension = {}. "
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
-                    dimensions, self._interface.get_dimensions()))
+                    self._fenics_dimensions, self._interface.get_dimensions()))
 
         fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
-            mesh, coupling_subdomain, dimensions, self._interface.get_dimensions())
+            mesh, coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
@@ -284,7 +290,8 @@ class Adapter:
         precice_dt = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
-            assert write_function  # if action is required, write function MUST be given.
+            if not write_function:
+                raise Exception("Non-standard initialization requires a write_function")
             self.write_data(write_function)
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
