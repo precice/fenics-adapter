@@ -136,6 +136,7 @@ class TestExpressionHandling(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
+        Interface.initialize_data = MagicMock()
 
         right_boundary = self.Right()
 
@@ -144,7 +145,8 @@ class TestExpressionHandling(TestCase):
         precice.initialize(right_boundary, self.mesh, self.scalar_V)
         data = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
 
-        scalar_coupling_expr = precice.create_coupling_expression(data)
+        scalar_coupling_expr = precice.create_coupling_expression()
+        precice.update_coupling_expression(scalar_coupling_expr, data)
 
         expr_samples = np.array([scalar_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
         func_samples = np.array([self.scalar_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
@@ -164,6 +166,7 @@ class TestExpressionHandling(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
+        Interface.initialize_data = MagicMock()
 
         right_boundary = self.Right()
 
@@ -172,7 +175,8 @@ class TestExpressionHandling(TestCase):
         precice.initialize(right_boundary, self.mesh, self.vector_V)
         data = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
 
-        vector_coupling_expr = precice.create_coupling_expression(data)
+        vector_coupling_expr = precice.create_coupling_expression()
+        precice.update_coupling_expression(vector_coupling_expr, data)
 
         expr_samples = np.array([vector_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
         func_samples = np.array([self.vector_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
