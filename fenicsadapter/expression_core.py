@@ -7,6 +7,7 @@ from dolfin import UserExpression
 from .adapter_core import FunctionType
 from scipy.interpolate import Rbf
 from scipy.interpolate import interp1d
+from scipy.linalg import lstsq
 import numpy as np
 
 import logging
@@ -214,6 +215,70 @@ class GeneralInterpolationExpression(CustomExpression):
         if self._dimension == 3:
             for i in range(self._vals.ndim):
                 return_value[i] = self._f[i](x[0], x[1], x[2])
+        return return_value
+
+
+class SegregatedRBFInterpolationExpression(CustomExpression):
+    """
+    Uses polynomial quadratic fit + RBF interpolation for implementation of CustomExpression.interpolate. Allows for
+    arbitrary coupling interfaces.
+
+    See Lindner, F., Mehl, M., & Uekermann, B. (2017). Radial basis function interpolation for black-box multi-physics
+    simulations.
+    """
+
+    def segregated_interpolant_2d(self, coords_x, coords_y, data):
+        assert(coords_x.shape == coords_y.shape)
+        # create least squares system to approximate a * x ** 2 + b * x + c ~= y
+        A = np.array([coords_x ** 2,
+                      coords_y ** 2,
+                      coords_y * coords_x,
+                      coords_x,
+                      coords_y,
+                      np.ones_like(coords_x)]).T
+        # solve system
+        w, _, _, _ = lstsq(A, data)
+        # create fit
+        lstsq_interp = lambda x, y: w[0] * x ** 2 + \
+                                    w[1] * y ** 2 + \
+                                    w[2] * x * y + \
+                                    w[3] * x + \
+                                    w[4] * y + \
+                                    w[5]
+        # compute remaining error
+        res = data - lstsq_interp(coords_x, coords_y)
+        # add RBF for error
+        rbf_interp = Rbf(coords_x, coords_y, res)
+
+        return lambda x, y: rbf_interp(x, y) + lstsq_interp(x, y)
+
+    def create_interpolant(self):
+        """
+        See base class description.
+        """
+        assert (self._dimension == 2)  # current implementation only supports two dimensions
+        interpolant = []
+
+        if self.is_scalar_valued():  # check if scalar or vector-valued
+            interpolant.append(self.segregated_interpolant_2d(self._coords_x, self._coords_y, self._vals))
+        elif self.is_vector_valued():
+            for d in range(2):
+                interpolant.append(self.segregated_interpolant_2d(self._coords_x, self._coords_y, self._vals[:, d]))
+        else:
+            raise Exception("Problem dimension and data dimension not matching.")
+
+        return interpolant
+
+    def interpolate(self, x):
+        """
+        See base class description.
+        """
+        assert (self._dimension == 2)  # current implementation only supports two dimensions
+
+        return_value = self._vals.ndim * [None]
+
+        for i in range(self._vals.ndim):
+            return_value[i] = self._f[i](x[0], x[1])
         return return_value
 
 
