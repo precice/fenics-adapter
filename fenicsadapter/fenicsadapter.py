@@ -7,7 +7,8 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
-from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression
+from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression, \
+    SegregatedRBFInterpolationExpression
 from .solverstate import SolverState
 from warnings import warn
 
@@ -59,10 +60,14 @@ class Adapter:
         # Interpolation strategy as provided by the user
         if self._config.get_interpolation_expression_type() == "cubic_spline":
             self._my_expression = ExactInterpolationExpression
-            print("Using cubic spline interpolation")
+            print("Using cubic spline interpolation.")
+            warn("Recommended to use rbf_segregated instead.")
         elif self._config.get_interpolation_expression_type() == "rbf":
             self._my_expression = GeneralInterpolationExpression
             print("Using RBF interpolation")
+        elif self._config.get_interpolation_expression_type() == "rbf_segregated":
+            self._my_expression = SegregatedRBFInterpolationExpression
+            print("Using segregated RBF interpolation")
         else:
             warn("No valid interpolation strategy entered. It is assumed that the user does not wish to use FEniCS Expressions on the coupling boundary.")
 
