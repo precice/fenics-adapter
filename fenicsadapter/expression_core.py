@@ -230,27 +230,31 @@ class SegregatedRBFInterpolationExpression(CustomExpression):
     def segregated_interpolant_2d(self, coords_x, coords_y, data):
         assert(coords_x.shape == coords_y.shape)
         # create least squares system to approximate a * x ** 2 + b * x + c ~= y
-        A = np.array([coords_x ** 2,
-                      coords_y ** 2,
-                      coords_y * coords_x,
-                      coords_x,
-                      coords_y,
-                      np.ones_like(coords_x)]).T
+        lstsq_interp = lambda x, y, w: w[0] * x ** 2 + \
+                                       w[1] * y ** 2 + \
+                                       w[2] * x * y + \
+                                       w[3] * x + \
+                                       w[4] * y + \
+                                       w[5]
+
+        A = np.empty((coords_x.shape[0], 0))
+        n_unknowns = 6
+        for i in range(n_unknowns):
+            w = np.zeros([n_unknowns])
+            w[i] = 1
+            column = lstsq_interp(coords_x, coords_y, w).reshape((coords_x.shape[0], 1))
+            A = np.hstack([A, column])
+
         # solve system
         w, _, _, _ = lstsq(A, data)
         # create fit
-        lstsq_interp = lambda x, y: w[0] * x ** 2 + \
-                                    w[1] * y ** 2 + \
-                                    w[2] * x * y + \
-                                    w[3] * x + \
-                                    w[4] * y + \
-                                    w[5]
+
         # compute remaining error
-        res = data - lstsq_interp(coords_x, coords_y)
+        res = data - lstsq_interp(coords_x, coords_y, w)
         # add RBF for error
         rbf_interp = Rbf(coords_x, coords_y, res)
 
-        return lambda x, y: rbf_interp(x, y) + lstsq_interp(x, y)
+        return lambda x, y: rbf_interp(x, y) + lstsq_interp(x, y, w)
 
     def create_interpolant(self):
         """
