@@ -118,10 +118,17 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
-        x_coord = np.array([vertex[0] for vertex in data.keys()])
-        y_coord = np.array([vertex[1] for vertex in data.keys()])
-        nodal_data = np.array([data for data in data.values()])
-        coupling_expression.update_boundary_data(nodal_data, x_coord, y_coord)
+        assert (self._fenics_dimensions == 2), \
+            "Only 2D FEniCS solvers are supported. See https://github.com/precice/fenics-adapter/issues/1."
+
+        for v in data.keys():
+            assert (len(v) == self._fenics_dimensions), \
+                "Dimension of all provided vertices must be equal to dimension of FEniCS solver. Dimension = {} and " \
+                "received vertex {}".format(self._fenics_dimensions, v)
+
+        vertices = np.array(list(data.keys()))
+        nodal_data = np.array(list(data.values()))
+        coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
 
     def get_point_sources(self, data):
         """
@@ -140,9 +147,24 @@ class Adapter:
         y_forces : list
             List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
+        assert (self._read_function_type is FunctionType.VECTOR), \
+            "PointSources only supported for vector valued read data."
+
+        for v in data.keys():
+            assert (len(v) == self._fenics_dimensions), \
+                "Dimension of all provided vertices must be equal to dimension of FEniCS solver. Dimension = {} and " \
+                "received vertex {}".format(self._fenics_dimensions, v)
+
         vertices = np.array(list(data.keys()))
         nodal_data = np.array(list(data.values()))
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, vertices, nodal_data)
+        if self._apply_2d_3d_coupling:
+            # append zeros in z dimension for processing internally
+            vector_of_zeros = np.zeros((vertices.shape[0], 1))
+            vertices = np.hstack([vertices, vector_of_zeros])
+            nodal_data = np.hstack([nodal_data, vector_of_zeros])
+
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, vertices, nodal_data,
+                                           z_dead=self._apply_2d_3d_coupling)
 
     def read_data(self):
         """
@@ -151,7 +173,8 @@ class Adapter:
         For a vector read function the data is a numpy array with shape (N, D) where
         N = number of coupling vertices and D = dimensions of FEniCS setup
 
-        Note: For quasi 2D-3D coupled simulation (FEniCS participant is 2D) the Z-component of the data is deleted.
+        Note: For quasi 2D-3D coupled simulation (FEniCS participant is 2D) the Z-component of the data and vertices
+        is deleted.
 
         Returns
         -------
@@ -164,23 +187,39 @@ class Adapter:
 
         if self._read_function_type is FunctionType.SCALAR:
             read_data = self._interface.read_block_scalar_data(read_data_id, self._vertex_ids)
+            if self._fenics_dimensions == self._interface.get_dimensions():
+                vertices = self._coupling_mesh_vertices
+            elif self._apply_2d_3d_coupling:
+                vertices = np.zeros((n_vertices, dims - 1))
+                vertices[:, 0] = self._coupling_mesh_vertices[:, 0]
+                vertices[:, 1] = self._coupling_mesh_vertices[:, 1]
+                # z is the dead direction so the data is not transferred to vertices
+                assert (np.sum(np.abs(self._coupling_mesh_vertices[:, 2])) < 1e-10)
+            else:
+                raise Exception("Dimensions do not match.")
         elif self._read_function_type is FunctionType.VECTOR:
             if self._fenics_dimensions == self._interface.get_dimensions():
                 read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
+                vertices = self._coupling_mesh_vertices
             elif self._apply_2d_3d_coupling:
                 precice_read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
                 n_vertices, dims = precice_read_data.shape
                 read_data = np.zeros((n_vertices, dims-1))
                 read_data[:, 0] = precice_read_data[:, 0]
                 read_data[:, 1] = precice_read_data[:, 1]
-                # z is the dead direction so the data is not transferred to read_data array
+
+                vertices = np.zeros((n_vertices, dims - 1))
+                vertices[:, 0] = self._coupling_mesh_vertices[:, 0]
+                vertices[:, 1] = self._coupling_mesh_vertices[:, 1]
+                # z is the dead direction so the data is not transferred to read_data array and vertices
                 assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
+                assert (np.sum(np.abs(self._coupling_mesh_vertices[:, 2])) < 1e-10)
             else:
                 raise Exception("Dimensions do not match.")
         else:
             raise Exception("Rank of function space is neither 0 nor 1")
 
-        return {tuple(key): value for key, value in zip(self._coupling_mesh_vertices, read_data)}
+        return {tuple(key): value for key, value in zip(vertices, read_data)}
 
     def write_data(self, write_function):
         """
