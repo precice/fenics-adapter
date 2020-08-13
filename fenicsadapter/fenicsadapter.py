@@ -140,8 +140,8 @@ class Adapter:
         y_forces : list
             List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
-        vertices = np.array(data.keys())
-        nodal_data = np.array(data.values())
+        vertices = np.array(list(data.keys()))
+        nodal_data = np.array(list(data.values()))
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, vertices, nodal_data)
 
     def read_data(self):
