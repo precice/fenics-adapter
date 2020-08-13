@@ -133,7 +133,7 @@ class Adapter:
             List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, self._coupling_mesh_vertices,
-                                           data)
+                                           data, z_dead=self._apply_2d_3d_coupling)
 
     def read_data(self):
         """
