@@ -7,8 +7,7 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
-from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression, \
-    SegregatedRBFInterpolationExpression
+from .expression_core import GeneralInterpolationExpression, SegregatedRBFInterpolationExpression
 from .solverstate import SolverState
 from warnings import warn
 
@@ -59,9 +58,8 @@ class Adapter:
 
         # Interpolation strategy as provided by the user
         if self._config.get_interpolation_expression_type() == "cubic_spline":
-            self._my_expression = ExactInterpolationExpression
-            print("Using cubic spline interpolation.")
-            warn("Recommended to use rbf_segregated instead.")
+            raise Exception("cubic_spline has been removed in https://github.com/precice/fenics-adapter/pull/83. "
+                            "Please use rbf_segregated.")
         elif self._config.get_interpolation_expression_type() == "rbf":
             self._my_expression = GeneralInterpolationExpression
             print("Using RBF interpolation")
