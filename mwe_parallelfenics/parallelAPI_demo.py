@@ -47,8 +47,7 @@ def communicate_shared_vertices(dofmap, data, owned_ids, unowned_ids):
             for dest in sharednodes_map[point]:
                 tag = 1000 + int(str(rank) + str(dofmap.local_to_global_index(point)) + str(dest))
                 print("Rank {} sending to Rank {} -- tag {}".format(rank, dest, tag))
-                req = comm.isend(data[point], dest=dest, tag=tag)
-                req.wait()
+                comm.isend(data[point], dest=dest, tag=tag)
     else:
         print("Rank {}: Nothing to Send".format(rank))
 
@@ -56,9 +55,10 @@ def communicate_shared_vertices(dofmap, data, owned_ids, unowned_ids):
         for point in unowned_ids:
             for source in sharednodes_map[point]:
                 tag = 1000 + int(str(source) + str(dofmap.local_to_global_index(point)) + str(rank))
+                print("Rank {} trying to receive from Rank {} -- tag {}".format(rank, source, tag))
                 req = comm.irecv(source=source, tag=tag)
                 data[point] = req.wait()
-                print("Rank {} receiving from Rank {} -- tag {}".format(rank, source, tag))
+                print("Rank {} successfully received from Rank {} -- tag {}".format(rank, source, tag))
     else:
         print("Rank {}: Nothing to Receive".format(rank))
 
