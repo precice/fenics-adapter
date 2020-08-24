@@ -171,25 +171,25 @@ class GeneralInterpolationExpression(CustomExpression):
         if self._dimension == 1:
             assert (
                 self.is_scalar_valued())  # for 1D only R->R mapping is allowed by preCICE, no need to implement Vector case
-            interpolant.append(Rbf(self._coords_x, self._vals.flatten()))
+            interpolant.append(Rbf(self._coords_x, self._vals))
         elif self._dimension == 2:
             if self.is_scalar_valued():  # check if scalar or vector-valued
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals.flatten()))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals))
             elif self.is_vector_valued():
                 interpolant.append(Rbf(self._coords_x, self._coords_y,
-                                       self._vals[:, 0].flatten()))  # extract dim_no element of each vector
+                                       self._vals[:, 0]))  # extract dim_no element of each vector
                 interpolant.append(Rbf(self._coords_x, self._coords_y,
-                                       self._vals[:, 1].flatten()))  # extract dim_no element of each vector
+                                       self._vals[:, 1]))  # extract dim_no element of each vector
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         elif self._dimension == 3:
             logger.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
             if self.is_scalar_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten()))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals))
             elif self.is_vector_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 0].flatten()))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 1].flatten()))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 2].flatten()))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 0]))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 1]))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 2]))
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         else:

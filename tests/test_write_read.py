@@ -145,7 +145,7 @@ class TestWriteandReadData(TestCase):
             elif type(arg) is np.ndarray:
                 np.testing.assert_allclose(arg, expected_arg)
 
-        np.testing.assert_almost_equal(read_data, return_dummy_data(self.n_vertices))
+        np.testing.assert_almost_equal(list(read_data.values()), return_dummy_data(self.n_vertices))
 
     def test_vector_read(self):
         """
@@ -185,4 +185,4 @@ class TestWriteandReadData(TestCase):
             elif type(arg) is np.ndarray:
                 np.testing.assert_allclose(arg, expected_arg)
 
-        np.testing.assert_almost_equal(read_data, return_dummy_data(self.n_vertices))
+        np.testing.assert_almost_equal(list(read_data.values()), return_dummy_data(self.n_vertices))
