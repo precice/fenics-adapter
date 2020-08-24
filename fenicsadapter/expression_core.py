@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 
 
-class CustomExpression(UserExpression):
+class CouplingExpression(UserExpression):
     """
     Creates functional representation (for FEniCS) of nodal data provided by preCICE.
     """
@@ -157,7 +157,7 @@ class CustomExpression(UserExpression):
             return self._function_type is FunctionType.VECTOR
 
 
-class GeneralInterpolationExpression(CustomExpression):
+class RBFInterpolationExpression(CouplingExpression):
     """
     Uses RBF interpolation for implementation of CustomExpression.interpolate. Allows for arbitrary coupling
     interfaces, but has limited accuracy.
@@ -218,7 +218,7 @@ class GeneralInterpolationExpression(CustomExpression):
         return return_value
 
 
-class SegregatedRBFInterpolationExpression(CustomExpression):
+class SegregatedRBFInterpolationExpression(CouplingExpression):
     """
     Uses polynomial quadratic fit + RBF interpolation for implementation of CustomExpression.interpolate. Allows for
     arbitrary coupling interfaces.
