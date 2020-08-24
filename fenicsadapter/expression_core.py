@@ -2,10 +2,10 @@
 This module provides a mechanism to imterpolate point data acquired from preCICE into FEniCS Expressions.
 """
 
-import dolfin
 from dolfin import UserExpression
+from .adapter_core import FunctionType
 from scipy.interpolate import Rbf
-from scipy.interpolate import interp1d
+from scipy.linalg import lstsq
 import numpy as np
 from fenics import MPI
 
@@ -15,10 +15,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 
 
-class CustomExpression(UserExpression):
+class CouplingExpression(UserExpression):
     """
     Creates functional representation (for FEniCS) of nodal data provided by preCICE.
     """
+
+    def set_function_type(self, function_type):
+        self._function_type = function_type
 
     def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
         """
@@ -119,12 +122,17 @@ class CustomExpression(UserExpression):
         tag : bool
             True if function being interpolated is scalar-valued, False otherwise.
         """
-        if self._vals.ndim == 1:
-            return True
-        elif self._vals.ndim > 1:
-            return False
-        else:
-            raise Exception("Dimension of the function is 0 or negative!")
+        try:
+            if self._vals.ndim == 1:
+                assert(self._function_type is FunctionType.SCALAR)
+                return True
+            elif self._vals.ndim > 1:
+                assert(self._function_type is FunctionType.VECTOR)
+                return False
+            else:
+                raise Exception("Dimension of the function is 0 or negative!")
+        except AttributeError:
+            return self._function_type is FunctionType.SCALAR
 
     def is_vector_valued(self):
         """
@@ -135,15 +143,20 @@ class CustomExpression(UserExpression):
         tag : bool
             True if function being interpolated is vector-valued, False otherwise.
         """
-        if self._vals.ndim > 1:
-            return True
-        elif self._vals.ndim == 1:
-            return False
-        else:
-            raise Exception("Dimension of the function is 0 or negative!")
+        try:
+            if self._vals.ndim > 1:
+                assert(self._function_type is FunctionType.VECTOR)
+                return True
+            elif self._vals.ndim == 1:
+                assert(self._function_type is FunctionType.SCALAR)
+                return False
+            else:
+                raise Exception("Dimension of the function is 0 or negative!")
+        except AttributeError:
+            return self._function_type is FunctionType.VECTOR
 
 
-class GeneralInterpolationExpression(CustomExpression):
+class RBFInterpolationExpression(CouplingExpression):
     """
     Uses RBF interpolation for implementation of CustomExpression.interpolate. Allows for arbitrary coupling
     interfaces, but has limited accuracy.
@@ -157,25 +170,25 @@ class GeneralInterpolationExpression(CustomExpression):
         if self._dimension == 1:
             assert (
                 self.is_scalar_valued())  # for 1D only R->R mapping is allowed by preCICE, no need to implement Vector case
-            interpolant.append(Rbf(self._coords_x, self._vals.flatten()))
+            interpolant.append(Rbf(self._coords_x, self._vals))
         elif self._dimension == 2:
             if self.is_scalar_valued():  # check if scalar or vector-valued
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals.flatten()))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals))
             elif self.is_vector_valued():
                 interpolant.append(Rbf(self._coords_x, self._coords_y,
-                                       self._vals[:, 0].flatten()))  # extract dim_no element of each vector
+                                       self._vals[:, 0]))  # extract dim_no element of each vector
                 interpolant.append(Rbf(self._coords_x, self._coords_y,
-                                       self._vals[:, 1].flatten()))  # extract dim_no element of each vector
+                                       self._vals[:, 1]))  # extract dim_no element of each vector
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         elif self._dimension == 3:
             logger.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
             if self.is_scalar_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals.flatten()))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals))
             elif self.is_vector_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 0].flatten()))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 1].flatten()))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 2].flatten()))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 0]))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 1]))
+                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 2]))
             else:
                 raise Exception("Problem dimension and data dimension not matching.")
         else:
@@ -204,49 +217,58 @@ class GeneralInterpolationExpression(CustomExpression):
         return return_value
 
 
-class ExactInterpolationExpression(CustomExpression):
+class SegregatedRBFInterpolationExpression(CouplingExpression):
     """
-    Uses cubic spline interpolation for implementation of CustomExpression.interpolate. Only allows interpolation on
-    coupling that are parallel to the y axis, and if the coordinates in self._coords_y are ordered such that the nodes
-    on the coupling mesh are traversed w.r.t their connectivity.
-    However, this method allows to exactly recover the solution at the coupling interface, if it is a polynomial of
-    order 3 or lower.
-    See also https://github.com/precice/fenics-adapter/milestone/1
+    Uses polynomial quadratic fit + RBF interpolation for implementation of CustomExpression.interpolate. Allows for
+    arbitrary coupling interfaces.
+
+    See Lindner, F., Mehl, M., & Uekermann, B. (2017). Radial basis function interpolation for black-box multi-physics
+    simulations.
     """
+
+    def segregated_interpolant_2d(self, coords_x, coords_y, data):
+        assert(coords_x.shape == coords_y.shape)
+        # create least squares system to approximate a * x ** 2 + b * x + c ~= y
+        lstsq_interp = lambda x, y, w: w[0] * x ** 2 + \
+                                       w[1] * y ** 2 + \
+                                       w[2] * x * y + \
+                                       w[3] * x + \
+                                       w[4] * y + \
+                                       w[5]
+
+        A = np.empty((coords_x.shape[0], 0))
+        n_unknowns = 6
+        for i in range(n_unknowns):
+            w = np.zeros([n_unknowns])
+            w[i] = 1
+            column = lstsq_interp(coords_x, coords_y, w).reshape((coords_x.shape[0], 1))
+            A = np.hstack([A, column])
+
+        # solve system
+        w, _, _, _ = lstsq(A, data)
+        # create fit
+
+        # compute remaining error
+        res = data - lstsq_interp(coords_x, coords_y, w)
+        # add RBF for error
+        rbf_interp = Rbf(coords_x, coords_y, res)
+
+        return lambda x, y: rbf_interp(x, y) + lstsq_interp(x, y, w)
 
     def create_interpolant(self):
         """
         See base class description.
         """
+        assert (self._dimension == 2)  # current implementation only supports two dimensions
         interpolant = []
-        if self._dimension == 2:
-            n_samples = len(self._coords_y)
-            if n_samples > 3:
-                kind = "cubic"
-            else:
-                logger.warning("Only {n_samples} nodes for interpolation provided. This may reduce the accuracy. "
-                                "Consider refining your mesh.".format(n_samples=n_samples))
-                if n_samples == 3:
-                    kind = "quadratic"
-                elif n_samples == 2:
-                    kind = "linear"
-                else:
-                    raise Exception("Not sufficient number nodes for interpolation provided!")
 
-            if self.is_scalar_valued():  # check if scalar or vector-valued
-                interpolant.append(
-                    interp1d(self._coords_y, self._vals, bounds_error=False, fill_value="extrapolate", kind=kind))
-            elif self.is_vector_valued():
-                interpolant.append(
-                    interp1d(self._coords_y, self._vals[:, 0].flatten(), bounds_error=False, fill_value="extrapolate",
-                             kind=kind))
-                interpolant.append(
-                    interp1d(self._coords_y, self._vals[:, 1].flatten(), bounds_error=False, fill_value="extrapolate",
-                             kind=kind))
-            else:
-                raise Exception("Problem dimension and data dimension not matching.")
+        if self.is_scalar_valued():  # check if scalar or vector-valued
+            interpolant.append(self.segregated_interpolant_2d(self._coords_x, self._coords_y, self._vals))
+        elif self.is_vector_valued():
+            for d in range(2):
+                interpolant.append(self.segregated_interpolant_2d(self._coords_x, self._coords_y, self._vals[:, d]))
         else:
-            raise Exception("Dimension of the function is invalid/not supported.")
+            raise Exception("Problem dimension and data dimension not matching.")
 
         return interpolant
 
@@ -254,20 +276,16 @@ class ExactInterpolationExpression(CustomExpression):
         """
         See base class description.
         """
-        assert ((self.is_scalar_valued() and self._vals.ndim == 1) or
-                (self.is_vector_valued() and self._vals.ndim == self._dimension))
+        assert (self._dimension == 2)  # current implementation only supports two dimensions
 
         return_value = self._vals.ndim * [None]
 
-        if self._dimension == 2:
-            for i in range(self._vals.ndim):
-                return_value[i] = self._f[i](x[1])
-        else:
-            raise Exception("invalid dimensionality!")
+        for i in range(self._vals.ndim):
+            return_value[i] = self._f[i](x[0], x[1])
         return return_value
 
 
-class EmptyExpression(CustomExpression):
+class EmptyExpression(CouplingExpression):
     """A dummy expression that can be used for implementing a coupling boundary condition, if the participant's mesh has
     no vertices on the coupling domain. Only used for parallel runs.
 

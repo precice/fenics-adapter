@@ -5,8 +5,13 @@ import sys
 if sys.version_info[0] < 3:
     raise Exception("The fenicsadapter only supports Python3. Did you run $python setup.py <option>.? Try running $python3 setup.py <option>.")
 
+# using point 3. in https://packaging.python.org/guides/single-sourcing-package-version/#single-sourcing-the-version
+version = {}
+with open("fenicsadapter/version.py") as fp:
+    exec(fp.read(), version)
+
 setup(name='fenicsadapter',
-      version='0.2',
+      version=version['__version__'],
       description='preCICE-adapter for the open source computing platform FEniCS ',
       url='https://github.com/precice/fenics-adapter',
       author="Benjamin Rueth",

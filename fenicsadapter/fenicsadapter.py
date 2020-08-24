@@ -6,11 +6,9 @@ import numpy as np
 from .config import Config
 import logging
 import precice
-from precice import action_write_initial_data, action_write_iteration_checkpoint, action_read_iteration_checkpoint
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
-    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, determine_shared_nodes, \
-    modify_coupling_boundary_data
-from .expression_core import GeneralInterpolationExpression, ExactInterpolationExpression, EmptyExpression
+    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
+from .expression_core import RBFInterpolationExpression, SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import MPI
 from warnings import warn
@@ -63,11 +61,14 @@ class Adapter:
 
         # Interpolation strategy as provided by the user
         if self._config.get_interpolation_expression_type() == "cubic_spline":
-            self._my_expression = ExactInterpolationExpression
-            print("Using cubic spline interpolation")
+            raise Exception("cubic_spline has been removed in https://github.com/precice/fenics-adapter/pull/83. "
+                            "Please use rbf_segregated.")
         elif self._config.get_interpolation_expression_type() == "rbf":
-            self._my_expression = GeneralInterpolationExpression
+            self._my_expression = RBFInterpolationExpression
             print("Using RBF interpolation")
+        elif self._config.get_interpolation_expression_type() == "rbf_segregated":
+            self._my_expression = SegregatedRBFInterpolationExpression
+            print("Using segregated RBF interpolation")
         else:
             warn("No valid interpolation strategy entered. It is assumed that the user does not wish to use FEniCS Expressions on the coupling boundary.")
 
@@ -80,31 +81,24 @@ class Adapter:
         # Necessary bools for enforcing proper control flow / warnings to user
         self._first_advance_done = False
         self._apply_2d_3d_coupling = False
-        self._non_standard_initialization = False
 
         # Necessary data for parallel computations
         self._owned_global_ids = None
         self._unowned_local_ids = None
 
-    def create_coupling_expression(self, data=None):
+    def create_coupling_expression(self):
         """
         Creates a FEniCS Expression in the form of an object of class GeneralInterpolationExpression or
         ExactInterpolationExpression. The adapter will hold this object till the coupling is on going.
-
-        Parameters
-        ----------
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
-            If no data is provided then a numpy array of shape (N, D) with zero values is used.
 
         Returns
         -------
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
         """
-        if self._non_standard_initialization and data is None:
-            warn("initialize_data() was called but the data was not supplied for creating the coupling expression")
+
+        if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
+            raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
 
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
@@ -124,17 +118,6 @@ class Adapter:
             elif self._read_function_type == FunctionType.VECTOR:
                 coupling_expression._vals = np.empty(shape=(0, 0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
 
-        if data is None:
-            # standard initialization with zero valued data
-            if self._read_function_type is FunctionType.SCALAR:
-                data = np.zeros(n_vertices)
-            elif self._read_function_type is FunctionType.VECTOR:
-                data = np.zeros((n_vertices, self._fenics_dimensions))
-            else:
-                raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
-
-        self.update_coupling_expression(coupling_expression, data)
-
         return coupling_expression
 
     def update_coupling_expression(self, coupling_expression, data):
@@ -146,61 +129,31 @@ class Adapter:
         ----------
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
+        data : dict_like
+            The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            value.
         """
-        # Add communicated data to data read from preCICE
-        full_data = modify_coupling_boundary_data(self._function_space, self._coupling_mesh_vertices, data)
-        coupling_expression.update_boundary_data(full_data, self._coupling_mesh_vertices[:, 0], self._coupling_mesh_vertices[:, 1])
+        assert (self._fenics_dimensions == 2), \
+            "Only 2D FEniCS solvers are supported. See https://github.com/precice/fenics-adapter/issues/1."
 
-    def create_point_sources(self, fixed_boundary, data=None):
-        """
-        Create point sources with reference to fixed boundary in a FSI simulation.
+        for v in data.keys():
+            assert (len(v) == self._fenics_dimensions), \
+                "Dimension of all provided vertices must be equal to dimension of FEniCS solver. Dimension = {} and " \
+                "received vertex {}".format(self._fenics_dimensions, v)
 
-        Parameters
-        ----------
-        fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
-            SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
-            is fixed at one end (fixed end of a flexible beam).
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
-            If no data is provided then a numpy array of shape (N, D) with zero values is used.
+        vertices = np.array(list(data.keys()))
+        nodal_data = np.array(list(data.values()))
+        coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
 
-        Returns
-        -------
-        x_forces : list
-            List containing X component of forces with reference to respective point sources on the coupling interface.
-        y_forces : list
-            List containing Y component of forces with reference to respective point sources on the coupling interface.
-        """
-        if self._non_standard_initialization and data is None:
-            warn("initialize_data() was called but the data was not supplied for creating the point sources")
-
-        n_vertices, _ = self._coupling_mesh_vertices.shape
-
-        if data is None:
-            # standard initialization with zero valued data
-            if self._read_function_type is FunctionType.SCALAR:
-                data = np.zeros(n_vertices)
-            elif self._read_function_type is FunctionType.VECTOR:
-                data = np.zeros((n_vertices, self._fenics_dimensions))
-            else:
-                raise Exception("No valid read_function is provided in initialization. Cannot create point sources")
-
-        self._Dirichlet_Boundary = fixed_boundary
-        return self.update_point_sources(data)
-
-    def update_point_sources(self, data):
+    def get_point_sources(self, data):
         """
         Update values of point sources using data.
 
         Parameters
         ----------
-        data : array_like
-            The coupling data. A numpy array [N x D] where N = number of vertices and D = dimensions of the data, i.e.
-            for scalar valued data D = 1 and for vector valued data D = dimension of problem.
+        data : dict_like
+            The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            value.
 
         Returns
         -------
@@ -209,8 +162,24 @@ class Adapter:
         y_forces : list
             List containing Y component of forces with reference to respective point sources on the coupling interface.
         """
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, self._coupling_mesh_vertices,
-                                           data)
+        assert (self._read_function_type is FunctionType.VECTOR), \
+            "PointSources only supported for vector valued read data."
+
+        for v in data.keys():
+            assert (len(v) == self._fenics_dimensions), \
+                "Dimension of all provided vertices must be equal to dimension of FEniCS solver. Dimension = {} and " \
+                "received vertex {}".format(self._fenics_dimensions, v)
+
+        vertices = np.array(list(data.keys()))
+        nodal_data = np.array(list(data.values()))
+        if self._apply_2d_3d_coupling:
+            # append zeros in z dimension for processing internally
+            vector_of_zeros = np.zeros((vertices.shape[0], 1))
+            vertices = np.hstack([vertices, vector_of_zeros])
+            nodal_data = np.hstack([nodal_data, vector_of_zeros])
+
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, vertices, nodal_data,
+                                           z_dead=self._apply_2d_3d_coupling)
 
     def read_data(self):
         """
@@ -219,12 +188,14 @@ class Adapter:
         For a vector read function the data is a numpy array with shape (N, D) where
         N = number of coupling vertices and D = dimensions of FEniCS setup
 
-        Note: For quasi 2D-3D coupled simulation (FEniCS participant is 2D) the Z-component of the data is deleted.
+        Note: For quasi 2D-3D coupled simulation (FEniCS participant is 2D) the Z-component of the data and vertices
+        is deleted.
 
         Returns
         -------
-        read_data : array_like
-            Numpy array containing the read data.
+        data : dict_like
+            The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            value.
         """
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -237,25 +208,40 @@ class Adapter:
         if n_vertices > 0:
             if self._read_function_type is FunctionType.SCALAR:
                 read_data = self._interface.read_block_scalar_data(read_data_id, self._vertex_ids)
+                if self._fenics_dimensions == self._interface.get_dimensions():
+                    vertices = self._coupling_mesh_vertices
+                elif self._apply_2d_3d_coupling:
+                    _, dims = read_data.shape
+                    vertices = np.zeros((n_vertices, dims - 1))
+                    vertices[:, 0] = self._coupling_mesh_vertices[:, 0]
+                    vertices[:, 1] = self._coupling_mesh_vertices[:, 1]
+                    # z is the dead direction so the data is not transferred to vertices
+                    assert (np.sum(np.abs(self._coupling_mesh_vertices[:, 2])) < 1e-10)
+                else:
+                    raise Exception("Dimensions do not match.")
             elif self._read_function_type is FunctionType.VECTOR:
                 if self._fenics_dimensions == self._interface.get_dimensions():
                     read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
+                    vertices = self._coupling_mesh_vertices
                 elif self._apply_2d_3d_coupling:
                     precice_read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
                     n_vertices, dims = precice_read_data.shape
                     read_data = np.zeros((n_vertices, dims-1))
                     read_data[:, 0] = precice_read_data[:, 0]
                     read_data[:, 1] = precice_read_data[:, 1]
-                    # z is the dead direction so the data is not transferred to read_data array
+
+                    vertices = np.zeros((n_vertices, dims - 1))
+                    vertices[:, 0] = self._coupling_mesh_vertices[:, 0]
+                    vertices[:, 1] = self._coupling_mesh_vertices[:, 1]
+                    # z is the dead direction so the data is not transferred to read_data array and vertices
                     assert (np.sum(np.abs(precice_read_data[:, 2])) < 1e-10)
+                    assert (np.sum(np.abs(self._coupling_mesh_vertices[:, 2])) < 1e-10)
                 else:
-                    raise Exception("Dimensions do not match.")
-            else:
-                raise Exception("Rank of function space is neither 0 nor 1")
+                    raise Exception("Rank of function space is neither 0 nor 1")
         else: # if there are no vertices, we return empty data
             read_data = None
 
-        return read_data
+        return {tuple(key): value for key, value in zip(vertices, read_data)}
 
     def write_data(self, write_function):
         """
@@ -306,9 +292,9 @@ class Adapter:
         else:
             print("Process {rank}: No data written as no coupling boundary detected".format(rank=MPI.rank(MPI.comm_world)))
 
-    def initialize(self, coupling_subdomain, function_space, dimensions=2):
+    def initialize(self, coupling_subdomain, mesh, function_space, write_function=None, fixed_boundary=None):
         """
-        Initializes the coupling interface and sets up the mesh in preCICE.
+        Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
 
         Parameters
         ----------
@@ -316,30 +302,41 @@ class Adapter:
             SubDomain of mesh which is the physical coupling boundary.
         function_space : Object of class dolfin.functions.functionspace.FunctionSpace
             Function space on which the finite element formulation of the problem lives.
-        dimensions : int
-            Dimensions of the problem as defined in FEniCS.
+        write_function : Object of class dolfin.functions.function.Function
+            FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
+        fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
+            SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
+            is fixed at one end (fixed end of a flexible beam).
 
         Returns
         -------
         dt : double
             Recommended time step value from preCICE.
         """
-        self._fenics_dimensions = dimensions
 
-        if dimensions != self._interface.get_dimensions():
+        coords = function_space.tabulate_dof_coordinates()
+        _, self._fenics_dimensions = coords.shape
+
+        if fixed_boundary:
+            self._Dirichlet_Boundary = fixed_boundary
+
+        if self._fenics_dimensions != 2:
+            raise Exception("Currently the fenics-adapter only supports 2D cases")
+
+        if self._fenics_dimensions != self._interface.get_dimensions():
             logger.warning("fenics_dimension = {} and precice_dimension = {} do not match!".format(
-                dimensions, self._interface.get_dimensions()))
+                self._fenics_dimensions, self._interface.get_dimensions()))
 
-            if dimensions == 2 and self._interface.get_dimensions() == 3:
+            if self._fenics_dimensions == 2 and self._interface.get_dimensions() == 3:
                 logger.warning("2D-3D coupling will be applied. Z coordinates of all nodes will be set to zero.")
                 self._apply_2d_3d_coupling = True
             else:
                 raise Exception("fenics_dimension = {}, precice_dimension = {}. "
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
-                    dimensions, self._interface.get_dimensions()))
+                    self._fenics_dimensions, self._interface.get_dimensions()))
 
-        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(coupling_subdomain,
-                                                            dimensions, self._interface.get_dimensions())
+        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
+            mesh, coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
@@ -365,45 +362,19 @@ class Adapter:
         self._read_function_type = determine_function_type(function_space)
         self._function_space = function_space
 
-        # Identify nodes which need to be shared
-        self._owned_global_ids, self._unowned_local_ids = determine_shared_nodes(function_space)
+        precice_dt = self._interface.initialize()
 
-        return self._interface.initialize()
-
-    def initialize_data(self, write_function=None):
-        """
-        Set non-standard values as initial conditions to coupling problem
-
-        Parameters
-        ----------
-        write_function : Object of class dolfin.functions.function.Function
-            FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
-
-        Returns
-        -------
-        read_data = array_like
-            Numpy array containing the read data.
-        """
-        self._non_standard_initialization = True
-
-        if self._interface.is_action_required(action_write_initial_data()):
-            # print('{rank} of {size}: is_action_required(action_write_initial_data())'.format(
-            #     rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+        if self._interface.is_action_required(precice.action_write_initial_data()):
+            if not write_function:
+                raise Exception("Non-standard initialization requires a write_function")
             self.write_data(write_function)
-            self._interface.mark_action_fulfilled(action_write_initial_data())
+            self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
         # print('{rank} of {size}: initialize_data()'.format(
         #     rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
         self._interface.initialize_data()
 
-        read_data = None
-
-        if self._interface.is_read_data_available():
-            # print('{rank} of {size}: is_read_data_available()'.format(
-            #     rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-            read_data = self.read_data()
-
-        return read_data
+        return precice_dt
 
     def store_checkpoint(self, user_u, t, n):
         """
@@ -550,7 +521,7 @@ class Adapter:
         action : string
             Name of action related to writing a checkpoint.
         """
-        return action_write_iteration_checkpoint()
+        return precice.action_write_iteration_checkpoint()
 
     def action_read_iteration_checkpoint(self):
         """
@@ -566,4 +537,4 @@ class Adapter:
         action : string
             Name of action related to reading a checkpoint.
         """
-        return action_read_iteration_checkpoint()
+        return precice.action_read_iteration_checkpoint()

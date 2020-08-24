@@ -24,7 +24,7 @@ Make sure to install
 * [preCICE](https://github.com/precice/precice/wiki)
 * python3 (this adapter **only supports python3**)
 * [the python language bindings for preCICE](https://github.com/precice/python-bindings)
-* [FEniCS](https://fenicsproject.org/)
+* [FEniCS](https://fenicsproject.org/) (with python interface, installed by default)
 * and scipy (`pip3 install scipy`)
 
 ### Build and install the adapter
