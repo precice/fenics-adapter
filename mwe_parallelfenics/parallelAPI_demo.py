@@ -8,6 +8,7 @@ import dolfin
 from dolfin import *
 import numpy as np
 from mpi4py import MPI
+import hashlib
 
 
 def determine_shared_vertices(function_space):
@@ -42,25 +43,30 @@ def determine_shared_vertices(function_space):
 def communicate_shared_vertices(dofmap, data, owned_ids, unowned_ids):
     sharednodes_map = dofmap.shared_nodes()
 
-    if owned_ids.size != 0:
-        for point in owned_ids:
-            for dest in sharednodes_map[point]:
-                tag = 1000 + int(str(rank) + str(dofmap.local_to_global_index(point)) + str(dest))
-                print("Rank {} sending to Rank {} -- tag {}".format(rank, dest, tag))
-                comm.isend(data[point], dest=dest, tag=tag)
-    else:
-        print("Rank {}: Nothing to Send".format(rank))
+    hash_tag = hashlib.sha256()
 
     if unowned_ids.size != 0:
         for point in unowned_ids:
             for source in sharednodes_map[point]:
-                tag = 1000 + int(str(source) + str(dofmap.local_to_global_index(point)) + str(rank))
-                print("Rank {} trying to receive from Rank {} -- tag {}".format(rank, source, tag))
+                hash_tag.update((str(source) + str(rank)).encode('utf-8'))
+                tag = int(hash_tag.hexdigest()[:6], base=16)
                 req = comm.irecv(source=source, tag=tag)
                 data[point] = req.wait()
-                print("Rank {} successfully received from Rank {} -- tag {}".format(rank, source, tag))
     else:
         print("Rank {}: Nothing to Receive".format(rank))
+
+    requests = []
+    if owned_ids.size != 0:
+        for point in owned_ids:
+            for dest in sharednodes_map[point]:
+                hash_tag.update((str(rank) + str(dest)).encode('utf-8'))
+                tag = int(hash_tag.hexdigest()[:6], base=16)
+                req = comm.isend(data[point], dest=dest, tag=tag)
+                requests.append(req)
+    else:
+        print("Rank {}: Nothing to Send".format(rank))
+
+    MPI.Request.Waitall(requests)
 
 
 comm = MPI.COMM_WORLD
