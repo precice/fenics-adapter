@@ -211,8 +211,8 @@ class Adapter:
                 if self._fenics_dimensions == self._interface.get_dimensions():
                     vertices = self._coupling_mesh_vertices
                 elif self._apply_2d_3d_coupling:
-                    _, dims = read_data.shape
-                    vertices = np.zeros((n_vertices, dims - 1))
+                    n_vertices = read_data.size
+                    vertices = np.zeros((n_vertices, 2))
                     vertices[:, 0] = self._coupling_mesh_vertices[:, 0]
                     vertices[:, 1] = self._coupling_mesh_vertices[:, 1]
                     # z is the dead direction so the data is not transferred to vertices
