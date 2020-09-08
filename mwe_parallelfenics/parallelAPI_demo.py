@@ -32,33 +32,37 @@ def determine_shared_vertices(function_space):
     # Global IDs of vertices which are owned and shared by this rank
     owned_shared_ids = [i for i in global_shared_ids if i not in unowned_shared_ids]
 
-    hash_tag = hashlib.sha256()
+    # Ranks with which this rank shares vertices
+    neigh_ranks = dofmap.neighbours()
 
+    # Transfer data of owned vertices to neighbouring processes
     recv_reqs = []
-    for neigh in dofmap.neighbours():
-        hash_tag.update((str(neigh) + str(rank)).encode('utf-8'))
-        tag = int(hash_tag.hexdigest()[:6], base=16)
-        recv_reqs.append(comm.irecv(source=neigh, tag=tag))
+    for neigh in neigh_ranks:
+        recv_hashtag = hashlib.sha256()
+        recv_hashtag.update((str(neigh) + str(rank)).encode('utf-8'))
+        recv_tag = int(recv_hashtag.hexdigest()[:6], base=16)
+        recv_reqs.append(comm.irecv(source=neigh, tag=recv_tag))
 
     send_reqs = []
-    for neigh in dofmap.neighbours():
-        hash_tag.update((str(rank) + str(neigh)).encode('utf-8'))
-        tag = int(hash_tag.hexdigest()[:6], base=16)
-        req = comm.isend(owned_shared_ids, dest=neigh, tag=tag)
+    for neigh in neigh_ranks:
+        send_hashtag = hashlib.sha256()
+        send_hashtag.update((str(rank) + str(neigh)).encode('utf-8'))
+        send_tag = int(send_hashtag.hexdigest()[:6], base=16)
+        req = comm.isend(owned_shared_ids, dest=neigh, tag=send_tag)
         send_reqs.append(req)
 
     # Wait for all non-blocking communications to complete
     MPI.Request.Waitall(send_reqs)
 
     all_owned_data = dict()
-    # Set received data into the existing data array
+    # Set received ownership data into the existing data array
     counter = 0
-    for neigh in dofmap.neighbours():
+    for neigh in neigh_ranks:
         all_owned_data[neigh] = recv_reqs[counter].wait()
         counter += 1
 
     to_recv_ids = dict()
-    for neigh in dofmap.neighbours():
+    for neigh in neigh_ranks:
         for oid in all_owned_data[neigh]:
             for id in unowned_shared_ids:
                 if oid == id:
@@ -76,33 +80,27 @@ def determine_shared_vertices(function_space):
 
 
 def communicate_shared_vertices(dofmap, data, to_send_ids, to_recv_ids):
-    sharednodes_map = dofmap.shared_nodes()
-    hash_tag = hashlib.sha256()
     local_to_global_ids = dofmap.tabulate_local_to_global_dofs()
 
     recv_reqs = []
-    if to_recv_ids.size != 0:
-        for recv_gid in to_recv_ids:
-            recv_lid = int(np.where(local_to_global_ids == recv_gid)[0][0])
-            for rk in sharednodes_map[recv_lid]:
-                hash_tag.update((str(rk) + str(recv_gid) + str(rank)).encode('utf-8'))
-                tag = int(hash_tag.hexdigest()[:6], base=16)
-                print("Tag ({}): Rank {} receiving ID:({}) from rank {}".format(tag, rank, recv_gid, rk))
-                recv_reqs.append(comm.irecv(source=rk, tag=tag))
-                #print("Tag ({}): Rank {} received ID:({}) from rank {}".format(tag, rank, recv_gid, rk))
+    if bool(to_recv_ids):
+        for recv_gid, src in to_recv_ids.items():
+            hash_tag = hashlib.sha256()
+            hash_tag.update((str(src) + str(recv_gid) + str(rank)).encode('utf-8'))
+            tag = int(hash_tag.hexdigest()[:6], base=16)
+            recv_reqs.append(comm.irecv(source=src, tag=tag))
     else:
         print("Rank {}: Nothing to Receive".format(rank))
 
     send_reqs = []
-    if to_send_ids.size != 0:
-        for send_gid in to_send_ids:
+    if bool(to_send_ids):
+        for send_gid, dests in to_send_ids.items():
             send_lid = int(np.where(local_to_global_ids == send_gid)[0][0])
-            for rk in sharednodes_map[send_lid]:
+            for rk in dests:
+                hash_tag = hashlib.sha256()
                 hash_tag.update((str(rank) + str(send_gid) + str(rk)).encode('utf-8'))
                 tag = int(hash_tag.hexdigest()[:6], base=16)
-                #print("Tag ({}): Rank {} sending ID: ({}) to rank {}".format(tag, rank, send_gid, rk))
                 req = comm.isend(data[send_lid], dest=rk, tag=tag)
-                print("Tag ({}): Rank {} sent ID: ({}) to rank {}".format(tag, rank, send_gid, rk))
                 send_reqs.append(req)
     else:
         print("Rank {}: Nothing to Send".format(rank))
@@ -112,7 +110,7 @@ def communicate_shared_vertices(dofmap, data, to_send_ids, to_recv_ids):
 
     # Set received data into the existing data array
     counter = 0
-    for recv_gid in to_recv_ids:
+    for recv_gid in to_recv_ids.keys():
         recv_lid = int(np.where(local_to_global_ids == recv_gid)[0][0])
         data[recv_lid] = recv_reqs[counter].wait()
         counter += 1
@@ -133,8 +131,8 @@ V = FunctionSpace(mesh, "P", 1)
 dofmap = V.dofmap()
 
 dof_coords = V.tabulate_dof_coordinates()
-print("Rank {} : dof coordinates = {}".format(rank, dof_coords))
-comm.Barrier()
+#print("Rank {} : dof coordinates = {}".format(rank, dof_coords))
+#comm.Barrier()
 
 print("Rank {}: shared nodes map: {}".format(rank, dofmap.shared_nodes()))
 comm.Barrier()
@@ -142,16 +140,17 @@ comm.Barrier()
 if rank == 0:
     print()
     print("---------- Communicating shared node values ----------")
+comm.Barrier()
 
 n_vertices = len(dofmap.tabulate_local_to_global_dofs())
 owned_shared, unowned_shared = determine_shared_vertices(V)
-if owned_shared.size == 0:
+if not bool(owned_shared):
     print("Rank {}: This process does not own any vertices it shares".format(rank))
 else:
     print("Rank {}: Indices of vertices which this process owns and shares are {}".format(rank, owned_shared))
 comm.Barrier()
 
-if unowned_shared.size == 0:
+if not bool(unowned_shared):
     print("Rank {}: This process owns all the vertices it shares".format(rank))
 else:
     print("Rank {}: Indices of vertices which this process does not own but shares are {}".format(rank, unowned_shared))
