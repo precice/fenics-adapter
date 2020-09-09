@@ -3,11 +3,13 @@ This module consists of helper functions used in the Adapter class. Names of the
 """
 
 import dolfin
-from dolfin import SubDomain, Point, PointSource, vertices
-from fenics import FunctionSpace, VectorFunctionSpace, Function
+from dolfin import SubDomain, Point, PointSource
+from fenics import FunctionSpace, Function
 import numpy as np
 from enum import Enum
 import logging
+import hashlib
+from mpi4py import MPI
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -136,6 +138,7 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
         Number of vertices on the coupling interface.
     """
     fenics_vertices = []
+    fenics_inds = []
     vertices_x = []
     vertices_y = []
     vertices_z = []
@@ -147,9 +150,15 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
     # preCICE only sees non-duplicate global vertices
     vertices = function_space.dofmap().tabulate_dof_coordinates()
 
+    local_to_global_map = function_space.dofmap().tabulate_local_to_global_dofs()
+    local_to_global_unowned = function_space.dofmap().local_to_global_unowned()
+    global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
+
+    counter = 0
     for v in vertices:
         if coupling_subdomain.inside(v.point(), True):
             fenics_vertices.append(v)
+            fenics_inds.append(global_ids[counter])
             vertices_x.append(v.x(0))
             if dimensions == 2:
                 vertices_y.append(v.x(1))
@@ -159,11 +168,12 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
             else:
                 raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
                                 .format(dimensions, fenics_dimensions))
+            counter += 1
 
     if dimensions == 2:
-        return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
+        return fenics_vertices, fenics_inds, np.stack([vertices_x, vertices_y], axis=1)
     elif dimensions == 3:
-        return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
+        return fenics_vertices, fenics_inds, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
 
 def are_connected_by_edge(v1, v2):
@@ -298,36 +308,128 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def determine_shared_nodes(function_space):
-    # Identify owned global indices
-    dofmap = function_space.dofmap()
+def determine_shared_vertices(comm, rank, dofmap, fenics_inds):
+    """
+
+    Parameters
+    ----------
+    comm
+    rank
+    dofmap
+    fenics_inds
+
+    Returns
+    -------
+
+    """
     sharednodes_map = dofmap.shared_nodes()
-    shared_ids = list(sharednodes_map.keys())
-    unowned_ids = dofmap.local_to_global_unowned()
-    global_ids = dofmap.tabulate_local_to_global_dofs()
 
-    # Identify local ids of vertices which are not owned by this rank
-    unowned_shared_ids, owned_shared_ids = [], []
-    for sid in shared_ids:
-        for unid in unowned_ids:
-            if global_ids[sid] == unid:
-                unowned_shared_ids.append(sid)
+    # Global IDs of vertices which are not owned but shared by this rank
+    unowned_shared_ids = dofmap.local_to_global_unowned()
 
-    unowned_ids = np.array(unowned_shared_ids)
+    # Global IDs of vertices which are owned and shared by this rank
+    owned_shared_ids = fenics_inds
 
-    owned_ids = np.copy(shared_ids)
-    for unowned_id in unowned_ids:
-        owned_ids = owned_ids[owned_ids != unowned_id]
+    # Ranks with which this rank shares vertices
+    neigh_ranks = dofmap.neighbours()
 
-    return owned_ids, unowned_ids
+    # Transfer data of owned vertices to neighbouring processes
+    recv_reqs = []
+    for neigh in neigh_ranks:
+        recv_hashtag = hashlib.sha256()
+        recv_hashtag.update((str(neigh) + str(rank)).encode('utf-8'))
+        recv_tag = int(recv_hashtag.hexdigest()[:6], base=16)
+        recv_reqs.append(comm.irecv(source=neigh, tag=recv_tag))
+
+    send_reqs = []
+    for neigh in neigh_ranks:
+        send_hashtag = hashlib.sha256()
+        send_hashtag.update((str(rank) + str(neigh)).encode('utf-8'))
+        send_tag = int(send_hashtag.hexdigest()[:6], base=16)
+        req = comm.isend(owned_shared_ids, dest=neigh, tag=send_tag)
+        send_reqs.append(req)
+
+    # Wait for all non-blocking communications to complete
+    MPI.Request.Waitall(send_reqs)
+
+    all_owned_data = dict()
+    # Set received ownership data into the existing data array
+    counter = 0
+    for neigh in neigh_ranks:
+        all_owned_data[neigh] = recv_reqs[counter].wait()
+        counter += 1
+
+    to_recv_ids = dict()
+    for neigh in neigh_ranks:
+        for oid in all_owned_data[neigh]:
+            for id in unowned_shared_ids:
+                if oid == id:
+                    to_recv_ids[id] = neigh
+
+    local_to_global_ids = dofmap.tabulate_local_to_global_dofs()
+    to_send_ids = dict()
+    for id in owned_shared_ids:
+        lid = int(np.where(local_to_global_ids == id)[0][0])
+        for shared_id in sharednodes_map.keys():
+            if shared_id == lid:
+                to_send_ids[id] = sharednodes_map[lid]
+
+    return to_send_ids, to_recv_ids
 
 
-def modify_coupling_boundary_data(function_space, coupling_vertices, data):
-    dofmap = function_space.dofmap()
-    shared_nodes_map = dofmap.shared_nodes()
+def communicate_shared_vertices(comm, rank, dofmap, precice_data, to_send_ids, to_recv_ids):
+    local_to_global_map = dofmap.tabulate_local_to_global_dofs()
+    local_to_global_unowned = dofmap.local_to_global_unowned()
+    global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
 
-    # MPI Communication
+    # Create fenics type shared data array for communication
+    fenics_data = np.zeros(len(local_to_global_map))
 
-    # Modifying data to new data
+    # Attach data read from preCICE to appropriate ids in fenics shared data array
+    counter = 0
+    for lid in range(len(local_to_global_map)):
+        for gid in global_ids:
+            if local_to_global_map[lid] == gid:
+                fenics_data[lid] = precice_data[counter]
+                counter += 1
 
-    # Return data
+    # Check if data at receiving IDs is zero
+    for lid in range(len(local_to_global_map)):
+        for gid in to_recv_ids:
+            if local_to_global_map[lid] == gid:
+                assert(fenics_data[lid] == 0)
+
+    recv_reqs = []
+    if bool(to_recv_ids):
+        for recv_gid, src in to_recv_ids.items():
+            hash_tag = hashlib.sha256()
+            hash_tag.update((str(src) + str(recv_gid) + str(rank)).encode('utf-8'))
+            tag = int(hash_tag.hexdigest()[:6], base=16)
+            recv_reqs.append(comm.irecv(source=src, tag=tag))
+    else:
+        print("Rank {}: Nothing to Receive".format(rank))
+
+    send_reqs = []
+    if bool(to_send_ids):
+        for send_gid, dests in to_send_ids.items():
+            send_lid = int(np.where(local_to_global_map == send_gid)[0][0])
+            for rk in dests:
+                hash_tag = hashlib.sha256()
+                hash_tag.update((str(rank) + str(send_gid) + str(rk)).encode('utf-8'))
+                tag = int(hash_tag.hexdigest()[:6], base=16)
+                req = comm.isend(fenics_data[send_lid], dest=rk, tag=tag)
+                send_reqs.append(req)
+    else:
+        print("Rank {}: Nothing to Send".format(rank))
+
+    # Wait for all non-blocking communications to complete
+    MPI.Request.Waitall(send_reqs)
+
+    # Set received data into the existing data array
+    counter = 0
+    for recv_gid in to_recv_ids.keys():
+        recv_lid = int(np.where(local_to_global_map == recv_gid)[0][0])
+        fenics_data[recv_lid] = recv_reqs[counter].wait()
+        counter += 1
+
+    return fenics_data

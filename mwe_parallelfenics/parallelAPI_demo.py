@@ -5,7 +5,7 @@ All functionalities described here have potential use in the adapter
 Important documentation for DofMap in dolfin: https://fenicsproject.org/docs/dolfin/1.6.0/python/programmers-reference/cpp/fem/GenericDofMap.html
 """
 import dolfin
-from dolfin import *
+from dolfin import Point, RectangleMesh, FunctionSpace, entities
 import numpy as np
 from mpi4py import MPI
 import hashlib
@@ -131,8 +131,16 @@ V = FunctionSpace(mesh, "P", 1)
 dofmap = V.dofmap()
 
 dof_coords = V.tabulate_dof_coordinates()
-#print("Rank {} : dof coordinates = {}".format(rank, dof_coords))
-#comm.Barrier()
+print("Rank {} : dof coordinates = {}".format(rank, dof_coords))
+comm.Barrier()
+
+local_to_global = dofmap.tabulate_local_to_global_dofs()
+print("Rank {} : tabulate_local_to_global_dofs coordinates = {}".format(rank, local_to_global))
+comm.Barrier()
+
+local_to_global_unowned = dofmap.local_to_global_unowned()
+print("Rank {} : local_to_global_unowned coordinates = {}".format(rank, local_to_global_unowned))
+comm.Barrier()
 
 print("Rank {}: shared nodes map: {}".format(rank, dofmap.shared_nodes()))
 comm.Barrier()
@@ -165,23 +173,19 @@ comm.Barrier()
 communicate_shared_vertices(dofmap, data, owned_shared, unowned_shared)
 
 print("Rank {}: Data after communication: {}".format(rank, data))
+comm.Barrier()
 
-# function = project(Expression("x[0]", degree=1), V)
-# if rank == 0:
-#     print()
-#     print("---------- Introducing function f = x ----------")
-#     print("Projecting function f = x[0] (x-coordinate value) on function space".format(rank))
-#
-# comm.Barrier()
-#
-# vec = function.vector().get_local()
-# global_indices = []
-# l_indices = []
-# for i in range(len(vec)):
-#     Vertex = dolfin.MeshEntity(mesh, 0, i)
-#     global_indices.append(Vertex.global_index())
-#
-# print("Rank {}: global indices of local vertices are = {}".format(rank, global_indices))
-# comm.Barrier()
+global_indices = []
+local_indices = []
+shared_indices = []
+for e in entities(mesh, 1):
+    global_indices.append(e.global_index())
+    local_indices.append(e.index())
+    if e.is_shared():
+        shared_indices.append(e.global_index())
 
+print("Rank {}: global indices by Mesh entities = {}".format(rank, global_indices))
+print("Rank {}: local indices by Mesh entities = {}".format(rank, local_indices))
+print("Rank {}: shared indices by Mesh entities = {}".format(rank, shared_indices))
+comm.Barrier()
 

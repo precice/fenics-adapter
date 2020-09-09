@@ -7,10 +7,11 @@ from .config import Config
 import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
-    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
+    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
+    determine_shared_vertices, communicate_shared_vertices
 from .expression_core import RBFInterpolationExpression, SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
-from fenics import MPI
+from mpi4py import MPI
 from warnings import warn
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ class Adapter:
         # FEniCS related quantities
         self._fenics_dimensions = None
         self._function_space = None  # initialized later
+        self._dofmap = None # initialized later using function space provided by user
 
         # coupling mesh related quantities
         self._coupling_mesh_vertices = None  # initialized later
@@ -83,8 +85,12 @@ class Adapter:
         self._apply_2d_3d_coupling = False
 
         # Necessary data for parallel computations
-        self._owned_global_ids = None
-        self._unowned_local_ids = None
+        self._to_send_pts = None
+        self._to_recv_pts = None
+
+        # Setup up MPI communicator on mpi4py
+        self._comm = MPI.COMM_WORLD
+        self._rank = self._comm.Get_rank()
 
     def create_coupling_expression(self):
         """
@@ -238,6 +244,8 @@ class Adapter:
                     assert (np.sum(np.abs(self._coupling_mesh_vertices[:, 2])) < 1e-10)
                 else:
                     raise Exception("Rank of function space is neither 0 nor 1")
+
+            communicate_shared_vertices(self._comm, self._rank, self._dofmap, read_data, self._to_send_pts, self._to_recv_pts)
         else: # if there are no vertices, we return empty data
             read_data = None
 
@@ -335,7 +343,7 @@ class Adapter:
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
                     self._fenics_dimensions, self._interface.get_dimensions()))
 
-        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
+        fenics_vertices, fenics_inds, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
             mesh, coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
 
         # Set up mesh in preCICE
@@ -361,6 +369,11 @@ class Adapter:
         # Set read functionality parameters
         self._read_function_type = determine_function_type(function_space)
         self._function_space = function_space
+        self._dofmap = function_space.dofmap()
+
+        # Determine shared vertices with neighbouring processes and get dictionaries for communication
+        self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank, self._dofmap,
+                                                                         fenics_inds)
 
         precice_dt = self._interface.initialize()
 
