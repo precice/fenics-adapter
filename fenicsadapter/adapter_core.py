@@ -145,7 +145,6 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
-    # Refer: https://github.com/precice/precice/wiki/Dealing-with-distributed-meshes#use-a-single-mesh-and-communicate-ghost-vertices-inside-adapter
     # preCICE only sees non-duplicate global vertices
     dofs = function_space.tabulate_dof_coordinates()
     local_to_global_map = function_space.dofmap().tabulate_local_to_global_dofs()
@@ -167,10 +166,13 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
                                 .format(dimensions, fenics_dimensions))
             counter += 1
 
+    coords = vertices_x
     if dimensions == 2:
-        return vertex_ids, np.stack([vertices_x, vertices_y], axis=1)
-    elif dimensions == 3:
-        return vertex_ids, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
+        coords = np.stack([vertices_x, vertices_y], axis=1)
+    if dimensions == 3:
+        coords = np.stack([vertices_x, vertices_y, vertices_z], axis=1)
+
+    return vertex_ids, coords
 
 
 def are_connected_by_edge(v1, v2):
@@ -216,7 +218,6 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping):
     vertices2_ids : numpy array
         Array of second vertex of each edge.
     """
-    # Refer: https://github.com/precice/precice/wiki/Dealing-with-distributed-meshes#use-a-single-mesh-and-communicate-ghost-vertices-inside-adapter
     # preCICE only sees non-duplicate global vertices
     dofs = function_space.tabulate_dof_coordinates()
     local_to_global_map = function_space.dofmap().tabulate_local_to_global_dofs()
@@ -377,11 +378,13 @@ def determine_shared_vertices(comm, rank, dofmap, fenics_gids, fenics_lids):
     sharednodes_map = dofmap.shared_nodes()
 
     # Global IDs of vertices shared by this rank and on the coupling interface
+    counter = 0
     global_shared_ids = []
     for local_id in fenics_lids:
         for key in sharednodes_map.keys():
             if local_id == key:
-                global_shared_ids.append(fenics_gids[local_id])
+                global_shared_ids.append(fenics_gids[counter])
+                counter += 1
 
     # Global IDs of vertices which are not owned but shared by this rank
     unowned_shared_ids = dofmap.local_to_global_unowned()

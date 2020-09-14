@@ -26,7 +26,7 @@
       <use-mesh name="NeumannNodes" from="HeatNeumann"/>
       <write-data name="Flux" mesh="DirichletNodes"/>
       <read-data  name="Temperature" mesh="DirichletNodes"/>
-      <mapping:nearest-projection direction="read"  from="NeumannNodes"   to="DirichletNodes" constraint="consistent" timing="initial"/>
+      <mapping:nearest-neighbor direction="read"  from="NeumannNodes"   to="DirichletNodes" constraint="consistent" timing="initial"/>
     </participant>
     
     <participant name="HeatNeumann">
@@ -34,7 +34,7 @@
       <use-mesh name="DirichletNodes" from="HeatDirichlet"/>
       <write-data name="Temperature" mesh="NeumannNodes"/>
       <read-data  name="Flux"        mesh="NeumannNodes"/>
-      <mapping:nearest-projection direction="read" from="DirichletNodes" to="NeumannNodes"   constraint="consistent" timing="initial"/>
+      <mapping:nearest-neighbor direction="read" from="DirichletNodes" to="NeumannNodes"   constraint="consistent" timing="initial"/>
     </participant>
 
     <m2n:sockets from="HeatDirichlet" to="HeatNeumann"/>

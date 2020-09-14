@@ -110,14 +110,6 @@ vertices = []
 for v in fenics.vertices(mesh):
     vertices.append((v.x(0), v.x(1)))
 
-# print("Rank {} vertices: {}".format(MPI.rank(MPI.comm_world), vertices))
-
-adapter_config_filename = None
-if problem is ProblemType.DIRICHLET:
-    adapter_config_filename = "precice-adapter-config-D.json"
-elif problem is ProblemType.NEUMANN:
-    adapter_config_filename = "precice-adapter-config-N.json"
-
 # Define function space using mesh
 V = FunctionSpace(mesh, 'P', 2)
 V_g = VectorFunctionSpace(mesh, 'P', 1)
@@ -133,29 +125,19 @@ f_N_function = interpolate(f_N, V_g)
 u_n = interpolate(u_D, V)
 u_n.rename("Temperature", "")
 
-# Adapter definition and initialization
-precice = Adapter(adapter_config_filename)
+precice, precice_dt, initial_data = None, 0.0, None
 
-# print('{rank} of {size}: calls initialize'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-# Initialize adapter according to which problem is being solved
+# Initialize the adapter according to the specific participant
 if problem is ProblemType.DIRICHLET:
-    precice_dt = precice.initialize(coupling_boundary, mesh, V)
+    precice = Adapter(adapter_config_filename="precice-adapter-config-D.json")
+    precice_dt = precice.initialize(coupling_boundary, mesh, V, write_function=f_N_function)
 elif problem is ProblemType.NEUMANN:
-    precice_dt = precice.initialize(coupling_boundary, mesh, V_g)
-print('{rank} of {size}: exit initialize'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+    precice = Adapter(adapter_config_filename="precice-adapter-config-N.json")
+    precice_dt = precice.initialize(coupling_boundary, mesh, V_g, write_function=u_D_function)
+
+print("Rank {}: preCICE initialization DONE".format(MPI.rank(MPI.comm_world)))
 
 boundary_marker = False
-coupling_expression = None
-
-# print('{rank} of {size}: calls initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-# Initialize data to non-standard initial values according to which problem is being solved
-if problem is ProblemType.DIRICHLET:
-    initial_data = precice.initialize_data(f_N_function)
-elif problem is ProblemType.NEUMANN:
-    initial_data = precice.initialize_data(u_D_function)
-print('{rank} of {size}: exit initialize_data'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-
-coupling_expression = precice.create_coupling_expression(initial_data)
 
 # Assigning appropriate dt
 dt = Constant(0)
@@ -170,6 +152,7 @@ F = u * v / dt * dx + dot(grad(u), grad(v)) * dx - (u_n / dt + f) * v * dx
 bcs = [DirichletBC(V, u_D, remaining_boundary)]
 
 # Set boundary conditions at coupling interface once wrt to the coupling expression
+coupling_expression = precice.create_coupling_expression()
 if problem is ProblemType.DIRICHLET:
     # modify Dirichlet boundary condition on coupling interface
     bcs.append(DirichletBC(V, coupling_expression, coupling_boundary))
