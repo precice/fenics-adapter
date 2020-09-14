@@ -4,7 +4,6 @@ All functionalities described here have potential use in the adapter
 
 Important documentation for DofMap in dolfin: https://fenicsproject.org/docs/dolfin/1.6.0/python/programmers-reference/cpp/fem/GenericDofMap.html
 """
-import dolfin
 from dolfin import Point, RectangleMesh, FunctionSpace, entities
 import numpy as np
 from mpi4py import MPI

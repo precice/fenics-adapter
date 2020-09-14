@@ -8,7 +8,7 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
-    determine_shared_vertices, communicate_shared_vertices
+    determine_shared_vertices, communicate_shared_vertices, get_fenics_data
 from .expression_core import RBFInterpolationExpression, SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from mpi4py import MPI
@@ -34,6 +34,7 @@ class Adapter:
     look at this tutorial:
     https://github.com/precice/tutorials/tree/master/FSI/flap_perp/OpenFOAM-FEniCS
     """
+
     def __init__(self, adapter_config_filename='precice-adapter-config.json'):
         """
         Constructor of Adapter class.
@@ -46,13 +47,18 @@ class Adapter:
 
         self._config = Config(adapter_config_filename)
 
+        # Setup up MPI communicator on mpi4py
+        self._comm = MPI.COMM_WORLD
+        self._rank = self._comm.Get_rank()
+        self._size = self._comm.Get_size()
+
         self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(),
-                                            MPI.rank(MPI.comm_world), MPI.size(MPI.comm_world))
+                                            self._rank, self._size)
 
         # FEniCS related quantities
         self._fenics_dimensions = None
         self._function_space = None  # initialized later
-        self._dofmap = None # initialized later using function space provided by user
+        self._dofmap = None  # initialized later using function space provided by user
 
         # coupling mesh related quantities
         self._coupling_mesh_vertices = None  # initialized later
@@ -72,7 +78,8 @@ class Adapter:
             self._my_expression = SegregatedRBFInterpolationExpression
             print("Using segregated RBF interpolation")
         else:
-            warn("No valid interpolation strategy entered. It is assumed that the user does not wish to use FEniCS Expressions on the coupling boundary.")
+            warn(
+                "No valid interpolation strategy entered. It is assumed that the user does not wish to use FEniCS Expressions on the coupling boundary.")
 
         # Solver state used by the Adapter internally to handle checkpointing
         self._checkpoint = None
@@ -87,10 +94,9 @@ class Adapter:
         # Necessary data for parallel computations
         self._to_send_pts = None
         self._to_recv_pts = None
-
-        # Setup up MPI communicator on mpi4py
-        self._comm = MPI.COMM_WORLD
-        self._rank = self._comm.Get_rank()
+        self._fenics_gids = None
+        self._fenics_lids = None
+        self._fenics_vertices = None
 
     def create_coupling_expression(self):
         """
@@ -111,18 +117,22 @@ class Adapter:
         if n_vertices > 0:
 
             try:  # works with dolfin 1.6.0
-                coupling_expression = self._my_expression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+                coupling_expression = self._my_expression(
+                    element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
             except (TypeError, KeyError):  # works with dolfin 2017.2.0
                 coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
         else:
             try:  # works with dolfin 1.6.0
-                coupling_expression = EmptyExpression(element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+                coupling_expression = EmptyExpression(
+                    element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
             except (TypeError, KeyError):  # works with dolfin 2017.2.0
                 coupling_expression = EmptyExpression(element=self._function_space.ufl_element(), degree=0)
             if self._read_function_type == FunctionType.SCALAR:
-                coupling_expression._vals = np.empty(shape=0)  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+                coupling_expression._vals = np.empty(
+                    shape=0)  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
             elif self._read_function_type == FunctionType.VECTOR:
-                coupling_expression._vals = np.empty(shape=(0, 0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+                coupling_expression._vals = np.empty(shape=(0,
+                                                            0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
 
         return coupling_expression
 
@@ -209,7 +219,8 @@ class Adapter:
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
         if n_vertices == 0:
-            assert (MPI.size(MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
+            assert (MPI.size(
+                MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
 
         if n_vertices > 0:
             if self._read_function_type is FunctionType.SCALAR:
@@ -232,7 +243,7 @@ class Adapter:
                 elif self._apply_2d_3d_coupling:
                     precice_read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
                     n_vertices, dims = precice_read_data.shape
-                    read_data = np.zeros((n_vertices, dims-1))
+                    read_data = np.zeros((n_vertices, dims - 1))
                     read_data[:, 0] = precice_read_data[:, 0]
                     read_data[:, 1] = precice_read_data[:, 1]
 
@@ -245,11 +256,12 @@ class Adapter:
                 else:
                     raise Exception("Rank of function space is neither 0 nor 1")
 
-            communicate_shared_vertices(self._comm, self._rank, self._dofmap, read_data, self._to_send_pts, self._to_recv_pts)
-        else: # if there are no vertices, we return empty data
+            new_data = communicate_shared_vertices(self._comm, self._rank, self._dofmap, read_data, self._to_send_pts,
+                                                   self._to_recv_pts)
+        else:  # if there are no vertices, we return empty data
             read_data = None
 
-        return {tuple(key): value for key, value in zip(vertices, read_data)}
+        return {tuple(key): value for key, value in zip(self._fenics_vertices, new_data)}
 
     def write_data(self, write_function):
         """
@@ -263,7 +275,7 @@ class Adapter:
         """
         w_func = write_function.copy()
         # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
-        assert(w_func != write_function)
+        assert (w_func != write_function)
 
         write_function_type = determine_function_type(w_func)
         assert (write_function_type in list(FunctionType))
@@ -274,7 +286,8 @@ class Adapter:
         n_vertices, _ = self._coupling_mesh_vertices.shape
 
         if n_vertices == 0:
-            assert (MPI.size(MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
+            assert (MPI.size(
+                MPI.comm_world) > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
 
         if n_vertices > 0:
             write_function_type = determine_function_type(write_function)
@@ -298,7 +311,7 @@ class Adapter:
             else:
                 raise Exception("write_function provided is neither VECTOR nor SCALAR type")
         else:
-            print("Process {rank}: No data written as no coupling boundary detected".format(rank=MPI.rank(MPI.comm_world)))
+            print("Process {rank}: No data written as no coupling boundary detected".format(rank=self._rank))
 
     def initialize(self, coupling_subdomain, mesh, function_space, write_function=None, fixed_boundary=None):
         """
@@ -322,6 +335,11 @@ class Adapter:
             Recommended time step value from preCICE.
         """
 
+        # Set read functionality parameters
+        self._read_function_type = determine_function_type(function_space)
+        self._function_space = function_space
+        self._dofmap = function_space.dofmap()
+
         coords = function_space.tabulate_dof_coordinates()
         _, self._fenics_dimensions = coords.shape
 
@@ -343,20 +361,25 @@ class Adapter:
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
                     self._fenics_dimensions, self._interface.get_dimensions()))
 
-        fenics_vertices, fenics_inds, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
-            mesh, coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
+        ids, self._coupling_mesh_vertices = get_coupling_boundary_vertices(self._function_space, coupling_subdomain,
+                                                                           self._fenics_dimensions, self._interface.get_dimensions())
+
+        print("Rank {} self._coupling_mesh_vertices = {}".format(self._rank, self._coupling_mesh_vertices))
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
             self._config.get_coupling_mesh_name()), self._coupling_mesh_vertices)
 
-        print("Rank {} self._coupling_mesh_vertices = {}".format(MPI.rank(MPI.comm_world), self._coupling_mesh_vertices))
+        # Determine IDs and coordinates on coupling interface as seen by FEniCS (includes duplicates)
+        self._fenics_gids, self._fenics_lids, self._fenics_vertices = get_fenics_data(mesh, function_space,
+                                                                                      coupling_subdomain, self._interface.get_dimensions())
+
+        # Determine shared vertices with neighbouring processes and get dictionaries for communication
+        self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank, self._dofmap,
+                                                                         self._fenics_gids, self._fenics_lids)
 
         # Define a mapping between coupling vertices and their IDs in preCICE
-        id_mapping = dict()
-        n_vertices, _ = self._coupling_mesh_vertices.shape
-        for i in range(n_vertices):
-            id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
+        id_mapping = {tuple(key): value for key, value in zip(ids, self._vertex_ids)}
 
         edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping)
 
@@ -366,15 +389,6 @@ class Adapter:
             self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-        # Set read functionality parameters
-        self._read_function_type = determine_function_type(function_space)
-        self._function_space = function_space
-        self._dofmap = function_space.dofmap()
-
-        # Determine shared vertices with neighbouring processes and get dictionaries for communication
-        self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank, self._dofmap,
-                                                                         fenics_inds)
-
         precice_dt = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
@@ -383,8 +397,7 @@ class Adapter:
             self.write_data(write_function)
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
-        # print('{rank} of {size}: initialize_data()'.format(
-        #     rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
+        # print('{rank} of {size}: initialize_data()'.format(self._rank, self._size))
         self._interface.initialize_data()
 
         return precice_dt

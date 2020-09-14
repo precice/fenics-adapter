@@ -3,7 +3,7 @@ This module consists of helper functions used in the Adapter class. Names of the
 """
 
 import dolfin
-from dolfin import SubDomain, Point, PointSource
+from dolfin import SubDomain, Point, PointSource, vertices
 from fenics import FunctionSpace, Function
 import numpy as np
 from enum import Enum
@@ -118,9 +118,9 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
 
     Parameters
     ----------
-    mesh_fenics : FEniCS Mesh
-        Mesh of complete domain.
-    coupling_subdomain : FeniCS Domain
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
     fenics_dimensions : int
         Dimensions of FEniCS case setup.
@@ -137,8 +137,7 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
     n : int
         Number of vertices on the coupling interface.
     """
-    fenics_vertices = []
-    fenics_inds = []
+    vertex_ids = []
     vertices_x = []
     vertices_y = []
     vertices_z = []
@@ -148,22 +147,20 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
 
     # Refer: https://github.com/precice/precice/wiki/Dealing-with-distributed-meshes#use-a-single-mesh-and-communicate-ghost-vertices-inside-adapter
     # preCICE only sees non-duplicate global vertices
-    vertices = function_space.dofmap().tabulate_dof_coordinates()
-
+    dofs = function_space.tabulate_dof_coordinates()
     local_to_global_map = function_space.dofmap().tabulate_local_to_global_dofs()
     local_to_global_unowned = function_space.dofmap().local_to_global_unowned()
     global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
 
     counter = 0
-    for v in vertices:
-        if coupling_subdomain.inside(v.point(), True):
-            fenics_vertices.append(v)
-            fenics_inds.append(global_ids[counter])
-            vertices_x.append(v.x(0))
+    for v in dofs:
+        if coupling_subdomain.inside(v, True):
+            vertex_ids.append(global_ids[counter])
+            vertices_x.append(v[0])
             if dimensions == 2:
-                vertices_y.append(v.x(1))
+                vertices_y.append(v[1])
             elif fenics_dimensions == 2 and dimensions == 3:
-                vertices_y.append(v.x(1))
+                vertices_y.append(v[1])
                 vertices_z.append(0)
             else:
                 raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
@@ -171,9 +168,9 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
             counter += 1
 
     if dimensions == 2:
-        return fenics_vertices, fenics_inds, np.stack([vertices_x, vertices_y], axis=1)
+        return vertex_ids, np.stack([vertices_x, vertices_y], axis=1)
     elif dimensions == 3:
-        return fenics_vertices, fenics_inds, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
+        return vertex_ids, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
 
 def are_connected_by_edge(v1, v2):
@@ -221,12 +218,15 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping):
     """
     # Refer: https://github.com/precice/precice/wiki/Dealing-with-distributed-meshes#use-a-single-mesh-and-communicate-ghost-vertices-inside-adapter
     # preCICE only sees non-duplicate global vertices
-    vertices = function_space.dofmap().tabulate_dof_coordinates()
+    dofs = function_space.tabulate_dof_coordinates()
+    local_to_global_map = function_space.dofmap().tabulate_local_to_global_dofs()
+    local_to_global_unowned = function_space.dofmap().local_to_global_unowned()
+    global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
 
     points = dict()
 
-    for v1 in vertices:
-        if coupling_subdomain.inside(v1.point(), True):
+    for v1 in dofs:
+        if coupling_subdomain.inside(v1, True):
             points[v1] = []
 
     for v1 in points.keys():
@@ -308,9 +308,61 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def determine_shared_vertices(comm, rank, dofmap, fenics_inds):
+def get_fenics_data(mesh_fenics, function_space, coupling_subdomain, dimensions):
     """
+    Extracts vertices from a given mesh which lie on the  given coupling domain.
 
+    Parameters
+    ----------
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    mesh_fenics : FEniCS Mesh
+        Mesh of complete domain.
+    coupling_subdomain : FEniCS Domain
+        Subdomain consists of only the coupling interface region.
+    dimensions : int
+        Dimensions of coupling case setup.
+
+    Returns
+    -------
+    fenics_vertices : numpy array
+        Array consisting of all vertices lying on the coupling interface.
+    coordinates : array_like
+        The coordinates of the vertices in a numpy array [N x D] where
+        N = number of vertices and D = dimensions of geometry.
+    n : int
+        Number of vertices on the coupling interface.
+    """
+    vertices_x = []
+    vertices_y = []
+    fenics_gids = []
+    fenics_lids = []
+
+    if not issubclass(type(coupling_subdomain), SubDomain):
+        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
+
+    global_ids = function_space.dofmap().tabulate_local_to_global_dofs()
+
+    counter = 0
+    for v in vertices(mesh_fenics):
+        if coupling_subdomain.inside(v.point(), True):
+            fenics_gids.append(global_ids[counter])
+            fenics_lids.append(counter)
+            vertices_x.append(v.x(0))
+            if dimensions == 2:
+                vertices_y.append(v.x(1))
+        counter += 1
+
+    fenics_vertices = vertices_x
+    if dimensions == 2:
+        fenics_vertices = np.stack([vertices_x, vertices_y], axis=1)
+
+    return fenics_gids, fenics_lids, fenics_vertices
+
+
+def determine_shared_vertices(comm, rank, dofmap, fenics_gids, fenics_lids):
+    """
+    Determine which vertices along the coupling boundary are shared with neighbouring processes
     Parameters
     ----------
     comm
@@ -324,11 +376,18 @@ def determine_shared_vertices(comm, rank, dofmap, fenics_inds):
     """
     sharednodes_map = dofmap.shared_nodes()
 
+    # Global IDs of vertices shared by this rank and on the coupling interface
+    global_shared_ids = []
+    for local_id in fenics_lids:
+        for key in sharednodes_map.keys():
+            if local_id == key:
+                global_shared_ids.append(fenics_gids[local_id])
+
     # Global IDs of vertices which are not owned but shared by this rank
     unowned_shared_ids = dofmap.local_to_global_unowned()
 
     # Global IDs of vertices which are owned and shared by this rank
-    owned_shared_ids = fenics_inds
+    owned_shared_ids = [i for i in global_shared_ids if i not in unowned_shared_ids]
 
     # Ranks with which this rank shares vertices
     neigh_ranks = dofmap.neighbours()
@@ -378,6 +437,21 @@ def determine_shared_vertices(comm, rank, dofmap, fenics_inds):
 
 
 def communicate_shared_vertices(comm, rank, dofmap, precice_data, to_send_ids, to_recv_ids):
+    """
+
+    Parameters
+    ----------
+    comm
+    rank
+    dofmap
+    precice_data
+    to_send_ids
+    to_recv_ids
+
+    Returns
+    -------
+
+    """
     local_to_global_map = dofmap.tabulate_local_to_global_dofs()
     local_to_global_unowned = dofmap.local_to_global_unowned()
     global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
@@ -385,7 +459,7 @@ def communicate_shared_vertices(comm, rank, dofmap, precice_data, to_send_ids, t
     # Create fenics type shared data array for communication
     fenics_data = np.zeros(len(local_to_global_map))
 
-    # Attach data read from preCICE to appropriate ids in fenics shared data array
+    # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
     counter = 0
     for lid in range(len(local_to_global_map)):
         for gid in global_ids:
