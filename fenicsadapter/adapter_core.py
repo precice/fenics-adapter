@@ -100,7 +100,6 @@ def convert_fenics_to_precice(function, sample_points):
     array : array_like
         Array of FEniCS function values at each point on the boundary.
     """
-    print("Entering convert_fenics_to_precice")
     if type(function) is dolfin.Function:
         x_all, y_all = sample_points[:, 0], sample_points[:, 1]
         for x, y in zip(x_all, y_all):
@@ -439,7 +438,8 @@ def determine_shared_vertices(comm, rank, dofmap, fenics_gids, fenics_lids):
     return to_send_ids, to_recv_ids
 
 
-def communicate_shared_vertices(comm, rank, dofmap, precice_data, to_send_ids, to_recv_ids):
+def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_coords, owned_data,
+                                to_send_ids, to_recv_ids):
     """
 
     Parameters
@@ -455,26 +455,14 @@ def communicate_shared_vertices(comm, rank, dofmap, precice_data, to_send_ids, t
     -------
 
     """
-    local_to_global_map = dofmap.tabulate_local_to_global_dofs()
-    local_to_global_unowned = dofmap.local_to_global_unowned()
-    global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
-
     # Create fenics type shared data array for communication
-    fenics_data = np.zeros(len(local_to_global_map))
+    fenics_data = dict.fromkeys(tuple(key) for key in fenics_coords)
 
     # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
-    counter = 0
-    for lid in range(len(local_to_global_map)):
-        for gid in global_ids:
-            if local_to_global_map[lid] == gid:
-                fenics_data[lid] = precice_data[counter]
-                counter += 1
-
-    # Check if data at receiving IDs is zero
-    for lid in range(len(local_to_global_map)):
-        for gid in to_recv_ids:
-            if local_to_global_map[lid] == gid:
-                assert(fenics_data[lid] == 0)
+    for coord in fenics_coords:
+        for owned_coord in owned_coords:
+            if coord.all() == owned_coord.all():
+                fenics_data[tuple(coord)] = owned_data[tuple(owned_coord)]
 
     recv_reqs = []
     if bool(to_recv_ids):
@@ -489,12 +477,12 @@ def communicate_shared_vertices(comm, rank, dofmap, precice_data, to_send_ids, t
     send_reqs = []
     if bool(to_send_ids):
         for send_gid, dests in to_send_ids.items():
-            send_lid = int(np.where(local_to_global_map == send_gid)[0][0])
-            for rk in dests:
+            send_lid = int(np.where(fenics_gids == send_gid)[0][0])
+            for dest in dests:
                 hash_tag = hashlib.sha256()
-                hash_tag.update((str(rank) + str(send_gid) + str(rk)).encode('utf-8'))
+                hash_tag.update((str(rank) + str(send_gid) + str(dest)).encode('utf-8'))
                 tag = int(hash_tag.hexdigest()[:6], base=16)
-                req = comm.isend(fenics_data[send_lid], dest=rk, tag=tag)
+                req = comm.isend(fenics_data[fenics_coords[send_lid]], dest=dest, tag=tag)
                 send_reqs.append(req)
     else:
         print("Rank {}: Nothing to Send".format(rank))
@@ -505,8 +493,8 @@ def communicate_shared_vertices(comm, rank, dofmap, precice_data, to_send_ids, t
     # Set received data into the existing data array
     counter = 0
     for recv_gid in to_recv_ids.keys():
-        recv_lid = int(np.where(local_to_global_map == recv_gid)[0][0])
-        fenics_data[recv_lid] = recv_reqs[counter].wait()
+        recv_lid = int(np.where(fenics_gids == recv_gid)[0][0])
+        fenics_data[fenics_coords[recv_lid]] = recv_reqs[counter].wait()
         counter += 1
 
     return fenics_data
