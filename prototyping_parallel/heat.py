@@ -28,7 +28,6 @@ from __future__ import print_function, division
 from fenics import Function, FunctionSpace, Expression, Constant, DirichletBC, TrialFunction, TestFunction, \
     File, solve, lhs, rhs, grad, inner, dot, dx, ds, interpolate, VectorFunctionSpace, MeshFunction
 from fenics import MPI
-import fenics
 from fenicsadapter import Adapter
 from errorcomputation import compute_errors
 from my_enums import ProblemType, Subcycling
@@ -105,10 +104,6 @@ gamma = args.gamma  # parameter gamma, dependence of heat flux on time
 # Create mesh and separate mesh components for grid, boundary and coupling interface
 domain_part, problem = get_problem_setup(args)
 mesh, coupling_boundary, remaining_boundary = get_geometry(domain_part)
-
-vertices = []
-for v in fenics.vertices(mesh):
-    vertices.append((v.x(0), v.x(1)))
 
 # Define function space using mesh
 V = FunctionSpace(mesh, 'P', 2)
@@ -236,9 +231,6 @@ while precice.is_coupling_ongoing():
     if problem is ProblemType.DIRICHLET:
         # Dirichlet problem reads temperature and writes flux on boundary to Neumann problem
         determine_gradient(V_g, u_np1, flux)
-        print('{rank} of {size}:running stupid loop'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
-        for vertex in fenics.vertices(mesh):  # TODO: this loop has no real purpose, however, if we do not execute it, the program hangs later on...
-            flux(vertex.x(0), vertex.x(1))
         precice.write_data(flux)
     elif problem is ProblemType.NEUMANN:
         # Neumann problem reads flux and writes temperature on boundary to Dirichlet problem

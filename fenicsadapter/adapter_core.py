@@ -111,12 +111,13 @@ def convert_fenics_to_precice(function, sample_points):
         raise Exception("Cannot handle data type {}".format(type(function)))
 
 
-def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_dimensions, dimensions):
+def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fenics_dimensions, dimensions):
     """
-    Extracts vertices from a given mesh which lie on the  given coupling domain.
+    Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
 
     Parameters
     ----------
+    mesh
     function_space : FEniCS function space
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
@@ -136,24 +137,39 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
     n : int
         Number of vertices on the coupling interface.
     """
-    vertex_ids = []
-    vertices_x = []
-    vertices_y = []
-    vertices_z = []
+    owned_gids, fenics_gids, fenics_lids = [], [], []
+    vertices_x, vertices_y, vertices_z = [], [], []
 
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
-    # preCICE only sees non-duplicate global vertices
+    global_ids = function_space.dofmap().tabulate_local_to_global_dofs()
+
+    counter = 0
+    for v in vertices(mesh):
+        if coupling_subdomain.inside(v.point(), True):
+            fenics_gids.append(global_ids[counter])
+            fenics_lids.append(counter)
+            vertices_x.append(v.x(0))
+            if dimensions == 2:
+                vertices_y.append(v.x(1))
+        counter += 1
+
+    fenics_vertices = vertices_x
+    if dimensions == 2:
+        fenics_vertices = np.stack([vertices_x, vertices_y], axis=1)
+
+    # Segregate vertices which this rank owns from all the vertices seen by this rank
     dofs = function_space.tabulate_dof_coordinates()
     local_to_global_map = function_space.dofmap().tabulate_local_to_global_dofs()
     local_to_global_unowned = function_space.dofmap().local_to_global_unowned()
     global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
 
     counter = 0
+    vertices_x, vertices_y, vertices_z = [], [], []
     for v in dofs:
         if coupling_subdomain.inside(v, True):
-            vertex_ids.append(global_ids[counter])
+            owned_gids.append(global_ids[counter])
             vertices_x.append(v[0])
             if dimensions == 2:
                 vertices_y.append(v[1])
@@ -163,15 +179,27 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
             else:
                 raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
                                 .format(dimensions, fenics_dimensions))
-            counter += 1
+        counter += 1
 
-    coords = vertices_x
+    owned_vertices = vertices_x
     if dimensions == 2:
-        coords = np.stack([vertices_x, vertices_y], axis=1)
+        owned_vertices = np.stack([vertices_x, vertices_y], axis=1)
     if dimensions == 3:
-        coords = np.stack([vertices_x, vertices_y, vertices_z], axis=1)
+        owned_vertices = np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
-    return vertex_ids, coords
+    counter = 0
+    physical_vertices, gids = [], []
+    for vertex in owned_vertices:
+        for fenics_vertex in fenics_vertices:
+            if (vertex == fenics_vertex).all():
+                physical_vertices.append(vertex)
+                gids.append(owned_gids[counter])
+        counter += 1
+
+    owned_gids = np.array(gids)
+    owned_vertices = np.array(physical_vertices)
+
+    return fenics_gids, fenics_lids, fenics_vertices, owned_gids, owned_vertices
 
 
 def are_connected_by_edge(v1, v2):
@@ -308,58 +336,6 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def get_fenics_data(mesh_fenics, function_space, coupling_subdomain, dimensions):
-    """
-    Extracts vertices from a given mesh which lie on the  given coupling domain.
-
-    Parameters
-    ----------
-    function_space : FEniCS function space
-        Function space on which the finite element problem definition lives.
-    mesh_fenics : FEniCS Mesh
-        Mesh of complete domain.
-    coupling_subdomain : FEniCS Domain
-        Subdomain consists of only the coupling interface region.
-    dimensions : int
-        Dimensions of coupling case setup.
-
-    Returns
-    -------
-    fenics_vertices : numpy array
-        Array consisting of all vertices lying on the coupling interface.
-    coordinates : array_like
-        The coordinates of the vertices in a numpy array [N x D] where
-        N = number of vertices and D = dimensions of geometry.
-    n : int
-        Number of vertices on the coupling interface.
-    """
-    vertices_x = []
-    vertices_y = []
-    fenics_gids = []
-    fenics_lids = []
-
-    if not issubclass(type(coupling_subdomain), SubDomain):
-        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
-
-    global_ids = function_space.dofmap().tabulate_local_to_global_dofs()
-
-    counter = 0
-    for v in vertices(mesh_fenics):
-        if coupling_subdomain.inside(v.point(), True):
-            fenics_gids.append(global_ids[counter])
-            fenics_lids.append(counter)
-            vertices_x.append(v.x(0))
-            if dimensions == 2:
-                vertices_y.append(v.x(1))
-        counter += 1
-
-    fenics_vertices = vertices_x
-    if dimensions == 2:
-        fenics_vertices = np.stack([vertices_x, vertices_y], axis=1)
-
-    return fenics_gids, fenics_lids, fenics_vertices
-
-
 def determine_shared_vertices(comm, rank, dofmap, fenics_gids, fenics_lids):
     """
     Determine which vertices along the coupling boundary are shared with neighbouring processes
@@ -455,14 +431,20 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
     -------
 
     """
+    print("fenics_coords in comm_shared_verts = {}".format(fenics_coords))
+
     # Create fenics type shared data array for communication
     fenics_data = dict.fromkeys(tuple(key) for key in fenics_coords)
+
+    print("fenics_data in comm_shared_verts before attachment = {}".format(fenics_data))
 
     # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
     for coord in fenics_coords:
         for owned_coord in owned_coords:
             if coord.all() == owned_coord.all():
                 fenics_data[tuple(coord)] = owned_data[tuple(owned_coord)]
+
+    print("fenics_data in comm_shared_verts after attachment = {}".format(fenics_data))
 
     recv_reqs = []
     if bool(to_recv_ids):

@@ -4,7 +4,7 @@ All functionalities described here have potential use in the adapter
 
 Important documentation for DofMap in dolfin: https://fenicsproject.org/docs/dolfin/1.6.0/python/programmers-reference/cpp/fem/GenericDofMap.html
 """
-from dolfin import Point, RectangleMesh, FunctionSpace, entities
+from dolfin import Point, RectangleMesh, FunctionSpace, entities, vertices
 import numpy as np
 from mpi4py import MPI
 import hashlib
@@ -186,5 +186,14 @@ for e in entities(mesh, 1):
 print("Rank {}: global indices by Mesh entities = {}".format(rank, global_indices))
 print("Rank {}: local indices by Mesh entities = {}".format(rank, local_indices))
 print("Rank {}: shared indices by Mesh entities = {}".format(rank, shared_indices))
+comm.Barrier()
+
+vertices_x, vertices_y = [], []
+for v in vertices(mesh):
+    vertices_x.append(v.x(0))
+    vertices_y.append(v.x(1))
+
+mesh_verts = np.stack([vertices_x, vertices_y], axis=1)
+print("Rank {}: Vertices derived from mesh = {}".format(rank, mesh_verts))
 comm.Barrier()
 

@@ -2,10 +2,12 @@
 
 echo "Cleaning logs and output files from previous runs..."
 
-rm -r precice-run/
+rm -r -fv precice-run/
 
-rm out/* 
+rm -fv out/* 
 
-rm -f *.log
+rm -fv *.log
+
+rm -fv *-events.json
 
 echo "Cleaning successful!"

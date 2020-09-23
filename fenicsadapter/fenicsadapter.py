@@ -8,7 +8,7 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
-    determine_shared_vertices, communicate_shared_vertices, get_fenics_data
+    determine_shared_vertices, communicate_shared_vertices
 from .expression_core import RBFInterpolationExpression, SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from mpi4py import MPI
@@ -99,6 +99,7 @@ class Adapter:
         # Necessary data for parallel computations
         self._to_send_pts = None
         self._to_recv_pts = None
+        self._empty_rank = True
 
     def create_coupling_expression(self):
         """
@@ -114,10 +115,7 @@ class Adapter:
         if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
             raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
 
-        n_vertices, _ = self._owned_coords.shape
-
-        if n_vertices > 0:
-
+        if not self._empty_rank:
             try:  # works with dolfin 1.6.0
                 coupling_expression = self._my_expression(
                     element=self._function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
@@ -153,9 +151,7 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
-        n_vertices, _ = self._owned_coords.shape
-
-        if n_vertices > 0:
+        if not self._empty_rank:
             assert (self._fenics_dimensions == 2), \
                 "Only 2D FEniCS solvers are supported. See https://github.com/precice/fenics-adapter/issues/1."
 
@@ -225,13 +221,12 @@ class Adapter:
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
-        n_vertices, _ = self._owned_coords.shape
         read_data = None
 
-        if n_vertices == 0:
-            assert (self._size > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
+        if self._empty_rank:
+            assert (self._size > 1)  # having participants without coupling mesh nodes is only valid for parallel runs
 
-        if n_vertices > 0:
+        if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
                 read_data = self._interface.read_block_scalar_data(read_data_id, self._vertex_ids)
                 if self._fenics_dimensions == self._interface.get_dimensions():
@@ -266,12 +261,14 @@ class Adapter:
                     raise Exception("Rank of function space is neither 0 nor 1")
 
             owned_read_data = {tuple(key): value for key, value in zip(self._owned_coords, read_data)}
+            print("Owned data before being updated from communication = {}".format(owned_read_data))
             updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_gids,
-                                                            self._owned_coords, self._fenics_coords, owned_read_data,
-                                                            self._to_send_pts, self._to_recv_pts)
+                                                       self._owned_coords, self._fenics_coords, owned_read_data,
+                                                       self._to_send_pts, self._to_recv_pts)
         else:  # if there are no vertices, we return empty data
             updated_data = None
 
+        print("Updated data after communication = {}".format(updated_data))
         return updated_data
 
     def write_data(self, write_function):
@@ -294,12 +291,10 @@ class Adapter:
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
-        n_vertices, _ = self._owned_coords.shape
+        if self._empty_rank:
+            assert (self._size > 1)  # having participants without coupling mesh nodes is only valid for parallel runs
 
-        if n_vertices == 0:
-            assert (self._size > 1)  # having participants without coupling mesh nodes is only accepted for parallel runs
-
-        if n_vertices > 0:
+        if not self._empty_rank:
             write_function_type = determine_function_type(write_function)
             assert (write_function_type in list(FunctionType))
             write_data = convert_fenics_to_precice(write_function, self._owned_coords)
@@ -308,6 +303,7 @@ class Adapter:
             elif write_function_type is FunctionType.VECTOR:
                 if self._apply_2d_3d_coupling:
                     # in 2d-3d coupling z dimension is set to zero
+                    n_vertices, _ = self._owned_coords.shape
                     precice_write_data = np.column_stack((write_data[:, 0], write_data[:, 1], np.zeros(n_vertices)))
                     assert (precice_write_data.shape[0] == n_vertices and
                             precice_write_data.shape[1] == self._interface.get_dimensions())
@@ -369,21 +365,19 @@ class Adapter:
                     self._fenics_dimensions, self._interface.get_dimensions()))
 
         # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
-        self._owned_gids, self._owned_coords = get_coupling_boundary_vertices(self._function_space, coupling_subdomain,
-                                                                        self._fenics_dimensions, self._interface.get_dimensions())
+        self._fenics_gids, self._fenics_lids, self._fenics_coords, self._owned_gids, \
+        self._owned_coords = get_coupling_boundary_vertices(mesh, self._function_space, coupling_subdomain,
+                                                            self._fenics_dimensions, self._interface.get_dimensions())
 
-        print("Rank {}: Vertices which this rank owns = {}".format(self._rank, self._owned_coords))
+        print("Rank {}: Owned vertices of this rank = {}".format(self._rank, self._owned_coords))
+        print("Rank {}: Owned global IDs of vertices of this rank = {}".format(self._rank, self._owned_gids))
 
         # Set up mesh in preCICE
-        self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
-            self._config.get_coupling_mesh_name()), self._owned_coords)
+        if self._owned_gids.size > 0:
+            self._empty_rank = False
 
-        # Get Global and Local IDs, and coordinates of vertices on coupling interface as seen by FEniCS (includes
-        # duplicates)
-        self._fenics_gids, self._fenics_lids, self._fenics_coords = get_fenics_data(mesh, function_space, coupling_subdomain,
-                                                                                    self._interface.get_dimensions())
-
-        print("fenics_lids = {}".format(self._fenics_lids))
+            self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
+                self._config.get_coupling_mesh_name()), self._owned_coords)
 
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
         self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank, self._dofmap,
