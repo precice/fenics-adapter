@@ -102,9 +102,9 @@ def convert_fenics_to_precice(function, sample_points):
     """
     if type(function) is dolfin.Function:
         x_all, y_all = sample_points[:, 0], sample_points[:, 1]
-        for x, y in zip(x_all, y_all):
-            print((x, y))
-            print((function(x, y)))
+        # for x, y in zip(x_all, y_all):
+        #     print((x, y))
+        #     print((function(x, y)))
 
         return np.array([function(x, y) for x, y in zip(x_all, y_all)])
     else:
@@ -431,17 +431,13 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
     -------
 
     """
-    print("fenics_coords in comm_shared_verts = {}".format(fenics_coords))
-
     # Create fenics type shared data array for communication
     fenics_data = dict.fromkeys(tuple(key) for key in fenics_coords)
-
-    print("fenics_data in comm_shared_verts before attachment = {}".format(fenics_data))
 
     # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
     for coord in fenics_coords:
         for owned_coord in owned_coords:
-            if coord.all() == owned_coord.all():
+            if (coord == owned_coord).all():
                 fenics_data[tuple(coord)] = owned_data[tuple(owned_coord)]
 
     print("fenics_data in comm_shared_verts after attachment = {}".format(fenics_data))

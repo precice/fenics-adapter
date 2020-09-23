@@ -399,12 +399,14 @@ class Adapter:
         if self._interface.is_action_required(precice.action_write_initial_data()):
             if not write_function:
                 raise Exception("Non-standard initialization requires a write_function")
+            print("Rank {}: Before write_data in initialize".format(self._rank))
             self.write_data(write_function)
+            print("Rank {}: After write_data in initialize".format(self._rank))
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
-        print('{} of {}: initialize_data()'.format(self._rank, self._size))
+        print('Rank {}: Before initialize_data()'.format(self._rank))
         self._interface.initialize_data()
-        print("Rank {}: after initialize_data()".format(self._rank))
+        print("Rank {}: After initialize_data()".format(self._rank))
 
         return precice_dt
 
