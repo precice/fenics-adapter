@@ -83,7 +83,7 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-def convert_fenics_to_precice(function, sample_points):
+def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, dimensions):
     """
     Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -91,22 +91,24 @@ def convert_fenics_to_precice(function, sample_points):
     ----------
     function : FEniCS function
         A FEniCS function referring to a physical variable in the problem.
-    sample_points : array_like
-        The coordinates of the vertices in a numpy array [N x D] where
-        N = number of vertices and D = dimensions of geometry.
 
     Returns
     -------
     array : array_like
         Array of FEniCS function values at each point on the boundary.
     """
+    function_space = function.function_space()
+    mesh = function_space.mesh()
+    _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain,
+                                                              fenics_dimensions, dimensions)
     if type(function) is dolfin.Function:
-        x_all, y_all = sample_points[:, 0], sample_points[:, 1]
-        # for x, y in zip(x_all, y_all):
-        #     print((x, y))
-        #     print((function(x, y)))
+        func_vector = function.vector().get_local()
+        func_eval = []
+        for lid in local_ids:
+            # func_eval = function(x, y) THIS DOES NOT WORK IN PARALLEL
+            func_eval.append(func_vector[lid])
 
-        return np.array([function(x, y) for x, y in zip(x_all, y_all)])
+        return np.array(func_eval)
     else:
         raise Exception("Cannot handle data type {}".format(type(function)))
 
@@ -137,7 +139,8 @@ def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fen
     n : int
         Number of vertices on the coupling interface.
     """
-    owned_gids, fenics_gids, fenics_lids = [], [], []
+    owned_gids, owned_lids = [], []
+    fenics_gids, fenics_lids = [], []
     vertices_x, vertices_y, vertices_z = [], [], []
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -170,6 +173,7 @@ def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fen
     for v in dofs:
         if coupling_subdomain.inside(v, True):
             owned_gids.append(global_ids[counter])
+            owned_lids.append(counter)
             vertices_x.append(v[0])
             if dimensions == 2:
                 vertices_y.append(v[1])
@@ -188,18 +192,20 @@ def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fen
         owned_vertices = np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
     counter = 0
-    physical_vertices, gids = [], []
+    physical_vertices, gids, lids = [], [], []
     for vertex in owned_vertices:
         for fenics_vertex in fenics_vertices:
             if (vertex == fenics_vertex).all():
                 physical_vertices.append(vertex)
                 gids.append(owned_gids[counter])
+                lids.append(owned_lids[counter])
         counter += 1
 
     owned_gids = np.array(gids)
+    owned_lids = np.array(lids)
     owned_vertices = np.array(physical_vertices)
 
-    return fenics_gids, fenics_lids, fenics_vertices, owned_gids, owned_vertices
+    return fenics_gids, fenics_lids, fenics_vertices, owned_gids, owned_lids, owned_vertices
 
 
 def are_connected_by_edge(v1, v2):
@@ -460,7 +466,7 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
                 hash_tag = hashlib.sha256()
                 hash_tag.update((str(rank) + str(send_gid) + str(dest)).encode('utf-8'))
                 tag = int(hash_tag.hexdigest()[:6], base=16)
-                req = comm.isend(fenics_data[fenics_coords[send_lid]], dest=dest, tag=tag)
+                req = comm.isend(fenics_data[tuple(fenics_coords[send_lid])], dest=dest, tag=tag)
                 send_reqs.append(req)
     else:
         print("Rank {}: Nothing to Send".format(rank))
@@ -472,7 +478,7 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
     counter = 0
     for recv_gid in to_recv_ids.keys():
         recv_lid = int(np.where(fenics_gids == recv_gid)[0][0])
-        fenics_data[fenics_coords[recv_lid]] = recv_reqs[counter].wait()
+        fenics_data[tuple(fenics_coords[recv_lid])] = recv_reqs[counter].wait()
         counter += 1
 
     return fenics_data

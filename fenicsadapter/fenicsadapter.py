@@ -62,9 +62,11 @@ class Adapter:
         self._fenics_lids = None
         self._fenics_gids = None
         self._fenics_coords = None
+        self._coupling_subdomain = None
 
         # coupling mesh related quantities
         self._owned_gids = None  # initialized later
+        self._owned_lids = None  # initialized later
         self._owned_coords = None  # initialized later
         self._vertex_ids = None  # initialized later
 
@@ -297,7 +299,8 @@ class Adapter:
         if not self._empty_rank:
             write_function_type = determine_function_type(write_function)
             assert (write_function_type in list(FunctionType))
-            write_data = convert_fenics_to_precice(write_function, self._owned_coords)
+            write_data = convert_fenics_to_precice(write_function, self._coupling_subdomain, self._fenics_dimensions,
+                                                   self._interface.get_dimensions())
             if write_function_type is FunctionType.SCALAR:
                 self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
             elif write_function_type is FunctionType.VECTOR:
@@ -345,6 +348,7 @@ class Adapter:
         self._function_space = function_space
         self._dofmap = function_space.dofmap()
         _, self._fenics_dimensions = self._function_space.tabulate_dof_coordinates().shape
+        self._coupling_subdomain = coupling_subdomain
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
@@ -365,7 +369,7 @@ class Adapter:
                     self._fenics_dimensions, self._interface.get_dimensions()))
 
         # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
-        self._fenics_gids, self._fenics_lids, self._fenics_coords, self._owned_gids, \
+        self._fenics_gids, self._fenics_lids, self._fenics_coords, self._owned_gids, self._owned_lids, \
         self._owned_coords = get_coupling_boundary_vertices(mesh, self._function_space, coupling_subdomain,
                                                             self._fenics_dimensions, self._interface.get_dimensions())
 
@@ -376,8 +380,9 @@ class Adapter:
         if self._owned_gids.size > 0:
             self._empty_rank = False
 
-            self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
-                self._config.get_coupling_mesh_name()), self._owned_coords)
+        # Define mesh in preCICE
+        self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
+            self._config.get_coupling_mesh_name()), self._owned_coords)
 
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
         self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank, self._dofmap,
