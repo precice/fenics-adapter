@@ -46,10 +46,6 @@ class Config:
         except:
             self._write_data_name = None
         self._read_data_name = data["interface"]["read_data_name"]
-        try:
-            self._interpolation_type = data["interface"]["interpolation_type"]
-        except:
-            self._interpolation_type = None
 
         read_file.close()
 
