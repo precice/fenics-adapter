@@ -299,19 +299,22 @@ class Adapter:
         if not self._empty_rank:
             write_function_type = determine_function_type(write_function)
             assert (write_function_type in list(FunctionType))
+            n_vertices, _ = self._owned_coords.shape
             write_data = convert_fenics_to_precice(write_function, self._coupling_subdomain, self._fenics_dimensions,
                                                    self._interface.get_dimensions())
+            print("Rank {}: Shape of write data = {}".format(self._rank, write_data.shape))
             if write_function_type is FunctionType.SCALAR:
                 self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
             elif write_function_type is FunctionType.VECTOR:
                 if self._apply_2d_3d_coupling:
                     # in 2d-3d coupling z dimension is set to zero
-                    n_vertices, _ = self._owned_coords.shape
                     precice_write_data = np.column_stack((write_data[:, 0], write_data[:, 1], np.zeros(n_vertices)))
                     assert (precice_write_data.shape[0] == n_vertices and
                             precice_write_data.shape[1] == self._interface.get_dimensions())
                     self._interface.write_block_vector_data(write_data_id, self._vertex_ids, precice_write_data)
                 elif self._fenics_dimensions == self._interface.get_dimensions():
+                    assert (write_data.shape[0] == n_vertices and
+                            write_data.shape[1] == self._interface.get_dimensions())
                     self._interface.write_block_vector_data(write_data_id, self._vertex_ids, write_data)
                 else:
                     raise Exception("Dimensions of FEniCS problem and coupling configuration do not match.")
@@ -320,7 +323,7 @@ class Adapter:
         else:
             print("Process {rank}: No data written as no coupling boundary detected".format(rank=self._rank))
 
-    def initialize(self, coupling_subdomain, mesh, function_space, write_function=None, fixed_boundary=None):
+    def initialize(self, coupling_subdomain, function_space, write_function=None, fixed_boundary=None):
         """
         Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
 
@@ -349,6 +352,9 @@ class Adapter:
         self._dofmap = function_space.dofmap()
         _, self._fenics_dimensions = self._function_space.tabulate_dof_coordinates().shape
         self._coupling_subdomain = coupling_subdomain
+
+        # Extract mesh from function space
+        mesh = self._function_space.mesh()
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
@@ -399,19 +405,14 @@ class Adapter:
         # edge_vertex_ids1[i], edge_vertex_ids2[i])
 
         precice_dt = self._interface.initialize()
-        print("Rank {}: after initialize()".format(self._rank))
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
             if not write_function:
                 raise Exception("Non-standard initialization requires a write_function")
-            print("Rank {}: Before write_data in initialize".format(self._rank))
             self.write_data(write_function)
-            print("Rank {}: After write_data in initialize".format(self._rank))
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
-        print('Rank {}: Before initialize_data()'.format(self._rank))
         self._interface.initialize_data()
-        print("Rank {}: After initialize_data()".format(self._rank))
 
         return precice_dt
 

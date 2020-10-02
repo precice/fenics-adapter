@@ -97,18 +97,14 @@ def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, d
     array : array_like
         Array of FEniCS function values at each point on the boundary.
     """
-    function_space = function.function_space()
-    mesh = function_space.mesh()
-    _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain,
-                                                              fenics_dimensions, dimensions)
+    _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(function.function_space().mesh(), function.function_space(),
+                                                              coupling_subdomain, fenics_dimensions, dimensions)
     if type(function) is dolfin.Function:
         func_vector = function.vector().get_local()
-        func_eval = []
-        for lid in local_ids:
-            # func_eval = function(x, y) THIS DOES NOT WORK IN PARALLEL
-            func_eval.append(func_vector[lid])
+        print("N dof coordinates = {}".format(len(function.function_space().tabulate_dof_coordinates())))
+        print("len func_vector = {}".format(len(func_vector)))
+        return np.array([func_vector[lid] for lid in local_ids])
 
-        return np.array(func_eval)
     else:
         raise Exception("Cannot handle data type {}".format(type(function)))
 
@@ -139,7 +135,6 @@ def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fen
     n : int
         Number of vertices on the coupling interface.
     """
-    owned_gids, owned_lids = [], []
     fenics_gids, fenics_lids = [], []
     vertices_x, vertices_y, vertices_z = [], [], []
 
@@ -169,6 +164,7 @@ def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fen
     global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
 
     counter = 0
+    owned_gids, owned_lids = [], []
     vertices_x, vertices_y, vertices_z = [], [], []
     for v in dofs:
         if coupling_subdomain.inside(v, True):
@@ -195,15 +191,28 @@ def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fen
     physical_vertices, gids, lids = [], [], []
     for vertex in owned_vertices:
         for fenics_vertex in fenics_vertices:
-            if (vertex == fenics_vertex).all():
+            if (vertex == fenics_vertex).all():  # Check if dof is actually a physical point on the mesh
                 physical_vertices.append(vertex)
                 gids.append(owned_gids[counter])
                 lids.append(owned_lids[counter])
         counter += 1
 
-    owned_gids = np.array(gids)
-    owned_lids = np.array(lids)
-    owned_vertices = np.array(physical_vertices)
+    owned_lids, owned_gids = [], []
+    owned_vertices = []
+    if len(gids) > len(fenics_gids):
+        for i in range(len(gids) - 1):
+            if (physical_vertices[i+1] == physical_vertices[i]).all():
+                owned_vertices.append(physical_vertices[i])
+                owned_gids.append(gids[i])
+                owned_lids.append(lids[i])
+    else:
+        owned_gids = gids
+        owned_lids = lids
+        owned_vertices = physical_vertices
+
+    owned_gids = np.array(owned_gids)
+    owned_lids = np.array(owned_lids)
+    owned_vertices = np.array(owned_vertices)
 
     return fenics_gids, fenics_lids, fenics_vertices, owned_gids, owned_lids, owned_vertices
 
