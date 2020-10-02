@@ -20,7 +20,6 @@ class Config:
         self._coupling_mesh_name = None
         self._read_data_name = None
         self._write_data_name = None
-        self._interpolation_type = None
 
         self.read_json(adapter_config_filename)
 
@@ -63,6 +62,3 @@ class Config:
 
     def get_write_data_name(self):
         return self._write_data_name
-
-    def get_interpolation_expression_type(self):
-        return self._interpolation_type
