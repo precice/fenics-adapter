@@ -20,7 +20,7 @@ class Config:
         self._coupling_mesh_name = None
         self._read_data_name = None
         self._write_data_name = None
-        self._interpolation_type = None
+        self._data_writing_type = None
 
         self.read_json(adapter_config_filename)
 
@@ -46,6 +46,7 @@ class Config:
         except:
             self._write_data_name = None
         self._read_data_name = data["interface"]["read_data_name"]
+        self._data_writing_type = data["interface"]["data_writing_type"]
 
         read_file.close()
 
@@ -64,5 +65,5 @@ class Config:
     def get_write_data_name(self):
         return self._write_data_name
 
-    def get_interpolation_expression_type(self):
-        return self._interpolation_type
+    def get_data_writing_type(self):
+        return self._data_writing_type

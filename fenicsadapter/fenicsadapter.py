@@ -69,6 +69,14 @@ class Adapter:
         self._first_advance_done = False
         self._apply_2d_3d_coupling = False
 
+        # Handle Displacement Delta type FSI cases
+        if self._config.get_data_writing_type() == "absolute":
+            self._write_abs_val = True
+        elif self._config.get_data_writing_type() == "relative":
+            self._write_abs_val = False
+
+        self._write_data_n = None  # Displacement from previous time window
+
     def create_coupling_expression(self):
         """
         Creates a FEniCS Expression in the form of an object of class GeneralInterpolationExpression or
@@ -228,6 +236,11 @@ class Adapter:
         assert (write_function_type in list(FunctionType))
 
         write_data = convert_fenics_to_precice(w_func, self._coupling_mesh_vertices)
+
+        if not self._write_abs_val:
+            np1_write_data = write_data
+            write_data = write_data - self._write_data_n
+            self._write_data_n = np1_write_data
 
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
