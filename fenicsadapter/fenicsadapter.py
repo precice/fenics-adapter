@@ -304,8 +304,10 @@ class Adapter:
                                                    self._interface.get_dimensions())
             print("Rank {}: Shape of write data = {}".format(self._rank, write_data.shape))
             if write_function_type is FunctionType.SCALAR:
+                assert(write_function.function_space().num_sub_spaces() == 0)
                 self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
             elif write_function_type is FunctionType.VECTOR:
+                assert (write_function.function_space().num_sub_spaces() > 0)
                 if self._apply_2d_3d_coupling:
                     # in 2d-3d coupling z dimension is set to zero
                     precice_write_data = np.column_stack((write_data[:, 0], write_data[:, 1], np.zeros(n_vertices)))

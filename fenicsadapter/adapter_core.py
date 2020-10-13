@@ -4,7 +4,7 @@ This module consists of helper functions used in the Adapter class. Names of the
 
 import dolfin
 from dolfin import SubDomain, Point, PointSource, vertices
-from fenics import FunctionSpace, Function
+from fenics import FunctionSpace, VectorFunctionSpace, Function, interpolate
 import numpy as np
 from enum import Enum
 import logging
@@ -97,16 +97,34 @@ def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, d
     array : array_like
         Array of FEniCS function values at each point on the boundary.
     """
+
+    if type(function) is not dolfin.Function:
+        raise Exception("Cannot handle data type {}".format(type(function)))
+
+    if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
+        linear_space = VectorFunctionSpace(function.function_space().mesh(), "P", 1)
+    else:
+        linear_space = FunctionSpace(function.function_space().mesh(), "P", 1)
+
     _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(function.function_space().mesh(), function.function_space(),
                                                               coupling_subdomain, fenics_dimensions, dimensions)
-    if type(function) is dolfin.Function:
-        func_vector = function.vector().get_local()
-        print("N dof coordinates = {}".format(len(function.function_space().tabulate_dof_coordinates())))
-        print("len func_vector = {}".format(len(func_vector)))
-        return np.array([func_vector[lid] for lid in local_ids])
 
-    else:
-        raise Exception("Cannot handle data type {}".format(type(function)))
+    projected = interpolate(function, linear_space)
+    func_vector = projected.vector().get_local()
+    print("N dof coordinates original = {}".format(len(function.function_space().tabulate_dof_coordinates())))
+    print("N dof coordinates projected = {}".format(len(projected.function_space().tabulate_dof_coordinates())))
+    print("len func_vector = {}".format(len(func_vector)))
+    print("local_ids = {}".format(local_ids))
+
+    if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
+        assert((len(projected.function_space().tabulate_dof_coordinates()) / dimensions).is_integer())
+        n_vertices = int(len(projected.function_space().tabulate_dof_coordinates()) / dimensions)
+        func_vector = func_vector.reshape([n_vertices, dimensions])
+    else:  # function space is a FunctionSpace
+        n_vertices = len(projected.function_space().tabulate_dof_coordinates())
+        func_vector = func_vector.reshape([n_vertices, 1])
+
+    return np.array([func_vector[lid, :] for lid in local_ids])
 
 
 def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fenics_dimensions, dimensions):
