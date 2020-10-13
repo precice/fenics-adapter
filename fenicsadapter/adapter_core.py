@@ -106,7 +106,7 @@ def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, d
     else:
         linear_space = FunctionSpace(function.function_space().mesh(), "P", 1)
 
-    _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(function.function_space().mesh(), function.function_space(),
+    _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(linear_space.mesh(), linear_space,
                                                               coupling_subdomain, fenics_dimensions, dimensions)
 
     projected = interpolate(function, linear_space)
@@ -118,13 +118,12 @@ def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, d
 
     if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
         assert((len(projected.function_space().tabulate_dof_coordinates()) / dimensions).is_integer())
-        n_vertices = int(len(projected.function_space().tabulate_dof_coordinates()) / dimensions)
-        func_vector = func_vector.reshape([n_vertices, dimensions])
+        func_vector = np.array([func_vector[lid:lid+dimensions] for lid in local_ids])
+        func_vector = func_vector.reshape([len(local_ids), dimensions])
     else:  # function space is a FunctionSpace
-        n_vertices = len(projected.function_space().tabulate_dof_coordinates())
-        func_vector = func_vector.reshape([n_vertices, 1])
+        func_vector = np.array([func_vector[lid] for lid in local_ids])
 
-    return np.array([func_vector[lid, :] for lid in local_ids])
+    return func_vector
 
 
 def get_coupling_boundary_vertices(mesh, function_space, coupling_subdomain, fenics_dimensions, dimensions):
