@@ -355,9 +355,6 @@ class Adapter:
         _, self._fenics_dimensions = self._function_space.tabulate_dof_coordinates().shape
         self._coupling_subdomain = coupling_subdomain
 
-        # Extract mesh from function space
-        mesh = self._function_space.mesh()
-
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
@@ -378,7 +375,7 @@ class Adapter:
 
         # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
         self._fenics_gids, self._fenics_lids, self._fenics_coords, self._owned_gids, self._owned_lids, \
-        self._owned_coords = get_coupling_boundary_vertices(mesh, self._function_space, coupling_subdomain,
+        self._owned_coords = get_coupling_boundary_vertices(self._function_space, coupling_subdomain,
                                                             self._fenics_dimensions, self._interface.get_dimensions())
 
         print("Rank {}: Owned vertices of this rank = {}".format(self._rank, self._owned_coords))
