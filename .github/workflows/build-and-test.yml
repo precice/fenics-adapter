@@ -12,7 +12,7 @@ jobs:
   test:
     name: Run mock unit tests
     runs-on: ubuntu-latest
-    container: precice/ci-fenicsadapter-ubuntu-2004
+    container: precice/ci-ubuntu-2004
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -22,6 +22,11 @@ jobs:
           python-version: 3.7 
       - name: Install pip
         run: python3 -m pip install --upgrade pip
+      - name: Install FEniCS
+        run:  |
+          add-apt-repository -y ppa:fenics-packages/fenics
+          apt-get -qq update
+          apt-get -qq install --no-install-recommends fenics          
       - name: Install fake precice
         run:  |
           mkdir -p precice 
