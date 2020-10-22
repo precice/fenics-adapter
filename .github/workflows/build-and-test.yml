@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@v2
+      - name: "Install pip"
+        run:  sudo apt install python3-pip  
       - name: "Install fake precice"
         run:  |
           -p precice && echo -e "from setuptools import setup\nsetup(name='pyprecice', version='2.0.2.1')" > precice/setup.py
