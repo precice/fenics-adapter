@@ -1,0 +1,24 @@
+name: Build and Test
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    paths:
+      - '**'
+      
+jobs:  
+  test:
+    name: "run mock unit tests"
+    runs-on: ubuntu-latest
+    container: precice/ci-ubuntu-1804
+  steps:
+    - name: "Checkout Repository"
+      uses: actions/checkout@v2
+    - name: "Install fake precice"
+      run:  |
+        -p precice && echo -e "from setuptools import setup\nsetup(name='pyprecice', version='2.0.2.1')" > precice/setup.py
+        python3 -m pip install ./precice/
+    - name: "Run unit tests"
+        python3 setup.py test
