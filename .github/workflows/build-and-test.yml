@@ -22,4 +22,4 @@ jobs:
         -p precice && echo -e "from setuptools import setup\nsetup(name='pyprecice', version='2.0.2.1')" > precice/setup.py
         python3 -m pip install ./precice/
     - name: "Run unit tests"
-        python3 setup.py test
+      run:  python3 setup.py test
