@@ -35,5 +35,7 @@ jobs:
           python3 -m pip install ./precice/
       - name: Install wheel
         run: python3 -m pip install wheel
+      - name: Adjust user rights
+        run: chown -R $PRECICE_USER .
       - name: Run unit tests
-        run:  python3 setup.py test
+        run:  su -c "python3 setup.py test" $PRECICE_USER
