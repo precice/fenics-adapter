@@ -23,6 +23,6 @@ jobs:
       - name: "Install fake precice"
         run:  |
           mkdir -p precice && echo -e "from setuptools import setup\nsetup(name='pyprecice', version='2.0.2.1')" > precice/setup.py
-          pip3 install --user ./precice/
+          pip install --user ./precice/
       - name: "Run unit tests"
         run:  python3 setup.py test
