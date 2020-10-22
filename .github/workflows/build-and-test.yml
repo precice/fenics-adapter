@@ -12,7 +12,7 @@ jobs:
   test:
     name: Run mock unit tests
     runs-on: ubuntu-latest
-    container: precice/ci-ubuntu-1804
+    container: precice/ci-fenicsadapter-ubuntu-2004
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
