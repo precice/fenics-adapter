@@ -12,30 +12,15 @@ jobs:
   test:
     name: Run mock unit tests
     runs-on: ubuntu-latest
-    container: precice/ci-fenicsadapter-ubuntu-2004
+    container: quay.io/fenicsproject/stable:current
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
-      # - name: Set up Python 3.7 (or use precice/ci-fenicsadapter-ubuntu-2004)
-      #   uses: actions/setup-python@v2
-      #   with:
-      #     python-version: 3.7 
-      - name: Install pip
-        run: python3 -m pip install --upgrade pip
-      # - name: Install FEniCS (or use precice/ci-fenicsadapter-ubuntu-2004)
-      #   run:  |
-      #     add-apt-repository -y ppa:fenics-packages/fenics
-      #     apt-get -qq update
-      #     apt-get -qq install --no-install-recommends fenics          
+        uses: actions/checkout@v2      
       - name: Install fake precice
         run:  |
           mkdir -p precice 
           echo "from setuptools import setup" >> precice/setup.py
           echo "setup(name='pyprecice', version='2.0.2.1')" >> precice/setup.py
           python3 -m pip install ./precice/
-      - name: Install wheel
-        run: python3 -m pip install wheel
-      - name: Adjust user rights
-        run: chown -R $PRECICE_USER .
       - name: Run unit tests
-        run:  su -c "python3 setup.py test" $PRECICE_USER
+        run:  python3 setup.py test
