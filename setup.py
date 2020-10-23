@@ -12,7 +12,7 @@ with open("fenicsprecice/version.py") as fp:
 
 setup(name='fenicsprecice',
       version=version['__version__'],
-      description='preCICE-adapter for the open source computing platform FEniCS',
+      description='FEniCS-preCICE adapter: A preCICE-adapter for the open source computing platform FEniCS.',
       url='https://github.com/precice/fenics-adapter',
       author="Benjamin Rueth",
       author_email='benjamin.rueth@tum.de',

@@ -1,4 +1,4 @@
-# preCICE-adapter for the open source computing platform FEniCS
+# FEniCS-preCICE adapter
 
 <a style="text-decoration: none" href="https://travis-ci.org/precice/fenics-adapter" target="_blank">
     <img src="https://travis-ci.org/precice/fenics-adapter.svg?branch=master" alt="Build status">
