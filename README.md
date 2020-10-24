@@ -29,7 +29,8 @@ Make sure to install
 
 ### Build and install the adapter
 
-Run ``pip3 install --user .`` from your shell.
+Download or clone the adapter repository to the system.
+Run `pip3 install --user .` from your shell.
 
 ### Test the adapter
 
