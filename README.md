@@ -1,4 +1,5 @@
-# FEniCS-preCICE adapter
+FEniCS-preCICE adapter
+----------------------
 
 <a style="text-decoration: none" href="https://travis-ci.org/precice/fenics-adapter" target="_blank">
     <img src="https://travis-ci.org/precice/fenics-adapter.svg?branch=master" alt="Build status">
@@ -15,11 +16,21 @@ _**Note:** This adapter is currently purely expermental and limited in functiona
 
 This adapter was developed by [Benjamin Rüth](https://www5.in.tum.de/wiki/index.php/Benjamin_R%C3%BCth,_M.Sc._(hons)) during his research stay at Lund University in the group for [Numerical Analysis](http://www.maths.lu.se/english/research/research-divisions/numerical-analysis/) in close collaboration with [Peter Meisrimel](https://www.lunduniversity.lu.se/lucat/user/09d80f0367a060bcf2a22d7c22e5e504).
 
-## Installation
+# Installing the package
 
-### Dependencies
+## Using pip3 to install from PyPI
 
-Make sure to install 
+It is recommended to install [fenicsprecice from PyPI](https://pypi.org/project/fenicsprecice/) via
+```
+$ pip3 install --user fenicsprecice
+```
+This should work out of the box, if all dependencies are installed correctly. If you face problems during installation or you want to run the tests, see below for a list of dependencies and alternative installation procedures
+
+## Clone this repository and use pip3
+
+### Required dependencies
+
+Make sure to install the following dependencies:
 
 * [preCICE](https://github.com/precice/precice/wiki)
 * python3 (this adapter **only supports python3**)
@@ -29,7 +40,7 @@ Make sure to install
 
 ### Build and install the adapter
 
-Run ``pip3 install --user .`` from your shell.
+After cloning this repository and switching to the root directory (`fenics-adapter`), run ``pip3 install --user .`` from your shell.
 
 ### Test the adapter
 
@@ -42,17 +53,17 @@ Single tests can be also be run. For example the test `test_vector_write` in the
 python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
 ```
 
-## Use the adapter
+# Use the adapter
 
 Add ``from fenicsprecice import Adapter`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples:
 
 The adapter is configured via a `json` configuration file. For example configuration files and usage refer to the tutorials ([fenics-fenics](https://github.com/precice/tutorials/tree/master/HT/partitioned-heat/fenics-fenics)).
 
-## Packaging
+# Packaging
 
 To create and install the `fenicsprecice` python package the following instructions were used: https://python-packaging.readthedocs.io/en/latest/index.html.
 
-## Citing
+# Citing
 
 preCICE is an academic project, developed at the [Technical University of Munich](https://www5.in.tum.de/) and at the [University of Stuttgart](https://www.ipvs.uni-stuttgart.de/). If you use preCICE, please [cite us](https://www.precice.org/publications/):
 
@@ -60,6 +71,6 @@ preCICE is an academic project, developed at the [Technical University of Munich
 
 If you are using FEniCS, please also consider the information on https://fenicsproject.org/citing/.
 
-## Disclaimer
+# Disclaimer
 
 This offering is not approved or endorsed by the FEniCS Project, producer and distributor of the FEniCS software via https://fenicsproject.org/.
