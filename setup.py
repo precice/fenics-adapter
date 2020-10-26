@@ -9,10 +9,16 @@ if sys.version_info[0] < 3:
 version = {}
 with open("fenicsprecice/version.py") as fp:
     exec(fp.read(), version)
+    
+this_directory = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(name='fenicsprecice',
       version=version['__version__'],
       description='FEniCS-preCICE adapter: A preCICE-adapter for the open source computing platform FEniCS.',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
       url='https://github.com/precice/fenics-adapter',
       author="Benjamin Rueth",
       author_email='benjamin.rueth@tum.de',
