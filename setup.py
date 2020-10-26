@@ -3,7 +3,7 @@ from setuptools import setup
 # from https://stackoverflow.com/a/9079062
 import sys  
 if sys.version_info[0] < 3:
-    raise Exception("The fenicsprecice only supports Python3. Did you run $python setup.py <option>.? Try running $python3 setup.py <option>.")
+    raise Exception("fenicsprecice only supports Python3. Did you run $python setup.py <option>.? Try running $python3 setup.py <option>.")
 
 # using point 3. in https://packaging.python.org/guides/single-sourcing-package-version/#single-sourcing-the-version
 version = {}
