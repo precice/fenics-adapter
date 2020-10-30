@@ -47,14 +47,14 @@ class TestWriteandReadData(TestCase):
         Test to check if Adapter function write() passes correct parameters to the API function write_block_scalar_data()
         """
         from precice import Interface
-        import fenicsadapter
+        import fenicsprecice
 
         Interface.write_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=self.fake_id)
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
         precice._write_data_id = self.fake_id
@@ -78,14 +78,14 @@ class TestWriteandReadData(TestCase):
         Test to check if Adapter function write() passes correct parameters to the API function write_block_vector_data()
         """
         from precice import Interface
-        import fenicsadapter
+        import fenicsprecice
 
         Interface.write_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=self.fake_id)
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)
         precice._write_data_id = self.fake_id
@@ -113,8 +113,8 @@ class TestWriteandReadData(TestCase):
         Test to check if data return by API function read_block_scalar_data() is also returned by Adapter function read()
         """
         from precice import Interface
-        import fenicsadapter
-        from fenicsadapter.adapter_core import FunctionType
+        import fenicsprecice
+        from fenicsprecice.adapter_core import FunctionType
 
         def return_dummy_data(n_points):
             data = np.arange(n_points)
@@ -125,7 +125,7 @@ class TestWriteandReadData(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=self.fake_id)
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice._read_function_type = FunctionType.SCALAR
         precice._fenics_dimensions = self.dimension
@@ -153,8 +153,8 @@ class TestWriteandReadData(TestCase):
         Test to check if data return by API function read_block_vector_data() is also returned by Adapter function read()
         """
         from precice import Interface
-        import fenicsadapter
-        from fenicsadapter.adapter_core import FunctionType
+        import fenicsprecice
+        from fenicsprecice.adapter_core import FunctionType
 
         def return_dummy_data(n_points):
             data = np.arange(n_points * self.dimension).reshape(n_points, self.dimension)
@@ -165,7 +165,7 @@ class TestWriteandReadData(TestCase):
         Interface.get_mesh_id = MagicMock()
         Interface.get_data_id = MagicMock(return_value=self.fake_id)
 
-        precice = fenicsadapter.Adapter(self.dummy_config)
+        precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
         precice._read_function_type = FunctionType.VECTOR
         precice._coupling_mesh_vertices = np.stack([self.vertices_x, self.vertices_y], axis=1)

@@ -3,21 +3,21 @@ from setuptools import setup
 # from https://stackoverflow.com/a/9079062
 import sys  
 if sys.version_info[0] < 3:
-    raise Exception("The fenicsadapter only supports Python3. Did you run $python setup.py <option>.? Try running $python3 setup.py <option>.")
+    raise Exception("fenicsprecice only supports Python3. Did you run $python setup.py <option>.? Try running $python3 setup.py <option>.")
 
 # using point 3. in https://packaging.python.org/guides/single-sourcing-package-version/#single-sourcing-the-version
 version = {}
-with open("fenicsadapter/version.py") as fp:
+with open("fenicsprecice/version.py") as fp:
     exec(fp.read(), version)
 
-setup(name='fenicsadapter',
+setup(name='fenicsprecice',
       version=version['__version__'],
-      description='preCICE-adapter for the open source computing platform FEniCS ',
+      description='FEniCS-preCICE adapter is a preCICE adapter for the open source computing platform FEniCS.',
       url='https://github.com/precice/fenics-adapter',
       author="Benjamin Rueth",
       author_email='benjamin.rueth@tum.de',
       license='LGPL-3.0',
-      packages=['fenicsadapter'],
+      packages=['fenicsprecice'],
       install_requires=['pyprecice>=2.0.0', 'fenics', 'scipy', 'numpy>=1.13.3'],
       test_suite='tests',
       zip_safe=False)
