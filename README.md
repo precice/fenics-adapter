@@ -1,4 +1,4 @@
-# fenics-adapter
+# FEniCS-preCICE adapter
 
 <a style="text-decoration: none" href="https://travis-ci.org/precice/fenics-adapter" target="_blank">
     <img src="https://travis-ci.org/precice/fenics-adapter.svg?branch=master" alt="Build status">
@@ -29,11 +29,12 @@ Make sure to install
 
 ### Build and install the adapter
 
-Run ``pip3 install --user .`` from your shell.
+Download or clone the adapter repository to the system.
+Run `pip3 install --user .` from your shell.
 
 ### Test the adapter
 
-As a first test, try to import the adapter via `python3 -c "import fenicsadapter"`.
+As a first test, try to import the adapter via `python3 -c "import fenicsprecice"`.
 
 You can run the other tests via `python3 setup.py test`.
 
@@ -44,13 +45,13 @@ python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
 
 ## Use the adapter
 
-Add ``from fenicsadapter import Adapter`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples:
+Add ``from fenicsprecice import Adapter`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples:
 
 The adapter is configured via a `json` configuration file. For example configuration files and usage refer to the tutorials ([fenics-fenics](https://github.com/precice/tutorials/tree/master/HT/partitioned-heat/fenics-fenics)).
 
 ## Packaging
 
-To create and install the `fenicsadapter` python package the following instructions were used: https://python-packaging.readthedocs.io/en/latest/index.html.
+To create and install the `fenicsprecice` python package the following instructions were used: https://python-packaging.readthedocs.io/en/latest/index.html.
 
 ## Citing
 
