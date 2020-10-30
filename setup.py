@@ -16,8 +16,8 @@ with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='fenicsprecice',
-      version=version['__version__']+"rc1",
-      description='FEniCS-preCICE adapter: A preCICE-adapter for the open source computing platform FEniCS.',
+      version=version['__version__']+"rc2",
+      description='FEniCS-preCICE adapter is a preCICE adapter for the open source computing platform FEniCS.',
       long_description=long_description,
       long_description_content_type='text/markdown',
       url='https://github.com/precice/fenics-adapter',
