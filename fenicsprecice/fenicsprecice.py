@@ -5,7 +5,7 @@ import numpy as np
 from .config import Config
 import logging
 import precice
-from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
+from .adapter_core import FunctionType, CouplingMode, determine_function_type, convert_fenics_to_precice, \
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
 from .expression_core import SegregatedRBFInterpolationExpression
 from .solverstate import SolverState
@@ -47,14 +47,18 @@ class Adapter:
 
         # FEniCS related quantities
         self._fenics_dimensions = None
-        self._function_space = None  # initialized later
+        self._read_function_space = None  # initialized later
+        self._write_function_space = None  # initialized later
 
         # coupling mesh related quantities
         self._coupling_mesh_vertices = None  # initialized later
         self._vertex_ids = None  # initialized later
 
-        # read data related quantities (read data is read by use to FEniCS from preCICE)
+        # read data related quantities (read data is read from preCICE and applied in FEniCS)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
+
+        # write data related quantities (write data is written to preCICE)
+        self._write_function_type = None  # stores whether read function is scalar or vector valued
 
         # Interpolation strategy
         self._my_expression = SegregatedRBFInterpolationExpression
@@ -68,6 +72,9 @@ class Adapter:
         # Necessary bools for enforcing proper control flow / warnings to user
         self._first_advance_done = False
         self._apply_2d_3d_coupling = False
+
+        # Determine type of coupling in initialization
+        self._coupling_type = None
 
     def create_coupling_expression(self):
         """
@@ -85,9 +92,9 @@ class Adapter:
 
         try:  # works with dolfin 1.6.0
             # element information must be provided, else DOLFIN assumes scalar function
-            coupling_expression = self._my_expression(element=self._function_space.ufl_element())
+            coupling_expression = self._my_expression(element=self._read_function_space.ufl_element())
         except (TypeError, KeyError):  # works with dolfin 2017.2.0
-            coupling_expression = self._my_expression(element=self._function_space.ufl_element(), degree=0)
+            coupling_expression = self._my_expression(element=self._read_function_space.ufl_element(), degree=0)
 
         coupling_expression.set_function_type(self._read_function_type)
 
@@ -151,7 +158,7 @@ class Adapter:
             vertices = np.hstack([vertices, vector_of_zeros])
             nodal_data = np.hstack([nodal_data, vector_of_zeros])
 
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._function_space, vertices, nodal_data,
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, vertices, nodal_data,
                                            z_dead=self._apply_2d_3d_coupling)
 
     def read_data(self):
@@ -170,6 +177,8 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
+        assert(self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR_COUPLING)
+
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
@@ -220,6 +229,9 @@ class Adapter:
         write_function : Object of class dolfin.functions.function.Function
             A FEniCS function consisting of the data which this participant will write to preCICE in every time step.
         """
+
+        assert(self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR_COUPLING)
+
         w_func = write_function.copy()
         # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
         assert(w_func != write_function)
@@ -250,7 +262,7 @@ class Adapter:
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
-    def initialize(self, coupling_subdomain, mesh, function_space, write_function=None, fixed_boundary=None):
+    def initialize(self, coupling_subdomain, read_function_space=None, write_function_space=None, write_function=None, fixed_boundary=None):
         """
         Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
 
@@ -258,10 +270,10 @@ class Adapter:
         ----------
         coupling_subdomain : Object of class dolfin.cpp.mesh.SubDomain
             SubDomain of mesh which is the physical coupling boundary.
-        mesh : Object of class dolfin.cpp.mesh.Mesh
-            SubDomain of mesh of the complete region.
-        function_space : Object of class dolfin.functions.functionspace.FunctionSpace
-            Function space on which the finite element formulation of the problem lives.
+        read_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
+            Function space on which the read function lives.
+        write_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
+            Function space on which the write function lives.
         write_function : Object of class dolfin.functions.function.Function
             FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
         fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
@@ -274,8 +286,31 @@ class Adapter:
             Recommended time step value from preCICE.
         """
 
-        coords = function_space.tabulate_dof_coordinates()
+        if read_function_space is None and write_function_space is not None:
+            self._coupling_type = CouplingMode.UNIDIR_WRITE
+            assert(self._config.get_write_data_name())
+        elif read_function_space is not None and write_function_space is None:
+            self._coupling_type = CouplingMode.UNIDIR_READ
+            assert(self._config.get_read_data_name())
+        elif read_function_space is not None and write_function_space is not None:
+            self._coupling_type = CouplingMode.BIDIR_COUPLING
+            assert(self._config.get_read_data_name() and self._config.get_write_data_name())
+        else:
+            raise Exception("Incorrect read and write function space combination provided. Please check input parameters"
+                            "in initialization")
+
+        if self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR_COUPLING:
+            self._read_function_type = determine_function_type(read_function_space)
+            self._read_function_space = read_function_space
+        elif self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR_COUPLING:
+            self._write_function_type = determine_function_type(write_function_space)
+            self._write_function_space = write_function_space
+
+        coords = self._read_function_space.tabulate_dof_coordinates()
         _, self._fenics_dimensions = coords.shape
+
+        # Ensure that function spaces of read and write functions use the same mesh
+        assert self._read_function_space.mesh() is self._write_function_space.mesh()
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
@@ -295,8 +330,8 @@ class Adapter:
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
                     self._fenics_dimensions, self._interface.get_dimensions()))
 
-        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(
-            mesh, coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
+        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(self._read_function_space.mesh(),
+                coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
@@ -308,17 +343,14 @@ class Adapter:
         for i in range(n_vertices):
             id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(mesh, coupling_subdomain, id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(self._read_function_space.mesh(),
+                                                                         coupling_subdomain, id_mapping)
 
         # Set mesh edges in preCICE to allow nearest-projection mapping
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
-
-        # Set read functionality parameters
-        self._read_function_type = determine_function_type(function_space)
-        self._function_space = function_space
 
         precice_dt = self._interface.initialize()
 
