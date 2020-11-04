@@ -40,11 +40,16 @@ class Config:
         self._config_file_name = os.path.join(folder, data["config_file_name"])
         self._participant_name = data["participant_name"]
         self._coupling_mesh_name = data["interface"]["coupling_mesh_name"]
+
         try:
             self._write_data_name = data["interface"]["write_data_name"]
         except:
-            self._write_data_name = None
-        self._read_data_name = data["interface"]["read_data_name"]
+            self._write_data_name = None  # not required for one-way coupling, if this participant reads data
+
+        try:
+            self._read_data_name = data["interface"]["read_data_name"]
+        except:
+            self._read_data_name = None  # not required for one-way coupling, if this participant writes data
 
         read_file.close()
 
