@@ -143,7 +143,7 @@ class TestExpressionHandling(TestCase):
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice.initialize(right_boundary, self.mesh, self.scalar_V)
+        precice.initialize(right_boundary, self.scalar_V)
         values = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
 
@@ -174,7 +174,7 @@ class TestExpressionHandling(TestCase):
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice.initialize(right_boundary, self.mesh, self.vector_V)
+        precice.initialize(right_boundary, self.vector_V)
         values = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
 
