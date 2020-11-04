@@ -83,7 +83,7 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, dimensions):
+def convert_fenics_to_precice(function, coupling_subdomain, dimensions):
     """
     Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -106,7 +106,7 @@ def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, d
     else:
         linear_space = FunctionSpace(function.function_space().mesh(), "P", 1)
 
-    _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(linear_space, coupling_subdomain, fenics_dimensions, dimensions)
+    _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(linear_space, coupling_subdomain, dimensions)
 
     projected = interpolate(function, linear_space)
     func_vector = projected.vector().get_local()
@@ -125,7 +125,7 @@ def convert_fenics_to_precice(function, coupling_subdomain, fenics_dimensions, d
     return func_vector
 
 
-def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_dimensions, dimensions):
+def get_coupling_boundary_vertices(function_space, coupling_subdomain, dimensions):
     """
     Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
 
@@ -135,8 +135,6 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
-    fenics_dimensions : int
-        Dimensions of FEniCS case setup.
     dimensions : int
         Dimensions of coupling case setup.
 
@@ -197,19 +195,11 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, fenics_di
             vertices_x.append(v[0])
             if dimensions == 2:
                 vertices_y.append(v[1])
-            elif fenics_dimensions == 2 and dimensions == 3:
-                vertices_y.append(v[1])
-                vertices_z.append(0)
-            else:
-                raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
-                                .format(dimensions, fenics_dimensions))
         counter += 1
 
     owned_vertices = vertices_x
     if dimensions == 2:
         owned_vertices = np.stack([vertices_x, vertices_y], axis=1)
-    if dimensions == 3:
-        owned_vertices = np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
     # Cross reference all owned DoFs on the coupling boundary with the mesh vertices on coupling boundary to filter out
     # the higher order DoFs. Only the DoFs on the physical points are relevant
@@ -317,7 +307,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping):
     return vertices1_ids, vertices2_ids
 
 
-def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data, z_dead=False):
+def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data):
     """
     Creating two dicts of PointSources that can be applied to the assembled system. Appling filter_point_source to
     avoid forces being applied to already existing Dirichlet BC, since this would lead to an overdetermined system
@@ -333,10 +323,8 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     coupling_mesh_vertices : numpy.ndarray
         The coordinates of the vertices on the coupling interface. Coordinates of vertices are stored in a
         numpy array [N x D] where N = number of vertices and D = dimensions of geometry
-    data : PointSource
+    data : a numpy array of PointSource
         FEniCS PointSource data carrying forces
-    z_dead: bool
-        Allows to ignore z dimension
 
     Returns
     -------
@@ -354,12 +342,6 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
     n_vertices, dims = coupling_mesh_vertices.shape
 
-    if z_dead:
-        assert (dims == 3), "z_dead=True is only allowed for 3D data"
-    else:
-        assert (dims == 2), "This Adapter can create Point Sources only from 2D data. Use z_dead=True, if you want " \
-                            "to ignore the z dimension."
-
     vertices_x = coupling_mesh_vertices[:, 0]
     vertices_y = coupling_mesh_vertices[:, 1]
 
@@ -376,7 +358,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def determine_shared_vertices(comm, rank, dofmap, fenics_gids, fenics_lids):
+def determine_shared_vertices(comm, rank, function_space, fenics_gids, fenics_lids):
     """
     Determine which vertices along the coupling boundary are shared with neighbouring processes
     Parameters
@@ -390,6 +372,7 @@ def determine_shared_vertices(comm, rank, dofmap, fenics_gids, fenics_lids):
     -------
 
     """
+    dofmap = function_space.dofmap()
     sharednodes_map = dofmap.shared_nodes()
 
     # Global IDs of vertices shared by this rank and on the coupling interface
