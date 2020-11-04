@@ -310,7 +310,8 @@ class Adapter:
         _, self._fenics_dimensions = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
-        assert self._read_function_space.mesh() is self._write_function_space.mesh()
+        if self._coupling_type is CouplingMode.BIDIR_COUPLING:
+            assert self._read_function_space.mesh() is self._write_function_space.mesh()
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
