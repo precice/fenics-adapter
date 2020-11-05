@@ -28,7 +28,7 @@ class CouplingMode(Enum):
     Options are: Bi-directional coupling, Uni-directional Write Coupling, Uni-directional Read Coupling
     Used in assertions to check which type of coupling is done
     """
-    BIDIR_COUPLING = 4
+    BIDIR = 4
     UNIDIR_WRITE = 5
     UNIDIR_READ = 6
 

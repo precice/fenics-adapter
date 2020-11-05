@@ -177,7 +177,7 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
-        assert(self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR_COUPLING)
+        assert(self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR)
 
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -230,7 +230,7 @@ class Adapter:
             A FEniCS function consisting of the data which this participant will write to preCICE in every time step.
         """
 
-        assert(self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR_COUPLING)
+        assert(self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR)
 
         w_func = write_function.copy()
         # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
@@ -286,23 +286,24 @@ class Adapter:
             Recommended time step value from preCICE.
         """
 
-        if read_function_space is None and write_function_space is not None:
+        if read_function_space is None and write_function_space:
             self._coupling_type = CouplingMode.UNIDIR_WRITE
             assert(self._config.get_write_data_name())
-        elif read_function_space is not None and write_function_space is None:
+        elif read_function_space and write_function_space is None:
             self._coupling_type = CouplingMode.UNIDIR_READ
             assert(self._config.get_read_data_name())
-        elif read_function_space is not None and write_function_space is not None:
-            self._coupling_type = CouplingMode.BIDIR_COUPLING
+        elif read_function_space and write_function_space:
+            self._coupling_type = CouplingMode.BIDIR
             assert(self._config.get_read_data_name() and self._config.get_write_data_name())
         else:
             raise Exception("Incorrect read and write function space combination provided. Please check input parameters"
                             "in initialization")
 
-        if self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR_COUPLING:
+        if self._coupling_type is CouplingMode.UNIDIR_READ or self._coupling_type is CouplingMode.BIDIR:
             self._read_function_type = determine_function_type(read_function_space)
             self._read_function_space = read_function_space
-        elif self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR_COUPLING:
+
+        if self._coupling_type is CouplingMode.UNIDIR_WRITE or self._coupling_type is CouplingMode.BIDIR:
             self._write_function_type = determine_function_type(write_function_space)
             self._write_function_space = write_function_space
 
@@ -310,8 +311,8 @@ class Adapter:
         _, self._fenics_dimensions = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
-        if self._coupling_type is CouplingMode.BIDIR_COUPLING:
-            assert self._read_function_space.mesh() is self._write_function_space.mesh()
+        if self._coupling_type is CouplingMode.BIDIR:
+            assert(self._read_function_space.mesh() is self._write_function_space.mesh())
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
