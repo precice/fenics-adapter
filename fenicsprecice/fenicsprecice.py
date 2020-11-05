@@ -112,9 +112,9 @@ class Adapter:
             value.
         """
         for v in data.keys():
-            assert (len(v) == self._fenics_dimensions), \
+            assert (len(v) == self._interface.get_dimensions()), \
                 "Dimension of all provided vertices must be equal to dimension of FEniCS solver. Dimension = {} and " \
-                "received vertex {}".format(self._fenics_dimensions, v)
+                "received vertex {}".format(self._interface.get_dimensions(), v)
 
         vertices = np.array(list(data.keys()))
         nodal_data = np.array(list(data.values()))
@@ -141,9 +141,9 @@ class Adapter:
             "PointSources only supported for vector valued read data."
 
         for v in data.keys():
-            assert (len(v) == self._fenics_dimensions), \
+            assert (len(v) == self._interface.get_dimensions()), \
                 "Dimension of all provided vertices must be equal to dimension of FEniCS solver. Dimension = {} and " \
-                "received vertex {}".format(self._fenics_dimensions, v)
+                "received vertex {}".format(self._interface.get_dimensions(), v)
 
         vertices = np.array(list(data.keys()))
         nodal_data = np.array(list(data.values()))
@@ -277,7 +277,7 @@ class Adapter:
                                                                                     self._interface.get_dimensions()))
 
         fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(self._read_function_space.mesh(),
-                coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
+                coupling_subdomain, fenics_dimensions, self._interface.get_dimensions())
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(

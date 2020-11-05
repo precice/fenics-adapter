@@ -145,7 +145,6 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
     fenics_vertices = []
     vertices_x = []
     vertices_y = []
-    vertices_z = []
 
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
