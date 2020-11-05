@@ -157,19 +157,13 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
             vertices_x.append(v.x(0))
             if dimensions == 2:
                 vertices_y.append(v.x(1))
-            elif fenics_dimensions == 2 and dimensions == 3:
-                vertices_y.append(v.x(1))
-                vertices_z.append(0)
             else:
                 raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
                                 .format(dimensions, fenics_dimensions))
 
     assert (n != 0), "No coupling boundary vertices detected"
 
-    if dimensions == 2:
-        return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
-    elif dimensions == 3:
-        return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
+    return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
 
 
 def are_connected_by_edge(v1, v2):
@@ -241,7 +235,7 @@ def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
     return vertices1_ids, vertices2_ids
 
 
-def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data, z_dead=False):
+def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data):
     """
     Creating two dicts of PointSources that can be applied to the assembled system. Appling filter_point_source to
     avoid forces being applied to already existing Dirichlet BC, since this would lead to an overdetermined system
@@ -259,8 +253,6 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
         numpy array [N x D] where N = number of vertices and D = dimensions of geometry
     data : PointSource
         FEniCS PointSource data carrying forces
-    z_dead: bool
-        Allows to ignore z dimension
 
     Returns
     -------
@@ -278,12 +270,6 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
 
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
     n_vertices, dims = coupling_mesh_vertices.shape
-
-    if z_dead:
-        assert (dims == 3), "z_dead=True is only allowed for 3D data"
-    else:
-        assert (dims == 2), "This Adapter can create Point Sources only from 2D data. Use z_dead=True, if you want " \
-                            "to ignore the z dimension."
 
     vertices_x = coupling_mesh_vertices[:, 0]
     vertices_y = coupling_mesh_vertices[:, 1]
