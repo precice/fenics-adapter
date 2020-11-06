@@ -115,9 +115,15 @@ def convert_fenics_to_precice(function, coupling_subdomain, dimensions):
     print("len func_vector = {}".format(len(func_vector)))
     print("local_ids = {}".format(local_ids))
 
+    bnd_vals = []
     if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
         assert((len(projected.function_space().tabulate_dof_coordinates()) / dimensions).is_integer())
-        func_vector = np.array([func_vector[lid] for lid in local_ids])
+        # Pick data on the coupling boundary
+        for lid in local_ids:
+            bnd_vals.append(func_vector[lid])
+            bnd_vals.append(func_vector[lid+1])
+
+        func_vector = np.array(bnd_vals)
         func_vector = func_vector.reshape([len(local_ids), dimensions])
     else:  # function space is a FunctionSpace
         func_vector = np.array([func_vector[lid] for lid in local_ids])
@@ -149,11 +155,12 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain, dimension
         Number of vertices on the coupling interface.
     """
     fenics_gids, fenics_lids = [], []
-    vertices_x, vertices_y, vertices_z = [], [], []
+    vertices_x, vertices_y = [], []
 
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
+    # Get mesh from FEniCS function space
     mesh = function_space.mesh()
 
     # Global IDs of all DoFs seen by this rank (owned + unowned)

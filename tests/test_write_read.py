@@ -20,7 +20,6 @@ class RightBoundary(SubDomain):
 
 @patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
 class TestWriteandReadData(TestCase):
-
     """
     Test suite to test read and write functionality of Adapter. Read and Write functionality is tested for both scalar
     and vector data.

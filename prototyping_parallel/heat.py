@@ -45,16 +45,13 @@ def determine_gradient(V_g, u, flux):
     :param u: solution where gradient is to be determined
     :return:
     """
-    # print('{rank} of {size}:determine gradient'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
     w = TrialFunction(V_g)
     v = TestFunction(V_g)
 
     a = inner(w, v) * dx
     L = inner(grad(u), v) * dx
 
-    # print('{rank} of {size}:starts solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
     solve(a == L, flux)
-    # print('{rank} of {size}:done solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
 
 
 parser = argparse.ArgumentParser(description='Solving heat equation for simple or complex interface case')

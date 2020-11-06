@@ -240,7 +240,9 @@ class Adapter:
         # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
         assert (w_func != write_function)
 
-        assert self._write_function_type == determine_function_type(w_func)
+        # Check that the function provided lives on the same function space provided during initialization
+        assert (self._write_function_type == determine_function_type(w_func))
+        # assert (write_function.function_space() is self._write_function_space)
 
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -298,7 +300,7 @@ class Adapter:
         self._coupling_subdomain = coupling_subdomain
         _, fenics_dimensions = self._read_function_space.tabulate_dof_coordinates().shape
 
-        # Ensure that
+        # Ensure that read and write function spaces are defined using the same mesh
         assert self._read_function_space.mesh() is self._write_function_space.mesh()
 
         if fixed_boundary:
