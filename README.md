@@ -8,7 +8,7 @@ FEniCS-preCICE adapter
     <img src="https://img.shields.io/github/license/precice/fenics-adapter.svg" alt="GNU LGPL license">
 </a>
 
-**experimental** preCICE-adapter for the open source computing platform FEniCS
+preCICE-adapter for the open source computing platform FEniCS
 
 _**Note:** This adapter is currently purely expermental and limited in functionality. If you are interested in using it or you want to contribute, feel free to contact us via the [preCICE mailing list](https://mailman.informatik.uni-stuttgart.de/mailman/listinfo/precice)._
 
