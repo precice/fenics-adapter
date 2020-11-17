@@ -127,8 +127,6 @@ elif problem is ProblemType.NEUMANN:
     precice = Adapter(adapter_config_filename="precice-adapter-config-N.json")
     precice_dt = precice.initialize(coupling_boundary, V_g, V, write_function=u_D_function)
 
-print("Rank {}: preCICE initialization DONE".format(MPI.rank(MPI.comm_world)))
-
 boundary_marker = False
 
 # Assigning appropriate dt
@@ -162,6 +160,7 @@ if problem is ProblemType.NEUMANN:
         # TODO: fix the problem here
         raise Exception("Boundary markers are not implemented yet")
         # return dot(coupling_bc_expression, v) * dolfin.dss(boundary_marker)
+
 
 a, L = lhs(F), rhs(F)
 

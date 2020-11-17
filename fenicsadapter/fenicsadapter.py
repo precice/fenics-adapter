@@ -242,7 +242,7 @@ class Adapter:
 
         # Check that the function provided lives on the same function space provided during initialization
         assert (self._write_function_type == determine_function_type(w_func))
-        # assert (write_function.function_space() is self._write_function_space)
+        assert (write_function.function_space() == self._write_function_space)
 
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -250,22 +250,17 @@ class Adapter:
         if self._empty_rank:
             assert (self._size > 1)  # having participants without coupling mesh nodes is only valid for parallel runs
 
-        if not self._empty_rank:
-            write_function_type = determine_function_type(write_function)
-            assert (write_function_type in list(FunctionType))
-            n_vertices, _ = self._owned_coords.shape
-            write_data = convert_fenics_to_precice(write_function, self._coupling_subdomain, self._interface.get_dimensions())
-            print("Rank {}: Shape of write data = {}".format(self._rank, write_data.shape))
-            if write_function_type is FunctionType.SCALAR:
-                assert (write_function.function_space().num_sub_spaces() == 0)
-                self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
-            elif write_function_type is FunctionType.VECTOR:
-                assert (write_function.function_space().num_sub_spaces() > 0)
-                self._interface.write_block_vector_data(write_data_id, self._vertex_ids, write_data)
-            else:
-                raise Exception("write_function provided is neither VECTOR nor SCALAR type")
+        write_function_type = determine_function_type(write_function)
+        assert (write_function_type in list(FunctionType))
+        write_data = convert_fenics_to_precice(write_function, self._coupling_subdomain, self._interface.get_dimensions())
+        if write_function_type is FunctionType.SCALAR:
+            assert (write_function.function_space().num_sub_spaces() == 0)
+            self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
+        elif write_function_type is FunctionType.VECTOR:
+            assert (write_function.function_space().num_sub_spaces() > 0)
+            self._interface.write_block_vector_data(write_data_id, self._vertex_ids, write_data)
         else:
-            print("Process {rank}: No data written as no coupling boundary detected".format(rank=self._rank))
+            raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
     def initialize(self, coupling_subdomain, read_function_space=None, write_function_space=None, write_function=None,
                    fixed_boundary=None):

@@ -102,11 +102,17 @@ def convert_fenics_to_precice(function, coupling_subdomain, dimensions):
         raise Exception("Cannot handle data type {}".format(type(function)))
 
     if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
+        print("Before defining a new linear VectorFunctionSpace")
         linear_space = VectorFunctionSpace(function.function_space().mesh(), "P", 1)
+        print("After defining a new linear VectorFunctionSpace")
     else:
+        print("Before defining a new linear FunctionSpace")
         linear_space = FunctionSpace(function.function_space().mesh(), "P", 1)
+        print("After defining a new linear FunctionSpace")
 
+    print("Before get_coupling_boundary_vertices in convert_fenics_to_precice")
     _, _, _, _, local_ids, _ = get_coupling_boundary_vertices(linear_space, coupling_subdomain, dimensions)
+    print("After get_coupling_boundary_vertices in convert_fenics_to_precice")
 
     projected = interpolate(function, linear_space)
     func_vector = projected.vector().get_local()
@@ -117,16 +123,22 @@ def convert_fenics_to_precice(function, coupling_subdomain, dimensions):
 
     bnd_vals = []
     if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
-        assert((len(projected.function_space().tabulate_dof_coordinates()) / dimensions).is_integer())
-        # Pick data on the coupling boundary
-        for lid in local_ids:
-            bnd_vals.append(func_vector[lid])
-            bnd_vals.append(func_vector[lid+1])
+        if len(local_ids):
+            assert((len(projected.function_space().tabulate_dof_coordinates()) / dimensions).is_integer())
+            # Pick data on the coupling boundary
+            for lid in local_ids:
+                bnd_vals.append(func_vector[lid])
+                bnd_vals.append(func_vector[lid+1])
 
-        func_vector = np.array(bnd_vals)
-        func_vector = func_vector.reshape([len(local_ids), dimensions])
-    else:  # function space is a FunctionSpace
-        func_vector = np.array([func_vector[lid] for lid in local_ids])
+            func_vector = np.array(bnd_vals)
+            func_vector = func_vector.reshape([len(local_ids), dimensions])
+        else:
+            func_vector = np.ndarray(shape=(0, 0))
+    else:  # function space is a FunctionSpace (scalar)
+        if len(local_ids):
+            func_vector = np.array([func_vector[lid] for lid in local_ids])
+        else:
+            func_vector = np.array([])
 
     return func_vector
 
