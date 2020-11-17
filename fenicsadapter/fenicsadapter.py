@@ -216,14 +216,14 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
 
             owned_read_data = {tuple(key): value for key, value in zip(self._owned_coords, read_data)}
-            print("Owned data before being updated from communication = {}".format(owned_read_data))
+            print("Rank {}: Owned data before being updated from communication = {}".format(self._rank, owned_read_data))
             updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_gids,
                                                        self._owned_coords, self._fenics_coords, owned_read_data,
                                                        self._to_send_pts, self._to_recv_pts)
         else:  # if there are no vertices, we return empty data
             updated_data = None
 
-        print("Updated data after communication = {}".format(updated_data))
+        print("Rank {}: Updated data after communication = {}".format(self._rank, updated_data))
         return updated_data
 
     def write_data(self, write_function):
@@ -309,11 +309,15 @@ class Adapter:
 
         # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
         self._fenics_gids, self._fenics_lids, self._fenics_coords, self._owned_gids, self._owned_lids, \
-        self._owned_coords = get_coupling_boundary_vertices(self._read_function_space, coupling_subdomain,
-                                                            self._interface.get_dimensions())
+        self._owned_coords = get_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
 
-        print("Rank {}: Owned vertices of this rank = {}".format(self._rank, self._owned_coords))
-        print("Rank {}: Owned global IDs of vertices of this rank = {}".format(self._rank, self._owned_gids))
+        print("Rank {}: fenics_gids = {}".format(self._rank, self._fenics_gids))
+        print("Rank {}: fenics_lids = {}".format(self._rank, self._fenics_lids))
+        print("Rank {}: fenics_coords = {}".format(self._rank, self._fenics_coords))
+
+        print("Rank {}: owned_gids = {}".format(self._rank, self._owned_gids))
+        print("Rank {}: owned_lids = {}".format(self._rank, self._owned_lids))
+        print("Rank {}: owned_coords = {}".format(self._rank, self._owned_coords))
 
         # Set up mesh in preCICE
         if self._owned_gids.size > 0:
@@ -326,6 +330,9 @@ class Adapter:
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
         self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank, self._read_function_space,
                                                                          self._fenics_gids, self._fenics_lids)
+
+        print("Rank {}: to_send_pts = {}".format(self._rank, self._to_send_pts))
+        print("Rank {}: to_recv_pts = {}".format(self._rank, self._to_recv_pts))
 
         # # Set mesh edges in preCICE to allow nearest-projection mapping
         # # Define a mapping between coupling vertices and their IDs in preCICE
