@@ -37,6 +37,19 @@ class MockedArray:
 
 
 @patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+class TestAdapter(TestCase):
+    """
+    Test suite for basic API functions
+    """
+    def test_version(self):
+        """
+        Test that adapter provides a version
+        """
+        import fenicsprecice
+        fenicsprecice.__version__
+
+
+@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
     """
     Test suite to check if Checkpointing functionality of the Adapter is working.
