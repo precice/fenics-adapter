@@ -311,28 +311,30 @@ class Adapter:
         self._fenics_gids, self._fenics_lids, self._fenics_coords, self._owned_gids, self._owned_lids, \
         self._owned_coords = get_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
 
-        print("Rank {}: fenics_gids = {}".format(self._rank, self._fenics_gids))
-        print("Rank {}: fenics_lids = {}".format(self._rank, self._fenics_lids))
-        print("Rank {}: fenics_coords = {}".format(self._rank, self._fenics_coords))
-
-        print("Rank {}: owned_gids = {}".format(self._rank, self._owned_gids))
-        print("Rank {}: owned_lids = {}".format(self._rank, self._owned_lids))
-        print("Rank {}: owned_coords = {}".format(self._rank, self._owned_coords))
-
         # Set up mesh in preCICE
-        if self._owned_gids.size > 0:
+        if self._fenics_gids.size > 0:
             self._empty_rank = False
+            print("Rank {}: fenics_gids = {}".format(self._rank, self._fenics_gids))
+            print("Rank {}: fenics_lids = {}".format(self._rank, self._fenics_lids))
+            print("Rank {}: fenics_coords = {}".format(self._rank, self._fenics_coords))
+
+            print("Rank {}: owned_gids = {}".format(self._rank, self._owned_gids))
+            print("Rank {}: owned_lids = {}".format(self._rank, self._owned_lids))
+            print("Rank {}: owned_coords = {}".format(self._rank, self._owned_coords))
+        else:
+            print("Rank {} is EMPTY RANK".format(self._rank))
 
         # Define mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
             self._config.get_coupling_mesh_name()), self._owned_coords)
 
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
-        self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank, self._read_function_space,
-                                                                         self._fenics_gids, self._fenics_lids)
+        self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank,
+                                                                         self._read_function_space, self._fenics_lids)
 
-        print("Rank {}: to_send_pts = {}".format(self._rank, self._to_send_pts))
-        print("Rank {}: to_recv_pts = {}".format(self._rank, self._to_recv_pts))
+        if self._empty_rank is False:
+            print("Rank {}: to_send_pts = {}".format(self._rank, self._to_send_pts))
+            print("Rank {}: to_recv_pts = {}".format(self._rank, self._to_recv_pts))
 
         # # Set mesh edges in preCICE to allow nearest-projection mapping
         # # Define a mapping between coupling vertices and their IDs in preCICE
