@@ -156,67 +156,6 @@ class CouplingExpression(UserExpression):
             return self._function_type is FunctionType.VECTOR
 
 
-class RBFInterpolationExpression(CouplingExpression):
-    """
-    Uses RBF interpolation for implementation of CustomExpression.interpolate. Allows for arbitrary coupling
-    interfaces, but has limited accuracy.
-    """
-
-    def create_interpolant(self):
-        """
-        See base class description.
-        """
-        interpolant = []
-        if self._dimension == 1:
-            assert (
-                self.is_scalar_valued())  # for 1D only R->R mapping is allowed by preCICE, no need to implement Vector case
-            interpolant.append(Rbf(self._coords_x, self._vals))
-        elif self._dimension == 2:
-            if self.is_scalar_valued():  # check if scalar or vector-valued
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._vals))
-            elif self.is_vector_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y,
-                                       self._vals[:, 0]))  # extract dim_no element of each vector
-                interpolant.append(Rbf(self._coords_x, self._coords_y,
-                                       self._vals[:, 1]))  # extract dim_no element of each vector
-            else:
-                raise Exception("Problem dimension and data dimension not matching.")
-        elif self._dimension == 3:
-            logger.warning("RBF Interpolation for 3D Simulations has not been properly tested!")
-            if self.is_scalar_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals))
-            elif self.is_vector_valued():
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 0]))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 1]))
-                interpolant.append(Rbf(self._coords_x, self._coords_y, self._coords_z, self._vals[:, 2]))
-            else:
-                raise Exception("Problem dimension and data dimension not matching.")
-        else:
-            raise Exception("Dimension of the function invalid/not supported.")
-
-        return interpolant
-
-    def interpolate(self, x):
-        """
-        See base class description.
-        """
-        assert ((self.is_scalar_valued() and self._vals.ndim == 1) or
-                (self.is_vector_valued() and self._vals.ndim == self._dimension))
-
-        return_value = self._vals.ndim * [None]
-
-        if self._dimension == 1:
-            for i in range(self._vals.ndim):
-                return_value[i] = self._f[i](x[0])
-        if self._dimension == 2:
-            for i in range(self._vals.ndim):
-                return_value[i] = self._f[i](x[0], x[1])
-        if self._dimension == 3:
-            for i in range(self._vals.ndim):
-                return_value[i] = self._f[i](x[0], x[1], x[2])
-        return return_value
-
-
 class SegregatedRBFInterpolationExpression(CouplingExpression):
     """
     Uses polynomial quadratic fit + RBF interpolation for implementation of CustomExpression.interpolate. Allows for

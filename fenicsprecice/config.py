@@ -20,7 +20,6 @@ class Config:
         self._coupling_mesh_name = None
         self._read_data_name = None
         self._write_data_name = None
-        self._interpolation_type = None
 
         self.read_json(adapter_config_filename)
 
@@ -40,15 +39,16 @@ class Config:
         self._config_file_name = os.path.join(folder, data["config_file_name"])
         self._participant_name = data["participant_name"]
         self._coupling_mesh_name = data["interface"]["coupling_mesh_name"]
+
         try:
             self._write_data_name = data["interface"]["write_data_name"]
         except:
-            self._write_data_name = None
-        self._read_data_name = data["interface"]["read_data_name"]
+            self._write_data_name = None  # not required for one-way coupling, if this participant reads data
+
         try:
-            self._interpolation_type = data["interface"]["interpolation_type"]
+            self._read_data_name = data["interface"]["read_data_name"]
         except:
-            self._interpolation_type = None
+            self._read_data_name = None  # not required for one-way coupling, if this participant writes data
 
         read_file.close()
 
@@ -66,6 +66,3 @@ class Config:
 
     def get_write_data_name(self):
         return self._write_data_name
-
-    def get_interpolation_expression_type(self):
-        return self._interpolation_type

@@ -9,7 +9,7 @@ import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_fenics_coupling_boundary_vertices, get_owned_coupling_boundary_vertices, get_unowned_coupling_boundary_vertices, \
     get_coupling_boundary_edges, get_forces_as_point_sources, determine_shared_vertices, communicate_shared_vertices
-from .expression_core import RBFInterpolationExpression, SegregatedRBFInterpolationExpression, EmptyExpression
+from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from mpi4py import MPI
 from warnings import warn
@@ -76,20 +76,8 @@ class Adapter:
         self._read_function_type = None  # stores whether read function is scalar or vector valued
         self._write_function_type = None  # stores whether write function is scalar or vector valued
 
-        # Interpolation strategy as provided by the user
-        if self._config.get_interpolation_expression_type() == "cubic_spline":
-            raise Exception("cubic_spline has been removed in https://github.com/precice/fenics-adapter/pull/83. "
-                            "Please use rbf_segregated.")
-        elif self._config.get_interpolation_expression_type() == "rbf":
-            self._my_expression = RBFInterpolationExpression
-            print("Using RBF interpolation")
-        elif self._config.get_interpolation_expression_type() == "rbf_segregated":
-            self._my_expression = SegregatedRBFInterpolationExpression
-            print("Using segregated RBF interpolation")
-        else:
-            warn(
-                "No valid interpolation strategy entered. It is assumed that the user does not wish to use FEniCS "
-                "Expressions on the coupling boundary.")
+        # Interpolation strategy
+        self._my_expression = SegregatedRBFInterpolationExpression
 
         # Solver state used by the Adapter internally to handle checkpointing
         self._checkpoint = None

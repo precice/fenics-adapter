@@ -305,29 +305,20 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping):
     vertices2_ids : numpy array
         Array of second vertex of each edge.
     """
-    # preCICE only sees non-duplicate global vertices
-    dofs = function_space.tabulate_dof_coordinates()
-    local_to_global_map = function_space.dofmap().tabulate_local_to_global_dofs()
-    local_to_global_unowned = function_space.dofmap().local_to_global_unowned()
-    global_ids = [i for i in local_to_global_map if i not in local_to_global_unowned]
 
-    points = dict()
-
-    for v1 in dofs:
-        if coupling_subdomain.inside(v1, True):
-            points[v1] = []
-
-    for v1 in points.keys():
-        for v2 in points.keys():
-            if are_connected_by_edge(v1, v2):
-                points[v1] = v2
-                points[v2] = v1
+    def edge_is_on(subdomain, edge):
+        """
+        Check whether edge lies within subdomain
+        """
+        assert(len(list(dolfin.vertices(edge))) == 2)
+        return all([subdomain.inside(v.point(), True) for v in dolfin.vertices(edge)])
 
     vertices1_ids = []
     vertices2_ids = []
 
-    for v1, v2 in points.items():
-        if v1 is not v2:
+    for edge in dolfin.edges(function_space.mesh()):
+        if edge_is_on(coupling_subdomain, edge):
+            v1, v2 = list(dolfin.vertices(edge))
             vertices1_ids.append(id_mapping[v1.global_index()])
             vertices2_ids.append(id_mapping[v2.global_index()])
 
