@@ -12,7 +12,6 @@ from .adapter_core import FunctionType, determine_function_type, convert_fenics_
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from mpi4py import MPI
-from warnings import warn
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -59,17 +58,14 @@ class Adapter:
         self._read_function_space = None  # initialized later
         self._write_function_space = None  # initialized later
         self._dofmap = None  # initialized later using function space provided by user
-        self._fenics_lids = None
         self._fenics_gids = None
         self._fenics_coords = None
         self._coupling_subdomain = None
 
         # coupling mesh related quantities
         self._owned_gids = None  # initialized later
-        self._owned_lids = None  # initialized later
         self._owned_coords = None  # initialized later
         self._unowned_gids = None
-        self._unowned_lids = None
         self._vertex_ids = None  # initialized later
 
         # read data related quantities (read data is read by use to FEniCS from preCICE)
@@ -240,7 +236,7 @@ class Adapter:
 
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
-        write_data = convert_fenics_to_precice(write_function, self._coupling_subdomain, self._interface.get_dimensions())
+        write_data = convert_fenics_to_precice(write_function, self._coupling_subdomain)
         if write_function_type is FunctionType.SCALAR:
             assert (write_function.function_space().num_sub_spaces() == 0)
             self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
@@ -296,28 +292,24 @@ class Adapter:
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
-        self._fenics_gids, self._fenics_lids, self._fenics_coords = \
+        self._fenics_gids, self._fenics_coords = \
             get_fenics_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
 
-        self._owned_gids, self._owned_lids, self._owned_coords = \
+        self._owned_gids, _, self._owned_coords = \
             get_owned_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
 
-        self._unowned_gids, self._unowned_lids = \
-            get_unowned_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
+        self._unowned_gids = get_unowned_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
 
         # Set up mesh in preCICE
         if self._fenics_gids.size > 0:
             self._empty_rank = False
             print("Rank {}: fenics_gids = {}".format(self._rank, self._fenics_gids))
-            print("Rank {}: fenics_lids = {}".format(self._rank, self._fenics_lids))
             print("Rank {}: fenics_coords = {}".format(self._rank, self._fenics_coords))
 
             print("Rank {}: owned_gids = {}".format(self._rank, self._owned_gids))
-            print("Rank {}: owned_lids = {}".format(self._rank, self._owned_lids))
             print("Rank {}: owned_coords = {}".format(self._rank, self._owned_coords))
 
             print("Rank {}: unowned_gids = {}".format(self._rank, self._unowned_gids))
-            print("Rank {}: unowned_lids = {}".format(self._rank, self._unowned_lids))
         else:
             print("Rank {} is EMPTY RANK".format(self._rank))
 
@@ -334,15 +326,16 @@ class Adapter:
             print("Rank {}: to_send_pts = {}".format(self._rank, self._to_send_pts))
             print("Rank {}: to_recv_pts = {}".format(self._rank, self._to_recv_pts))
 
-        # # Set mesh edges in preCICE to allow nearest-projection mapping
-        # # Define a mapping between coupling vertices and their IDs in preCICE
-        # id_mapping = {tuple(key): value for key, value in zip(owned_gids, self._vertex_ids)}
-        #
-        # edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,
-        # id_mapping)
-        # for i in range(len(edge_vertex_ids1)): assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-        # self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-        # edge_vertex_ids1[i], edge_vertex_ids2[i])
+        # Set mesh edges in preCICE to allow nearest-projection mapping
+        # Define a mapping between coupling vertices and their IDs in preCICE
+        id_mapping = {key: value for key, value in zip(self._owned_gids, self._vertex_ids)}
+
+        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(self._read_function_space, coupling_subdomain,
+                                                                         id_mapping)
+        for i in range(len(edge_vertex_ids1)):
+            assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
+            self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
+                                          edge_vertex_ids1[i], edge_vertex_ids2[i])
 
         precice_dt = self._interface.initialize()
 

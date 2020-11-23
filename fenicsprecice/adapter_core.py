@@ -3,8 +3,8 @@ This module consists of helper functions used in the Adapter class. Names of the
 """
 
 import dolfin
-from dolfin import SubDomain, Point, PointSource, vertices, vertex_to_dof_map, dof_to_vertex_map
-from fenics import FunctionSpace, VectorFunctionSpace, Function, interpolate
+from dolfin import SubDomain, Point, PointSource, vertices
+from fenics import FunctionSpace, VectorFunctionSpace, Function
 import numpy as np
 from enum import Enum
 import logging
@@ -83,7 +83,7 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-def convert_fenics_to_precice(function, coupling_subdomain, dimensions):
+def convert_fenics_to_precice(function, coupling_subdomain):
     """
     Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -91,6 +91,9 @@ def convert_fenics_to_precice(function, coupling_subdomain, dimensions):
     ----------
     function : FEniCS function
         A FEniCS function referring to a physical variable in the problem.
+    coupling_subdomain : FEniCS Domain
+        Subdomain consists of only the coupling interface region.
+
 
     Returns
     -------
@@ -154,14 +157,13 @@ def get_fenics_coupling_boundary_vertices(function_space, coupling_subdomain):
 
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
-    fenics_gids, fenics_lids, fenics_coords = [], [], []
+    fenics_gids, fenics_coords = [], []
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
             fenics_gids.append(v.global_index())
-            fenics_lids.append(v.index())
             fenics_coords.append([v.x(0), v.x(1)])
 
-    return np.array(fenics_gids), np.array(fenics_lids), np.array(fenics_coords)
+    return np.array(fenics_gids), np.array(fenics_coords)
 
 
 def get_owned_coupling_boundary_vertices(function_space, coupling_subdomain):
@@ -244,7 +246,7 @@ def get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain):
 
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
-    unowned_gids, unowned_lids = [], []
+    unowned_gids = []
     ownership = False
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
@@ -257,32 +259,8 @@ def get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain):
 
             if ownership is False:
                 unowned_gids.append(v.global_index())
-                unowned_lids.append(v.index())
 
-    return np.array(unowned_gids), np.array(unowned_lids)
-
-
-def are_connected_by_edge(v1, v2):
-    """
-    Checks if vertices are connected by an edge.
-
-    Parameters
-    ----------
-    v1 : dolfin.vertex
-        Vertex 1 of the edge
-    v2 : dolfin.vertex
-        Vertex 2 of the edge
-
-    Returns
-    -------
-    tag : bool
-        True is v1 and v2 are connected by edge and False if not connected
-    """
-    for edge1 in dolfin.edges(v1):
-        for edge2 in dolfin.edges(v2):
-            if edge1.index() == edge2.index():  # Vertices are connected by edge
-                return True
-    return False
+    return np.array(unowned_gids)
 
 
 def get_coupling_boundary_edges(function_space, coupling_subdomain, id_mapping):

@@ -28,7 +28,7 @@ from __future__ import print_function, division
 from fenics import Function, FunctionSpace, Expression, Constant, DirichletBC, TrialFunction, TestFunction, \
     File, solve, lhs, rhs, grad, inner, dot, dx, ds, interpolate, VectorFunctionSpace, MeshFunction, vertices
 from fenics import MPI
-from fenicsadapter import Adapter
+from fenicsprecice import Adapter
 from errorcomputation import compute_errors
 from my_enums import ProblemType, Subcycling
 import argparse
