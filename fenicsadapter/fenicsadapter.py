@@ -7,8 +7,8 @@ from .config import Config
 import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
-    get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
-    determine_shared_vertices, communicate_shared_vertices
+    get_fenics_coupling_boundary_vertices, get_owned_coupling_boundary_vertices, get_unowned_coupling_boundary_vertices, \
+    get_coupling_boundary_edges, get_forces_as_point_sources, determine_shared_vertices, communicate_shared_vertices
 from .expression_core import RBFInterpolationExpression, SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from mpi4py import MPI
@@ -68,6 +68,8 @@ class Adapter:
         self._owned_gids = None  # initialized later
         self._owned_lids = None  # initialized later
         self._owned_coords = None  # initialized later
+        self._unowned_gids = None
+        self._unowned_lids = None
         self._vertex_ids = None  # initialized later
 
         # read data related quantities (read data is read by use to FEniCS from preCICE)
@@ -216,14 +218,12 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
 
             owned_read_data = {tuple(key): value for key, value in zip(self._owned_coords, read_data)}
-            print("Rank {}: Owned data before being updated from communication = {}".format(self._rank, owned_read_data))
             updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_gids,
                                                        self._owned_coords, self._fenics_coords, owned_read_data,
                                                        self._to_send_pts, self._to_recv_pts)
         else:  # if there are no vertices, we return empty data
             updated_data = None
 
-        print("Rank {}: Updated data after communication = {}".format(self._rank, updated_data))
         return updated_data
 
     def write_data(self, write_function):
@@ -308,8 +308,14 @@ class Adapter:
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
-        self._fenics_gids, self._fenics_lids, self._fenics_coords, self._owned_gids, self._owned_lids, \
-        self._owned_coords = get_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
+        self._fenics_gids, self._fenics_lids, self._fenics_coords = \
+            get_fenics_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
+
+        self._owned_gids, self._owned_lids, self._owned_coords = \
+            get_owned_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
+
+        self._unowned_gids, self._unowned_lids = \
+            get_unowned_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
 
         # Set up mesh in preCICE
         if self._fenics_gids.size > 0:
@@ -321,6 +327,9 @@ class Adapter:
             print("Rank {}: owned_gids = {}".format(self._rank, self._owned_gids))
             print("Rank {}: owned_lids = {}".format(self._rank, self._owned_lids))
             print("Rank {}: owned_coords = {}".format(self._rank, self._owned_coords))
+
+            print("Rank {}: unowned_gids = {}".format(self._rank, self._unowned_gids))
+            print("Rank {}: unowned_lids = {}".format(self._rank, self._unowned_lids))
         else:
             print("Rank {} is EMPTY RANK".format(self._rank))
 
@@ -330,7 +339,8 @@ class Adapter:
 
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
         self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank,
-                                                                         self._read_function_space, self._fenics_lids)
+                                                                         self._read_function_space,
+                                                                         self._owned_gids, self._unowned_gids)
 
         if self._empty_rank is False:
             print("Rank {}: to_send_pts = {}".format(self._rank, self._to_send_pts))

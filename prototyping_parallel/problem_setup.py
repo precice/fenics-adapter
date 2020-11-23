@@ -103,7 +103,7 @@ def get_problem_setup(args):
 
 def get_geometry(domain_part):
     nx = 5
-    ny = 5
+    ny = 10
     low_resolution = 5
     high_resolution = 5
     n_vertices = 20

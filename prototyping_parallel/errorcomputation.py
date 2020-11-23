@@ -8,6 +8,6 @@ def compute_errors(u_approx, u_ref, V, total_error_tol=10 ** -4):
         assemble(inner(error_pointwise, error_pointwise) * dx))  # determine L2 norm to estimate total error
     error_pointwise.rename("error", " ")
 
-    # assert (error_total < total_error_tol)
+    assert (error_total < total_error_tol)
 
     return error_total, error_pointwise

@@ -103,40 +103,28 @@ def convert_fenics_to_precice(function, coupling_subdomain, dimensions):
 
     if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
         linear_space = VectorFunctionSpace(function.function_space().mesh(), "P", 1)
-    else: # function space is scalar
+    else:  # function space is scalar
         linear_space = FunctionSpace(function.function_space().mesh(), "P", 1)
 
-    _, _, _, _, lids, _ = get_coupling_boundary_vertices(linear_space, coupling_subdomain)
+    _, lids, _ = get_owned_coupling_boundary_vertices(linear_space, coupling_subdomain)
 
-    projected = interpolate(function, linear_space)
-    func_vector = projected.vector().get_local()
-    print("N dof coordinates original = {}".format(len(function.function_space().tabulate_dof_coordinates())))
-    print("N dof coordinates projected = {}".format(len(projected.function_space().tabulate_dof_coordinates())))
-    print("local_ids = {}".format(lids))
+    vertex_vals = function.compute_vertex_values(function.function_space().mesh())
 
-    bnd_vals = []
-    if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
-        if len(lids):
-            assert((len(projected.function_space().tabulate_dof_coordinates()) / dimensions).is_integer())
-            # Pick data on the coupling boundary
+    result_vals = []
+    if len(lids):
+        if function.function_space().num_sub_spaces() > 0:  # function space is VectorFunctionSpace
             for lid in lids:
-                bnd_vals.append(func_vector[lid])
-                bnd_vals.append(func_vector[lid+1])
+                result_vals.append([vertex_vals[lid], vertex_vals[lid+1]])
+        else:  # function space is FunctionSpace (scalar)
+            for lid in lids:
+                result_vals.append(vertex_vals[lid])
+    else:
+        result_vals = np.array([])
 
-            func_vector = np.array(bnd_vals)
-            func_vector = func_vector.reshape([len(lids), dimensions])
-        else:
-            func_vector = np.ndarray(shape=(0, 0))
-    else:  # function space is a FunctionSpace (scalar)
-        if len(lids):
-            func_vector = np.array([func_vector[lid] for lid in lids])
-        else:
-            func_vector = np.array([])
-
-    return func_vector
+    return np.array(result_vals)
 
 
-def get_coupling_boundary_vertices(function_space, coupling_subdomain):
+def get_fenics_coupling_boundary_vertices(function_space, coupling_subdomain):
     """
     Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
 
@@ -161,7 +149,47 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain):
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
-    # and coordinates of owned vertices
+    # Get mesh from FEniCS function space
+    mesh = function_space.mesh()
+
+    # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
+    # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
+    fenics_gids, fenics_lids, fenics_coords = [], [], []
+    for v in vertices(mesh):
+        if coupling_subdomain.inside(v.point(), True):
+            fenics_gids.append(v.global_index())
+            fenics_lids.append(v.index())
+            fenics_coords.append([v.x(0), v.x(1)])
+
+    return np.array(fenics_gids), np.array(fenics_lids), np.array(fenics_coords)
+
+
+def get_owned_coupling_boundary_vertices(function_space, coupling_subdomain):
+    """
+        Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
+
+        Parameters
+        ----------
+        function_space : FEniCS function space
+            Function space on which the finite element problem definition lives.
+        coupling_subdomain : FEniCS Domain
+            Subdomain consists of only the coupling interface region.
+
+        Returns
+        -------
+        fenics_vertices : numpy array
+            Array consisting of all vertices lying on the coupling interface.
+        coordinates : array_like
+            The coordinates of the vertices in a numpy array [N x D] where
+            N = number of vertices and D = dimensions of geometry.
+        n : int
+            Number of vertices on the coupling interface.
+        """
+
+    if not issubclass(type(coupling_subdomain), SubDomain):
+        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
+
+    # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
     dofs = function_space.tabulate_dof_coordinates()
 
     # Get mesh from FEniCS function space
@@ -169,21 +197,69 @@ def get_coupling_boundary_vertices(function_space, coupling_subdomain):
 
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
-    fenics_gids, fenics_lids, fenics_coords = [], [], []
     owned_gids, owned_lids, owned_coords = [], [], []
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
-            fenics_gids.append(v.global_index())
-            fenics_lids.append(v.index())
-            fenics_coords.append([v.x(0), v.x(1)])
+            dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
             for dof in dofs:
-                if (dof == [v.x(0), v.x(1)]).all():
+                if (dof == [v.x(0), v.x(1)]).all() and (dof != dof_nm1).any():
                     owned_gids.append(v.global_index())
                     owned_lids.append(v.index())
                     owned_coords.append([v.x(0), v.x(1)])
+                dof_nm1 = dof
 
-    return np.array(fenics_gids), np.array(fenics_lids), np.array(fenics_coords), np.array(owned_gids), \
-           np.array(owned_lids), np.array(owned_coords)
+    return np.array(owned_gids), np.array(owned_lids), np.array(owned_coords)
+
+
+def get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain):
+    """
+        Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
+
+        Parameters
+        ----------
+        function_space : FEniCS function space
+            Function space on which the finite element problem definition lives.
+        coupling_subdomain : FEniCS Domain
+            Subdomain consists of only the coupling interface region.
+
+        Returns
+        -------
+        fenics_vertices : numpy array
+            Array consisting of all vertices lying on the coupling interface.
+        coordinates : array_like
+            The coordinates of the vertices in a numpy array [N x D] where
+            N = number of vertices and D = dimensions of geometry.
+        n : int
+            Number of vertices on the coupling interface.
+        """
+
+    if not issubclass(type(coupling_subdomain), SubDomain):
+        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
+
+    # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
+    dofs = function_space.tabulate_dof_coordinates()
+
+    # Get mesh from FEniCS function space
+    mesh = function_space.mesh()
+
+    # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
+    # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
+    unowned_gids, unowned_lids = [], []
+    ownership = False
+    for v in vertices(mesh):
+        if coupling_subdomain.inside(v.point(), True):
+            dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
+            for dof in dofs:
+                if (dof == [v.x(0), v.x(1)]).all() and (dof != dof_nm1).any():
+                    ownership = True
+                    break
+                dof_nm1 = dof
+
+            if ownership is False:
+                unowned_gids.append(v.global_index())
+                unowned_lids.append(v.index())
+
+    return np.array(unowned_gids), np.array(unowned_lids)
 
 
 def are_connected_by_edge(v1, v2):
@@ -312,7 +388,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def determine_shared_vertices(comm, rank, function_space, fenics_lids):
+def determine_shared_vertices(comm, rank, function_space, owned_gids, unowned_gids):
     """
     Determine which vertices along the coupling boundary are shared with neighbouring processes
     Parameters
@@ -326,43 +402,8 @@ def determine_shared_vertices(comm, rank, function_space, fenics_lids):
     -------
 
     """
-    dofmap = function_space.dofmap()
-    sharednodes_map = dofmap.shared_nodes()
-
-    # Vertex to DoF map
-    # v2d = vertex_to_dof_map(function_space)
-
-    # DoF to Vertex map
-    d2v = dof_to_vertex_map(function_space)
-
-    # Global IDs of all DoFs seen by this rank (owned + unowned)
-    all_gids = function_space.dofmap().tabulate_local_to_global_dofs()
-
-    # Global IDs of vertices shared by this rank which are on the coupling interface
-    shared_gids = []
-    for key in sharednodes_map.keys():
-        for lid in fenics_lids:
-            if d2v[key] == lid:
-                shared_gids.append(all_gids[key])
-
-    # Global IDs of vertices which are not owned but shared by this rank
-    unowned_shared_gids = dofmap.local_to_global_unowned()
-
-    # Global IDs of vertices which are owned and shared by this rank
-    owned_shared_gids = [i for i in shared_gids if i not in unowned_shared_gids]
-
-    # Create dictionary: keys are Global IDs of vertices owned and shared by this rank, values are ranks to which
-    # data on these vertices needs to be sent
-    send_data = dict()
-    for gid in owned_shared_gids:
-        lid = int(np.where(all_gids == gid)[0][0])
-        for shared_id in sharednodes_map.keys():
-            if d2v[shared_id] == lid:
-                send_data[gid] = sharednodes_map[lid]
-
-    # Ranks with which this rank shares vertices
-    neigh_ranks = dofmap.neighbours()
-    print("Rank {}: Neighbors are: {}".format(rank, neigh_ranks))
+    # Get ranks which are neighbours of this rank from the DoFMap in FEniCS
+    neigh_ranks = function_space.dofmap().neighbours()
 
     # Receive ownership data of ranks which are neighbors of this rank
     recv_reqs = []
@@ -378,7 +419,7 @@ def determine_shared_vertices(comm, rank, function_space, fenics_lids):
         send_hashtag = hashlib.sha256()
         send_hashtag.update((str(rank) + str(neigh)).encode('utf-8'))
         send_tag = int(send_hashtag.hexdigest()[:6], base=16)
-        req = comm.isend(owned_shared_gids, dest=neigh, tag=send_tag)
+        req = comm.isend(owned_gids, dest=neigh, tag=send_tag)
         send_reqs.append(req)
 
     # Wait for all non-blocking communication operations to complete
@@ -391,20 +432,56 @@ def determine_shared_vertices(comm, rank, function_space, fenics_lids):
         ownership_data[neigh] = recv_reqs[counter].wait()
         counter += 1
 
-    # Create dictionary: keys are Global IDs of vertices not owned and shared by this rank, values are ranks from which
+    # Create dictionary: keys are Global IDs of vertices not owned by this rank, values are ranks from which
     # data on these vertices needs to be received
     recv_data = dict()
     for neigh in neigh_ranks:
-        for oid in ownership_data[neigh]:
-            for gid in unowned_shared_gids:
-                if oid == gid:
-                    recv_data[gid] = neigh
+        for o_gid in ownership_data[neigh]:
+            for uo_gid in unowned_gids:
+                if o_gid == uo_gid:
+                    recv_data[uo_gid] = neigh
+
+    # Receive ownership data of ranks which are neighbors of this rank
+    recv_reqs = []
+    for neigh in neigh_ranks:
+        recv_hashtag = hashlib.sha256()
+        recv_hashtag.update((str(neigh) + str(rank)).encode('utf-8'))
+        recv_tag = int(recv_hashtag.hexdigest()[:6], base=16)
+        recv_reqs.append(comm.irecv(source=neigh, tag=recv_tag))
+
+    # Send non-ownership data to ranks which are neighbors of this rank
+    send_reqs = []
+    for neigh in neigh_ranks:
+        send_hashtag = hashlib.sha256()
+        send_hashtag.update((str(rank) + str(neigh)).encode('utf-8'))
+        send_tag = int(send_hashtag.hexdigest()[:6], base=16)
+        req = comm.isend(unowned_gids, dest=neigh, tag=send_tag)
+        send_reqs.append(req)
+
+    # Wait for all non-blocking communication operations to complete
+    MPI.Request.Waitall(send_reqs)
+
+    nonownership_data = dict()
+    # Collect received ownership data of other ranks
+    counter = 0
+    for neigh in neigh_ranks:
+        nonownership_data[neigh] = recv_reqs[counter].wait()
+        counter += 1
+
+    # Create dictionary: keys are Global IDs of vertices not owned by this rank, values are ranks from which
+    # data on these vertices needs to be received
+    send_data = dict()
+    for neigh in neigh_ranks:
+        for uo_gid in nonownership_data[neigh]:
+            for o_gid in owned_gids:
+                if uo_gid == o_gid:
+                    send_data[o_gid] = neigh
 
     return send_data, recv_data
 
 
 def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_coords, owned_data,
-                                to_send_ids, to_recv_ids):
+                                send_pts, recv_pts):
     """
 
     Parameters
@@ -429,11 +506,9 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
             if (coord == owned_coord).all():
                 fenics_data[tuple(coord)] = owned_data[tuple(owned_coord)]
 
-    print("Rank {}: fenics_data in comm_shared_verts after attachment = {}".format(rank, fenics_data))
-
     recv_reqs = []
-    if to_recv_ids:
-        for recv_gid, src in to_recv_ids.items():
+    if recv_pts:
+        for recv_gid, src in recv_pts.items():
             hash_tag = hashlib.sha256()
             hash_tag.update((str(src) + str(recv_gid) + str(rank)).encode('utf-8'))
             tag = int(hash_tag.hexdigest()[:6], base=16)
@@ -442,10 +517,10 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
         print("Rank {}: Nothing to Receive".format(rank))
 
     send_reqs = []
-    if to_send_ids:
-        for send_gid, dests in to_send_ids.items():
+    if send_pts:
+        for send_gid, dests in send_pts.items():
             send_lid = int(np.where(fenics_gids == send_gid)[0][0])
-            for dest in dests:
+            for dest in [dests]:
                 hash_tag = hashlib.sha256()
                 hash_tag.update((str(rank) + str(send_gid) + str(dest)).encode('utf-8'))
                 tag = int(hash_tag.hexdigest()[:6], base=16)
@@ -457,9 +532,9 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
     # Wait for all non-blocking communications to complete
     MPI.Request.Waitall(send_reqs)
 
-    # Set received data into the existing data array
+    # Attach received data into the existing FEniCS style data array
     counter = 0
-    for recv_gid in to_recv_ids.keys():
+    for recv_gid in recv_pts.keys():
         recv_lid = int(np.where(fenics_gids == recv_gid)[0][0])
         fenics_data[tuple(fenics_coords[recv_lid])] = recv_reqs[counter].wait()
         counter += 1
