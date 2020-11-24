@@ -10,7 +10,6 @@ from .adapter_core import FunctionType, CouplingMode, determine_function_type, c
 from .expression_core import SegregatedRBFInterpolationExpression
 from .solverstate import SolverState
 from fenics import Function, FunctionSpace
-from warnings import warn
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
