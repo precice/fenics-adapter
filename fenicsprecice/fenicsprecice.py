@@ -285,12 +285,15 @@ class Adapter:
             Recommended time step value from preCICE.
         """
 
+        write_function_space, write_function = None, None
         if type(write_object) is Function:
             write_function_space = write_object.function_space()
             write_function = write_object
         elif type(write_object) is FunctionSpace:
             write_function_space = write_object
             write_function = None
+        elif write_object is None:
+            print("Participant {} is read-only participant".format(self._config.get_participant_name()))
         else:
             raise Exception("Given write object is neither of type dolfin.functions.function.Function or "
                             "dolfin.functions.functionspace.FunctionSpace")
@@ -298,6 +301,7 @@ class Adapter:
         if read_function_space is None and write_function_space:
             self._coupling_type = CouplingMode.UNIDIR_WRITE
             assert(self._config.get_write_data_name())
+            print("Participant {} is write-only participant".format(self._config.get_participant_name()))
         elif read_function_space and write_function_space is None:
             self._coupling_type = CouplingMode.UNIDIR_READ
             assert(self._config.get_read_data_name())
@@ -305,8 +309,8 @@ class Adapter:
             self._coupling_type = CouplingMode.BIDIR
             assert(self._config.get_read_data_name() and self._config.get_write_data_name())
         else:
-            raise Exception("Incorrect read and write function space combination provided. Please check input parameters"
-                            "in initialization")
+            raise Exception("Incorrect read and write function space combination provided. Please check input "
+                            "parameters in initialization")
 
         if self._coupling_type is CouplingMode.UNIDIR_READ or self._coupling_type is CouplingMode.BIDIR:
             self._read_function_type = determine_function_type(read_function_space)
