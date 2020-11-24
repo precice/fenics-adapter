@@ -83,7 +83,7 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-def convert_fenics_to_precice(function, coupling_subdomain):
+def convert_fenics_to_precice(function, lids):
     """
     Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
@@ -103,13 +103,6 @@ def convert_fenics_to_precice(function, coupling_subdomain):
 
     if type(function) is not dolfin.Function:
         raise Exception("Cannot handle data type {}".format(type(function)))
-
-    if function.function_space().num_sub_spaces() > 0:  # function space is a VectorFunctionSpace
-        linear_space = VectorFunctionSpace(function.function_space().mesh(), "P", 1)
-    else:  # function space is scalar
-        linear_space = FunctionSpace(function.function_space().mesh(), "P", 1)
-
-    _, lids, _ = get_owned_coupling_boundary_vertices(linear_space, coupling_subdomain)
 
     vertex_vals = function.compute_vertex_values(function.function_space().mesh())
 
@@ -247,9 +240,9 @@ def get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain):
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     unowned_gids = []
-    ownership = False
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
+            ownership = False
             dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
             for dof in dofs:
                 if (dof == [v.x(0), v.x(1)]).all() and (dof != dof_nm1).any():
