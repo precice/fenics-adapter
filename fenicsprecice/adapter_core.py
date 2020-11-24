@@ -4,7 +4,7 @@ This module consists of helper functions used in the Adapter class. Names of the
 
 import dolfin
 from dolfin import SubDomain, Point, PointSource
-from fenics import FunctionSpace, VectorFunctionSpace, Function
+from fenics import FunctionSpace, Function
 import numpy as np
 from enum import Enum
 import logging
@@ -159,29 +159,6 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
         return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
     elif dimensions == 3:
         return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
-
-
-def are_connected_by_edge(v1, v2):
-    """
-    Checks if vertices are connected by an edge.
-
-    Parameters
-    ----------
-    v1 : dolfin.vertex
-        Vertex 1 of the edge
-    v2 : dolfin.vertex
-        Vertex 2 of the edge
-
-    Returns
-    -------
-    tag : bool
-        True is v1 and v2 are connected by edge and False if not connected
-    """
-    for edge1 in dolfin.edges(v1):
-        for edge2 in dolfin.edges(v2):
-            if edge1.index() == edge2.index():  # Vertices are connected by edge
-                return True
-    return False
 
 
 def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):

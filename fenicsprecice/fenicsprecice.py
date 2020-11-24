@@ -9,7 +9,6 @@ from .adapter_core import FunctionType, determine_function_type, convert_fenics_
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
 from .expression_core import SegregatedRBFInterpolationExpression
 from .solverstate import SolverState
-from warnings import warn
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
