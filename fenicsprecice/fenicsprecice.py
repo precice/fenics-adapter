@@ -9,6 +9,7 @@ from .adapter_core import FunctionType, CouplingMode, determine_function_type, c
     get_coupling_boundary_vertices, get_coupling_boundary_edges, get_forces_as_point_sources
 from .expression_core import SegregatedRBFInterpolationExpression
 from .solverstate import SolverState
+from fenics import Function, FunctionSpace
 from warnings import warn
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,6 @@ class Adapter:
         # FEniCS related quantities
         self._fenics_dimensions = None
         self._read_function_space = None  # initialized later
-        self._write_function_space = None  # initialized later
 
         # coupling mesh related quantities
         self._coupling_mesh_vertices = None  # initialized later
@@ -262,9 +262,9 @@ class Adapter:
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
-    def initialize(self, coupling_subdomain, read_function_space=None, write_function_space=None, write_function=None, fixed_boundary=None):
+    def initialize(self, coupling_subdomain, read_function_space=None, write_object=None, fixed_boundary=None):
         """
-        Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
+        Initializes the coupling interface and sets up the mesh in preCICE. Custom initialization also possible.
 
         Parameters
         ----------
@@ -272,10 +272,9 @@ class Adapter:
             SubDomain of mesh which is the physical coupling boundary.
         read_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
             Function space on which the read function lives.
-        write_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
-            Function space on which the write function lives.
-        write_function : Object of class dolfin.functions.function.Function
-            FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
+        write_object : Object of class dolfin.functions.functionspace.FunctionSpace OR dolfin.functions.function.Function
+            Function space on which the write function lives or FEniCS function related to the quantity to be written
+            by FEniCS during each coupling iteration.
         fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
             SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
             is fixed at one end (fixed end of a flexible beam).
@@ -285,6 +284,16 @@ class Adapter:
         dt : double
             Recommended time step value from preCICE.
         """
+
+        if type(write_object) is Function:
+            write_function_space = write_object.function_space()
+            write_function = write_object
+        elif type(write_object) is FunctionSpace:
+            write_function_space = write_object
+            write_function = None
+        else:
+            raise Exception("Given write object is neither of type dolfin.functions.function.Function or "
+                            "dolfin.functions.functionspace.FunctionSpace")
 
         if read_function_space is None and write_function_space:
             self._coupling_type = CouplingMode.UNIDIR_WRITE
@@ -305,14 +314,13 @@ class Adapter:
 
         if self._coupling_type is CouplingMode.UNIDIR_WRITE or self._coupling_type is CouplingMode.BIDIR:
             self._write_function_type = determine_function_type(write_function_space)
-            self._write_function_space = write_function_space
 
         coords = self._read_function_space.tabulate_dof_coordinates()
         _, self._fenics_dimensions = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BIDIR:
-            assert(self._read_function_space.mesh() is self._write_function_space.mesh())
+            assert(self._read_function_space.mesh() is write_function_space.mesh())
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
