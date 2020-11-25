@@ -263,19 +263,21 @@ class Adapter:
 
     def initialize(self, coupling_subdomain, read_function_space=None, write_object=None, fixed_boundary=None):
         """
-        Initializes the coupling interface and sets up the mesh in preCICE. Custom initialization also possible.
+        Initializes the coupling interface and sets up the mesh in preCICE.
 
         Parameters
         ----------
         coupling_subdomain : Object of class dolfin.cpp.mesh.SubDomain
             SubDomain of mesh which is the physical coupling boundary.
         read_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
-            Function space on which the read function lives.
+            Function space on which the read function lives. If not provided then the adapter assumes that this
+            participant is a write-only participant.
         write_object : Object of class dolfin.functions.functionspace.FunctionSpace OR dolfin.functions.function.Function
             Function space on which the write function lives or FEniCS function related to the quantity to be written
-            by FEniCS during each coupling iteration.
+            by FEniCS during each coupling iteration. If not provided then the adapter assumes that this participant is
+            a read-only participant.
         fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
-            SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
+            SubDomain consisting of a fixed boundary of the mesh. For example in FSI cases usually the solid body
             is fixed at one end (fixed end of a flexible beam).
 
         Returns
