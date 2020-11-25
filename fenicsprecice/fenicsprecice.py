@@ -31,6 +31,7 @@ class Adapter:
     look at this tutorial:
     https://github.com/precice/tutorials/tree/master/FSI/flap_perp/OpenFOAM-FEniCS
     """
+
     def __init__(self, adapter_config_filename='precice-adapter-config.json'):
         """
         Constructor of Adapter class.
@@ -43,7 +44,8 @@ class Adapter:
 
         self._config = Config(adapter_config_filename)
 
-        self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(), 0, 1)
+        self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(), 0,
+                                            1)
 
         # FEniCS related quantities
         self._fenics_dimensions = None
@@ -176,7 +178,7 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
-        assert(self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR)
+        assert (self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR)
 
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -201,7 +203,7 @@ class Adapter:
             elif self._apply_2d_3d_coupling:
                 precice_read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
                 n_vertices, dims = precice_read_data.shape
-                read_data = np.zeros((n_vertices, dims-1))
+                read_data = np.zeros((n_vertices, dims - 1))
                 read_data[:, 0] = precice_read_data[:, 0]
                 read_data[:, 1] = precice_read_data[:, 1]
 
@@ -229,11 +231,11 @@ class Adapter:
             A FEniCS function consisting of the data which this participant will write to preCICE in every time step.
         """
 
-        assert(self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR)
+        assert (self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR)
 
         w_func = write_function.copy()
         # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
-        assert(w_func != write_function)
+        assert (w_func != write_function)
 
         write_function_type = determine_function_type(w_func)
         assert (write_function_type in list(FunctionType))
@@ -287,28 +289,39 @@ class Adapter:
         """
 
         write_function_space, write_function = None, None
-        if type(write_object) is Function:
+        if type(write_object) is Function:  # precice.initialize_data() will be called using this Function
             write_function_space = write_object.function_space()
             write_function = write_object
-        elif type(write_object) is FunctionSpace:
+        elif type(write_object) is FunctionSpace:  # preCICE will use default zero values for initialization.
             write_function_space = write_object
             write_function = None
         elif write_object is None:
-            print("Participant {} is read-only participant".format(self._config.get_participant_name()))
+            pass
         else:
             raise Exception("Given write object is neither of type dolfin.functions.function.Function or "
                             "dolfin.functions.functionspace.FunctionSpace")
 
+        mesh = None
         if read_function_space is None and write_function_space:
             self._coupling_type = CouplingMode.UNIDIR_WRITE
-            assert(self._config.get_write_data_name())
+            assert (self._config.get_write_data_name())
             print("Participant {} is write-only participant".format(self._config.get_participant_name()))
+            mesh = write_function_space.mesh()
         elif read_function_space and write_function_space is None:
             self._coupling_type = CouplingMode.UNIDIR_READ
-            assert(self._config.get_read_data_name())
+            assert (self._config.get_read_data_name())
+            print("Participant {} is read-only participant".format(self._config.get_participant_name()))
+            mesh = read_function_space.mesh()
         elif read_function_space and write_function_space:
             self._coupling_type = CouplingMode.BIDIR
-            assert(self._config.get_read_data_name() and self._config.get_write_data_name())
+            assert (self._config.get_read_data_name() and self._config.get_write_data_name())
+            mesh = read_function_space.mesh()
+        elif read_function_space is None and write_function_space is None:
+            raise Exception("Neither read_function_space nor write_function_space is provided. Please provide a write "
+                            "function_space if one-way coupling with this participant only writing data is intended. "
+                            "Please provide a read_function_space if one-way coupling with this participant only "
+                            "reading data is intended. If two-way coupling is implemented then both read_function_space"
+                            " and write_object need to be provided.")
         else:
             raise Exception("Incorrect read and write function space combination provided. Please check input "
                             "parameters in initialization")
@@ -318,6 +331,7 @@ class Adapter:
             self._read_function_space = read_function_space
 
         if self._coupling_type is CouplingMode.UNIDIR_WRITE or self._coupling_type is CouplingMode.BIDIR:
+            # Ensure that function spaces of read and write functions are defined using the same mesh
             self._write_function_type = determine_function_type(write_function_space)
 
         coords = self._read_function_space.tabulate_dof_coordinates()
@@ -325,7 +339,9 @@ class Adapter:
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BIDIR:
-            assert(self._read_function_space.mesh() is write_function_space.mesh())
+            assert (self._read_function_space.mesh() is write_function_space.mesh()), "read_function_space and " \
+                                                                                     "write_object need to be " \
+                                                                                      "defined using the same mesh"
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
@@ -345,8 +361,9 @@ class Adapter:
                                 "No proper treatment for dimensional mismatch is implemented. Aborting!".format(
                     self._fenics_dimensions, self._interface.get_dimensions()))
 
-        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(self._read_function_space.mesh(),
-                coupling_subdomain, self._fenics_dimensions, self._interface.get_dimensions())
+        fenics_vertices, self._coupling_mesh_vertices = get_coupling_boundary_vertices(mesh, coupling_subdomain,
+                                                                                       self._fenics_dimensions,
+                                                                                       self._interface.get_dimensions())
 
         # Set up mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
@@ -358,8 +375,7 @@ class Adapter:
         for i in range(n_vertices):
             id_mapping[fenics_vertices[i].global_index()] = self._vertex_ids[i]
 
-        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(self._read_function_space.mesh(),
-                                                                         coupling_subdomain, id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(mesh, coupling_subdomain, id_mapping)
 
         # Set mesh edges in preCICE to allow nearest-projection mapping
         for i in range(len(edge_vertex_ids1)):
