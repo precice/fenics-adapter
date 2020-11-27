@@ -306,15 +306,18 @@ class Adapter:
             assert (self._config.get_write_data_name())
             print("Participant {} is write-only participant".format(self._config.get_participant_name()))
             mesh = write_function_space.mesh()
+            function_space = write_function_space
         elif read_function_space and write_function_space is None:
             self._coupling_type = CouplingMode.UNIDIR_READ
             assert (self._config.get_read_data_name())
             print("Participant {} is read-only participant".format(self._config.get_participant_name()))
             mesh = read_function_space.mesh()
+            function_space = read_function_space
         elif read_function_space and write_function_space:
             self._coupling_type = CouplingMode.BIDIR
             assert (self._config.get_read_data_name() and self._config.get_write_data_name())
             mesh = read_function_space.mesh()
+            function_space = read_function_space
         elif read_function_space is None and write_function_space is None:
             raise Exception("Neither read_function_space nor write_function_space is provided. Please provide a write "
                             "function_space if one-way coupling with this participant only writing data is intended. "
@@ -333,7 +336,7 @@ class Adapter:
             # Ensure that function spaces of read and write functions are defined using the same mesh
             self._write_function_type = determine_function_type(write_function_space)
 
-        coords = self._read_function_space.tabulate_dof_coordinates()
+        coords = function_space.tabulate_dof_coordinates()
         _, self._fenics_dimensions = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
