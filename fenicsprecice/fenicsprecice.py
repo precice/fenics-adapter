@@ -319,10 +319,10 @@ class Adapter:
             mesh = read_function_space.mesh()
             function_space = read_function_space
         elif read_function_space is None and write_function_space is None:
-            raise Exception("Neither read_function_space nor write_function_space is provided. Please provide a write "
-                            "function_space if one-way coupling with this participant only writing data is intended. "
-                            "Please provide a read_function_space if one-way coupling with this participant only "
-                            "reading data is intended. If two-way coupling is implemented then both read_function_space"
+            raise Exception("Neither read_function_space nor write_function_space is provided. Please provide a "
+                            "write_object if this participant is used in one-way coupling and only writes data. "
+                            "Please provide a read_function_space if this participant is used in one-way coupling and "
+                            "only reads data. If two-way coupling is implemented then both read_function_space"
                             " and write_object need to be provided.")
         else:
             raise Exception("Incorrect read and write function space combination provided. Please check input "
