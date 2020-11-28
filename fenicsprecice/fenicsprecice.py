@@ -301,6 +301,13 @@ class Adapter:
             raise Exception("Given write object is neither of type dolfin.functions.function.Function or "
                             "dolfin.functions.functionspace.FunctionSpace")
 
+        if type(read_function_space) is FunctionSpace:
+            pass
+        elif read_function_space is None:
+            pass
+        else:
+            raise Exception("Given read_function_space is not of type dolfin.functions.functionspace.FunctionSpace")
+
         if read_function_space is None and write_function_space:
             self._coupling_type = CouplingMode.UNIDIR_WRITE
             assert (self._config.get_write_data_name())
