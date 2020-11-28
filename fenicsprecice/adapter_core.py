@@ -22,6 +22,17 @@ class FunctionType(Enum):
     VECTOR = 1  # vector valued function
 
 
+class CouplingMode(Enum):
+    """
+    Defines the type of coupling being used.
+    Options are: Bi-directional coupling, Uni-directional Write Coupling, Uni-directional Read Coupling
+    Used in assertions to check which type of coupling is done
+    """
+    BIDIR = 4
+    UNIDIR_WRITE = 5
+    UNIDIR_READ = 6
+
+
 def determine_function_type(input_obj):
     """
     Determines if the function is scalar- or vector-valued based on rank evaluation.
