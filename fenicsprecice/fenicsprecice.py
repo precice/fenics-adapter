@@ -8,9 +8,11 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
     get_fenics_coupling_boundary_vertices, get_owned_coupling_boundary_vertices, get_unowned_coupling_boundary_vertices, \
-    get_coupling_boundary_edges, get_forces_as_point_sources, determine_shared_vertices, communicate_shared_vertices
+    get_coupling_boundary_edges, get_forces_as_point_sources, determine_shared_vertices, communicate_shared_vertices,\
+    CouplingMode
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
+from fenics import Function, FunctionSpace
 from mpi4py import MPI
 
 logger = logging.getLogger(__name__)
@@ -69,9 +71,12 @@ class Adapter:
         self._unowned_gids = None
         self._vertex_ids = None  # initialized later
 
-        # read data related quantities (read data is read by use to FEniCS from preCICE)
+        # read data related quantities (read data is read from preCICE and applied in FEniCS)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
         self._write_function_type = None  # stores whether write function is scalar or vector valued
+
+        # write data related quantities (write data is written to preCICE)
+        self._write_function_type = None  # stores whether read function is scalar or vector valued
 
         # Interpolation strategy
         self._my_expression = SegregatedRBFInterpolationExpression
@@ -89,6 +94,9 @@ class Adapter:
         self._to_send_pts = None
         self._to_recv_pts = None
         self._empty_rank = True
+
+        # Determine type of coupling in initialization
+        self._coupling_type = None
 
     def create_coupling_expression(self):
         """
@@ -188,6 +196,8 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
+        assert (self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR)
+
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
@@ -225,6 +235,9 @@ class Adapter:
         write_function : Object of class dolfin.functions.function.Function
             A FEniCS function consisting of the data which this participant will write to preCICE in every time step.
         """
+
+        assert (self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR)
+
         w_func = write_function.copy()
         # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
         assert (w_func != write_function)
@@ -251,23 +264,23 @@ class Adapter:
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
-    def initialize(self, coupling_subdomain, read_function_space=None, write_function_space=None, write_function=None,
-                   fixed_boundary=None):
+    def initialize(self, coupling_subdomain, read_function_space=None, write_object=None, fixed_boundary=None):
         """
-        Initializes the coupling interface and sets up the mesh in preCICE. Allows to initialize data on coupling interface.
+        Initializes the coupling interface and sets up the mesh in preCICE.
 
         Parameters
         ----------
         coupling_subdomain : Object of class dolfin.cpp.mesh.SubDomain
             SubDomain of mesh which is the physical coupling boundary.
         read_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
-            Function space on which the finite element formulation of the problem lives.
-        write_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
-            Function space on which the finite element formulation of the problem lives.
-        write_function : Object of class dolfin.functions.function.Function
-            FEniCS function related to the quantity to be written by FEniCS during each coupling iteration.
+            Function space on which the read function lives. If not provided then the adapter assumes that this
+            participant is a write-only participant.
+        write_object : Object of class dolfin.functions.functionspace.FunctionSpace OR dolfin.functions.function.Function
+            Function space on which the write function lives or FEniCS function related to the quantity to be written
+            by FEniCS during each coupling iteration. If not provided then the adapter assumes that this participant is
+            a read-only participant.
         fixed_boundary : Object of class dolfin.fem.bcs.AutoSubDomain
-            SubDomain consisting of a fixed boundary condition. For example in FSI cases usually the solid body
+            SubDomain consisting of a fixed boundary of the mesh. For example in FSI cases usually the solid body
             is fixed at one end (fixed end of a flexible beam).
 
         Returns
@@ -276,16 +289,69 @@ class Adapter:
             Recommended time step value from preCICE.
         """
 
-        # Set read functionality parameters
-        self._read_function_type = determine_function_type(read_function_space)
-        self._write_function_type = determine_function_type(write_function_space)
-        self._read_function_space = read_function_space
-        self._write_function_space = write_function_space
-        self._coupling_subdomain = coupling_subdomain
-        _, fenics_dimensions = self._read_function_space.tabulate_dof_coordinates().shape
+        write_function_space, write_function = None, None
+        if type(write_object) is Function:  # precice.initialize_data() will be called using this Function
+            write_function_space = write_object.function_space()
+            write_function = write_object
+        elif type(write_object) is FunctionSpace:  # preCICE will use default zero values for initialization.
+            write_function_space = write_object
+            write_function = None
+        elif write_object is None:
+            pass
+        else:
+            raise Exception("Given write object is neither of type dolfin.functions.function.Function or "
+                            "dolfin.functions.functionspace.FunctionSpace")
 
-        # Ensure that read and write function spaces are defined using the same mesh
-        assert self._read_function_space.mesh() is self._write_function_space.mesh()
+        if type(read_function_space) is FunctionSpace:
+            pass
+        elif read_function_space is None:
+            pass
+        else:
+            raise Exception("Given read_function_space is not of type dolfin.functions.functionspace.FunctionSpace")
+
+        if read_function_space is None and write_function_space:
+            self._coupling_type = CouplingMode.UNIDIR_WRITE
+            assert (self._config.get_write_data_name())
+            print("Participant {} is write-only participant".format(self._config.get_participant_name()))
+            mesh = write_function_space.mesh()
+            function_space = write_function_space
+        elif read_function_space and write_function_space is None:
+            self._coupling_type = CouplingMode.UNIDIR_READ
+            assert (self._config.get_read_data_name())
+            print("Participant {} is read-only participant".format(self._config.get_participant_name()))
+            mesh = read_function_space.mesh()
+            function_space = read_function_space
+        elif read_function_space and write_function_space:
+            self._coupling_type = CouplingMode.BIDIR
+            assert (self._config.get_read_data_name() and self._config.get_write_data_name())
+            mesh = read_function_space.mesh()
+            function_space = read_function_space
+        elif read_function_space is None and write_function_space is None:
+            raise Exception("Neither read_function_space nor write_function_space is provided. Please provide a "
+                            "write_object if this participant is used in one-way coupling and only writes data. "
+                            "Please provide a read_function_space if this participant is used in one-way coupling and "
+                            "only reads data. If two-way coupling is implemented then both read_function_space"
+                            " and write_object need to be provided.")
+        else:
+            raise Exception("Incorrect read and write function space combination provided. Please check input "
+                            "parameters in initialization")
+
+        if self._coupling_type is CouplingMode.UNIDIR_READ or self._coupling_type is CouplingMode.BIDIR:
+            self._read_function_type = determine_function_type(read_function_space)
+            self._read_function_space = read_function_space
+
+        if self._coupling_type is CouplingMode.UNIDIR_WRITE or self._coupling_type is CouplingMode.BIDIR:
+            # Ensure that function spaces of read and write functions are defined using the same mesh
+            self._write_function_type = determine_function_type(write_function_space)
+
+        coords = function_space.tabulate_dof_coordinates()
+        _, fenics_dimensions = coords.shape
+
+        # Ensure that function spaces of read and write functions use the same mesh
+        if self._coupling_type is CouplingMode.BIDIR:
+            assert (self._read_function_space.mesh() is write_function_space.mesh()), "read_function_space and " \
+                                                                                     "write_object need to be " \
+                                                                                      "defined using the same mesh"
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
