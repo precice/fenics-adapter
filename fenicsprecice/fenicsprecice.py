@@ -313,18 +313,15 @@ class Adapter:
             self._coupling_type = CouplingMode.UNIDIR_WRITE
             assert (self._config.get_write_data_name())
             print("Participant {} is write-only participant".format(self._config.get_participant_name()))
-            mesh = write_function_space.mesh()
             function_space = write_function_space
         elif read_function_space and write_function_space is None:
             self._coupling_type = CouplingMode.UNIDIR_READ
             assert (self._config.get_read_data_name())
             print("Participant {} is read-only participant".format(self._config.get_participant_name()))
-            mesh = read_function_space.mesh()
             function_space = read_function_space
         elif read_function_space and write_function_space:
             self._coupling_type = CouplingMode.BIDIR
             assert (self._config.get_read_data_name() and self._config.get_write_data_name())
-            mesh = read_function_space.mesh()
             function_space = read_function_space
         elif read_function_space is None and write_function_space is None:
             raise Exception("Neither read_function_space nor write_function_space is provided. Please provide a "
@@ -343,6 +340,7 @@ class Adapter:
         if self._coupling_type is CouplingMode.UNIDIR_WRITE or self._coupling_type is CouplingMode.BIDIR:
             # Ensure that function spaces of read and write functions are defined using the same mesh
             self._write_function_type = determine_function_type(write_function_space)
+            self._write_function_space = write_function_space
 
         coords = function_space.tabulate_dof_coordinates()
         _, fenics_dimensions = coords.shape
@@ -363,24 +361,16 @@ class Adapter:
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
-        self._fenics_gids, self._fenics_coords = \
-            get_fenics_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
+        self._fenics_gids, self._fenics_coords = get_fenics_coupling_boundary_vertices(function_space, coupling_subdomain)
 
         self._owned_gids, self._owned_lids, self._owned_coords = \
-            get_owned_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
+            get_owned_coupling_boundary_vertices(function_space, coupling_subdomain)
 
-        self._unowned_gids = get_unowned_coupling_boundary_vertices(self._read_function_space, coupling_subdomain)
+        self._unowned_gids = get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain)
 
         # Set up mesh in preCICE
         if self._fenics_gids.size > 0:
             self._empty_rank = False
-            print("Rank {}: fenics_gids = {}".format(self._rank, self._fenics_gids))
-            print("Rank {}: fenics_coords = {}".format(self._rank, self._fenics_coords))
-
-            print("Rank {}: owned_gids = {}".format(self._rank, self._owned_gids))
-            print("Rank {}: owned_coords = {}".format(self._rank, self._owned_coords))
-
-            print("Rank {}: unowned_gids = {}".format(self._rank, self._unowned_gids))
         else:
             print("Rank {} is EMPTY RANK".format(self._rank))
 
@@ -393,10 +383,6 @@ class Adapter:
                                                                          self._read_function_space,
                                                                          self._owned_gids, self._unowned_gids)
 
-        if self._empty_rank is False:
-            print("Rank {}: to_send_pts = {}".format(self._rank, self._to_send_pts))
-            print("Rank {}: to_recv_pts = {}".format(self._rank, self._to_recv_pts))
-
         # # Set mesh edges in preCICE to allow nearest-projection mapping
         # # Define a mapping between coupling vertices and their IDs in preCICE
         # id_mapping = {key: value for key, value in zip(self._owned_gids, self._vertex_ids)}
@@ -405,6 +391,7 @@ class Adapter:
         #                                                                  id_mapping)
         # for i in range(len(edge_vertex_ids1)):
         #     assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
+
         #     self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
         #                                   edge_vertex_ids1[i], edge_vertex_ids2[i])
 

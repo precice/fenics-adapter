@@ -122,10 +122,10 @@ precice, precice_dt, initial_data = None, 0.0, None
 # Initialize the adapter according to the specific participant
 if problem is ProblemType.DIRICHLET:
     precice = Adapter(adapter_config_filename="precice-adapter-config-D.json")
-    precice_dt = precice.initialize(coupling_boundary, V, V_g, write_function=f_N_function)
+    precice_dt = precice.initialize(coupling_boundary, read_function_space=V, write_object=f_N_function)
 elif problem is ProblemType.NEUMANN:
     precice = Adapter(adapter_config_filename="precice-adapter-config-N.json")
-    precice_dt = precice.initialize(coupling_boundary, V_g, V, write_function=u_D_function)
+    precice_dt = precice.initialize(coupling_boundary, read_function_space=V_g, write_object=u_D_function)
 
 boundary_marker = False
 
@@ -221,7 +221,6 @@ while precice.is_coupling_ongoing():
     # Compute solution u^n+1, use bcs u_D^n+1, u^n and coupling bcs
     # print('{rank} of {size}:starts solving'.format(rank=MPI.rank(MPI.comm_world), size=MPI.size(MPI.comm_world)))
     solve(a == L, u_np1, bcs)
-    print('{rank}:done solving'.format(rank=MPI.rank(MPI.comm_world)))
 
     # Write data to preCICE according to which problem is being solved
     if problem is ProblemType.DIRICHLET:
@@ -232,11 +231,8 @@ while precice.is_coupling_ongoing():
         # Neumann problem reads flux and writes temperature on boundary to Dirichlet problem
         precice.write_data(u_np1)
 
-    print('{rank}:done writing'.format(rank=MPI.rank(MPI.comm_world)))
-
     # Call to advance coupling, also returns the optimum time step value
     precice_dt = precice.advance(dt(0))
-    print('{rank}:Advance coupling done'.format(rank=MPI.rank(MPI.comm_world)))
 
     # Either revert to old step if timestep has not converged or move to next timestep
     if precice.is_action_required(precice.action_read_iteration_checkpoint()):  # roll back to checkpoint
