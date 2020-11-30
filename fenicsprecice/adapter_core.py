@@ -4,7 +4,7 @@ This module consists of helper functions used in the Adapter class. Names of the
 
 import dolfin
 from dolfin import SubDomain, Point, PointSource
-from fenics import FunctionSpace, VectorFunctionSpace, Function
+from fenics import FunctionSpace, Function
 import numpy as np
 from enum import Enum
 import logging
@@ -20,6 +20,17 @@ class FunctionType(Enum):
     """
     SCALAR = 0  # scalar valued function
     VECTOR = 1  # vector valued function
+
+
+class CouplingMode(Enum):
+    """
+    Defines the type of coupling being used.
+    Options are: Bi-directional coupling, Uni-directional Write Coupling, Uni-directional Read Coupling
+    Used in assertions to check which type of coupling is done
+    """
+    BIDIR = 4
+    UNIDIR_WRITE = 5
+    UNIDIR_READ = 6
 
 
 def determine_function_type(input_obj):
@@ -161,29 +172,6 @@ def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimen
         return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
 
 
-def are_connected_by_edge(v1, v2):
-    """
-    Checks if vertices are connected by an edge.
-
-    Parameters
-    ----------
-    v1 : dolfin.vertex
-        Vertex 1 of the edge
-    v2 : dolfin.vertex
-        Vertex 2 of the edge
-
-    Returns
-    -------
-    tag : bool
-        True is v1 and v2 are connected by edge and False if not connected
-    """
-    for edge1 in dolfin.edges(v1):
-        for edge2 in dolfin.edges(v2):
-            if edge1.index() == edge2.index():  # Vertices are connected by edge
-                return True
-    return False
-
-
 def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
     """
     Extracts edges of mesh which lie on the coupling boundary.
@@ -204,23 +192,20 @@ def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
     vertices2_ids : numpy array
         Array of second vertex of each edge.
     """
-    vertices = dict()
 
-    for v1 in dolfin.vertices(mesh_fenics):
-        if coupling_subdomain.inside(v1.point(), True):
-            vertices[v1] = []
-
-    for v1 in vertices.keys():
-        for v2 in vertices.keys():
-            if are_connected_by_edge(v1, v2):
-                vertices[v1] = v2
-                vertices[v2] = v1
+    def edge_is_on(subdomain, edge):
+        """
+        Check whether edge lies within subdomain
+        """
+        assert(len(list(dolfin.vertices(edge))) == 2)
+        return all([subdomain.inside(v.point(), True) for v in dolfin.vertices(edge)])
 
     vertices1_ids = []
     vertices2_ids = []
 
-    for v1, v2 in vertices.items():
-        if v1 is not v2:
+    for edge in dolfin.edges(mesh_fenics):
+        if edge_is_on(coupling_subdomain, edge):
+            v1, v2 = list(dolfin.vertices(edge))
             vertices1_ids.append(id_mapping[v1.global_index()])
             vertices2_ids.append(id_mapping[v2.global_index()])
 

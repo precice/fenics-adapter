@@ -148,15 +148,19 @@ class TestExpressionHandling(TestCase):
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
         Interface.get_mesh_id = MagicMock()
+        Interface.get_data_id = MagicMock()
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
         Interface.initialize_data = MagicMock()
+        Interface.is_action_required = MagicMock()
+        Interface.mark_action_fulfilled = MagicMock()
+        Interface.write_block_scalar_data = MagicMock()
 
         right_boundary = self.Right()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice.initialize(right_boundary, self.mesh, self.scalar_V)
+        precice.initialize(right_boundary, self.scalar_V, self.scalar_function)
         values = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
 
@@ -179,15 +183,19 @@ class TestExpressionHandling(TestCase):
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
         Interface.get_mesh_id = MagicMock()
+        Interface.get_data_id = MagicMock()
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
         Interface.initialize_data = MagicMock()
+        Interface.is_action_required = MagicMock()
+        Interface.mark_action_fulfilled = MagicMock()
+        Interface.write_block_vector_data = MagicMock()
 
         right_boundary = self.Right()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice.initialize(right_boundary, self.mesh, self.vector_V)
+        precice.initialize(right_boundary, self.vector_V, self.vector_function)
         values = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
 
