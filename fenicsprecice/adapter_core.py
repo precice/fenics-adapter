@@ -293,7 +293,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, gids, id_map
     for edge in edges(function_space.mesh()):
         if edge_is_on(coupling_subdomain, edge):
             v1, v2 = list(vertices(edge))
-            if v1 in gids and v2 in gids:
+            if v1.global_index() in gids and v2.global_index() in gids:
                 vertices1_ids.append(id_mapping[v1.global_index()])
                 vertices2_ids.append(id_mapping[v2.global_index()])
 

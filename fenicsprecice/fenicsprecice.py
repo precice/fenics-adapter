@@ -213,9 +213,11 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
 
             owned_read_data = {tuple(key): value for key, value in zip(self._owned_coords, read_data)}
+            # print("Rank {}: Data before communication: {}".format(self._rank, owned_read_data))
             updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_gids,
                                                        self._owned_coords, self._fenics_coords, owned_read_data,
                                                        self._to_send_pts, self._to_recv_pts)
+            # print("Rank {}: Data after communication: {}".format(self._rank, updated_data))
         else:  # if there are no vertices, we return empty data
             updated_data = None
 
@@ -371,7 +373,6 @@ class Adapter:
         # Set up mesh in preCICE
         if self._fenics_gids.size > 0:
             self._empty_rank = False
-        else:
             print("Rank {} is EMPTY RANK".format(self._rank))
 
         # Define mesh in preCICE
@@ -389,10 +390,13 @@ class Adapter:
 
         edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,
                                                                          self._owned_gids, id_mapping)
+
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
             self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
+
+        print("Rank {}: Number of edges defined = {}".format(self._rank, len(edge_vertex_ids1)))
 
         precice_dt = self._interface.initialize()
 
