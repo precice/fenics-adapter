@@ -373,7 +373,6 @@ class Adapter:
         # Set up mesh in preCICE
         if self._fenics_gids.size > 0:
             self._empty_rank = False
-            print("Rank {} is EMPTY RANK".format(self._rank))
 
         # Define mesh in preCICE
         self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
