@@ -396,8 +396,6 @@ class Adapter:
             self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-        print("Rank {}: Number of edges defined = {}".format(self._rank, len(edge_vertex_ids1)))
-
         precice_dt = self._interface.initialize()
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
