@@ -3,14 +3,9 @@ from unittest import TestCase
 import tests.MockedPrecice
 from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, SubDomain, near
 import numpy as np
-from mpi4py import MPI
 
 x_left, x_right = 0, 1
 y_bottom, y_top = 0, 1
-
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
 
 
 class RightBoundary(SubDomain):
@@ -60,8 +55,7 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
         Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
@@ -88,6 +82,7 @@ class TestWriteandReadData(TestCase):
         """
         from precice import Interface
         import fenicsprecice
+        from fenicsprecice.adapter_core import get_owned_coupling_boundary_vertices, convert_fenics_to_precice
 
         Interface.write_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
@@ -96,8 +91,7 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
         Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
@@ -108,9 +102,8 @@ class TestWriteandReadData(TestCase):
         precice.write_data(self.vector_function)
 
         expected_data_id = self.fake_id
-        expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
-        expected_values_y = np.array([self.vector_expr(x_right, y)[1] for y in np.linspace(y_bottom, y_top, 11)])
-        expected_values = np.stack([expected_values_x, expected_values_y], axis=1)
+        _, lids, _ = get_owned_coupling_boundary_vertices(self.vector_V, RightBoundary())
+        expected_values = convert_fenics_to_precice(self.vector_function, lids)
         expected_ids = np.arange(self.n_vertices)
         expected_args = [expected_data_id, expected_ids, expected_values]
 
@@ -118,6 +111,8 @@ class TestWriteandReadData(TestCase):
             if type(arg) is int:
                 self.assertTrue(arg == expected_arg)
             elif type(arg) is np.ndarray:
+                print(arg)
+                print(expected_arg)
                 np.testing.assert_almost_equal(arg, expected_arg)
 
     def test_scalar_read(self):
@@ -139,8 +134,7 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
         Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
@@ -181,8 +175,7 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
+        Interface.is_action_required = MagicMock(return_value=False)
         Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
