@@ -8,9 +8,52 @@ from enum import Enum
 import logging
 import hashlib
 from mpi4py import MPI
+import copy
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
+
+
+class VertexType(Enum):
+    """
+    Defines type of vertices that exist in the adapter.
+    OWNED vertices are vertices on the coupling interface owned by this rank
+    UNOWNED vertices are vertices on the coupling interface which are not owned by this rank. They are borrowed
+        vertices from neigbouring ranks
+    FENICS vertices are OWNED + UNOWNED vertices in the order as seen by FEniCS
+    """
+    OWNED = 153
+    UNOWNED = 471
+    FENICS = 557
+
+
+class Vertices:
+    """
+
+    """
+    def __init__(self, vertex_type):
+        self._vertex_type = vertex_type
+        self._global_ids = None
+        self._local_ids = None
+        self._coordinates = None
+
+    def set_global_ids(self, ids):
+        self._global_ids = ids
+
+    def set_local_ids(self, ids):
+        self._local_ids = ids
+
+    def set_coordinates(self, coords):
+        self._coordinates = coords
+
+    def get_global_ids(self):
+        return copy.deepcopy(self._global_ids)
+
+    def get_local_ids(self):
+        return copy.deepcopy(self._local_ids)
+
+    def get_coordinates(self):
+        return copy.deepcopy(self._coordinates)
 
 
 class FunctionType(Enum):
@@ -92,43 +135,43 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-def convert_fenics_to_precice(function, lids):
+def convert_fenics_to_precice(fenics_function, local_ids):
     """
     Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
     Parameters
     ----------
-    function : FEniCS function
+    fenics_function : FEniCS function
         A FEniCS function referring to a physical variable in the problem.
-    lids: numpy array
+    local_ids: numpy array
         Array of local indices of vertices on the coupling interface and owned by this rank.
 
     Returns
     -------
-    result_vals : array_like
+    precice_data : array_like
         Array of FEniCS function values at each point on the boundary.
     """
 
-    if type(function) is not Function:
-        raise Exception("Cannot handle data type {}".format(type(function)))
+    if type(fenics_function) is not Function:
+        raise Exception("Cannot handle data type {}".format(type(fenics_function)))
 
-    vertex_vals = function.compute_vertex_values(function.function_space().mesh())
+    sampled_data = fenics_function.compute_vertex_values(fenics_function.function_space().mesh())
 
-    result_vals = []
-    if len(lids):
-        if function.function_space().num_sub_spaces() > 0:  # function space is VectorFunctionSpace
-            for lid in lids:
-                result_vals.append([vertex_vals[lid], vertex_vals[lid+1]])
+    precice_data = []
+    if len(local_ids):
+        if fenics_function.function_space().num_sub_spaces() > 0:  # function space is VectorFunctionSpace
+            for lid in local_ids:
+                precice_data.append([sampled_data[lid], sampled_data[lid+1]])
         else:  # function space is FunctionSpace (scalar)
-            for lid in lids:
-                result_vals.append(vertex_vals[lid])
+            for lid in local_ids:
+                precice_data.append(sampled_data[lid])
     else:
-        result_vals = np.array([])
+        precice_data = np.array([])
 
-    return np.array(result_vals)
+    return np.array(precice_data)
 
 
-def get_fenics_coupling_boundary_vertices(function_space, coupling_subdomain):
+def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     """
     Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
 
@@ -138,14 +181,8 @@ def get_fenics_coupling_boundary_vertices(function_space, coupling_subdomain):
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
-
-    Returns
-    -------
-    fenics_gids : numpy array
-        Array of global indices of vertices on the coupling interface as seen by this rank.
-    fenics_coords : array_like
-        The coordinates of the vertices on the coupling interface as seen by this rank, in a numpy array [N x D] where
-        N = number of vertices and D = dimensions of geometry.
+    fenics_vertices : Object of class Vertices
+        Vertices as seen by FEniCS on the coupling interface
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -162,30 +199,23 @@ def get_fenics_coupling_boundary_vertices(function_space, coupling_subdomain):
             fenics_gids.append(v.global_index())
             fenics_coords.append([v.x(0), v.x(1)])
 
-    return np.array(fenics_gids), np.array(fenics_coords)
+    fenics_vertices.set_global_ids(np.array(fenics_gids))
+    fenics_vertices.set_coordinates(np.array(fenics_coords))
 
 
-def get_owned_coupling_boundary_vertices(function_space, coupling_subdomain):
+def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
     """
-        Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
+    Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
 
-        Parameters
-        ----------
-        function_space : FEniCS function space
-            Function space on which the finite element problem definition lives.
-        coupling_subdomain : FEniCS Domain
-            Subdomain consists of only the coupling interface region.
-
-        Returns
-        -------
-        owned_gids : numpy array
-            Array of global indices of vertices on the coupling interface and owned by this rank.
-        owned_lids : numpy array
-            Array of local indices of vertices on the coupling interface and owned by this rank.
-        owned_coords : array_like
-            The coordinates of the vertices on the coupling interface and owned by this rank, in a numpy array [N x D]
-            where N = number of vertices and D = dimensions of geometry.
-        """
+    Parameters
+    ----------
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_subdomain : FEniCS Domain
+        Subdomain consists of only the coupling interface region.
+    owned_vertices : Object of class Vertices
+        Vertices owned by this rank
+    """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
@@ -209,25 +239,24 @@ def get_owned_coupling_boundary_vertices(function_space, coupling_subdomain):
                     owned_coords.append([v.x(0), v.x(1)])
                 dof_nm1 = dof
 
-    return np.array(owned_gids), np.array(owned_lids), np.array(owned_coords)
+    owned_vertices.set_global_ids(np.array(owned_gids))
+    owned_vertices.set_local_ids(np.array(owned_lids))
+    owned_vertices.set_coordinates(np.array(owned_coords))
 
 
-def get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain):
+def set_unowned_vertices(function_space, coupling_subdomain, unowned_vertices):
     """
-        Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
+    Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
 
-        Parameters
-        ----------
-        function_space : FEniCS function space
-            Function space on which the finite element problem definition lives.
-        coupling_subdomain : FEniCS Domain
-            Subdomain consists of only the coupling interface region.
-
-        Returns
-        -------
-        unowned_gids : numpy array
-            Array of global indices of all vertices on the coupling interface and NOT owned by this rank.
-        """
+    Parameters
+    ----------
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_subdomain : FEniCS Domain
+        Subdomain consists of only the coupling interface region.
+    unowned_vertices : Object of class Vertices
+        Vertices not owned but seen by this rank
+    """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
@@ -254,10 +283,10 @@ def get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain):
             if ownership is False:
                 unowned_gids.append(v.global_index())
 
-    return np.array(unowned_gids)
+    unowned_vertices.set_global_ids(np.array(unowned_gids))
 
 
-def get_coupling_boundary_edges(function_space, coupling_subdomain, gids, id_mapping):
+def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, id_mapping):
     """
     Extracts edges of mesh which lie on the coupling boundary.
 
@@ -267,7 +296,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, gids, id_map
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         FEniCS domain of the coupling interface region.
-    gids: numpy_array
+    global_ids: numpy_array
         Array of global IDs of vertices owned by this rank.
     id_mapping : python dictionary
         Dictionary mapping preCICE vertex IDs to FEniCS global vertex IDs.
@@ -293,7 +322,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, gids, id_map
     for edge in edges(function_space.mesh()):
         if edge_is_on(coupling_subdomain, edge):
             v1, v2 = list(vertices(edge))
-            if v1.global_index() in gids and v2.global_index() in gids:
+            if v1.global_index() in global_ids and v2.global_index() in global_ids:
                 vertices1_ids.append(id_mapping[v1.global_index()])
                 vertices2_ids.append(id_mapping[v2.global_index()])
 
@@ -355,7 +384,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def determine_shared_vertices(comm, rank, function_space, owned_gids, unowned_gids):
+def get_communication_map(comm, rank, function_space, owned_gids, unowned_gids):
     """
     Determine which vertices along the coupling boundary are shared with neighbouring processes
     Parameters
@@ -516,6 +545,7 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
     send_reqs = []
     if send_pts:
         for send_gid, dests in send_pts.items():
+            # Make sure that there is only one send_lid
             send_lid = int(np.where(fenics_gids == send_gid)[0][0])
             for dest in [dests]:
                 hash_tag = hashlib.sha256()

@@ -6,10 +6,9 @@ import numpy as np
 from .config import Config
 import logging
 import precice
-from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, \
-    get_fenics_coupling_boundary_vertices, get_owned_coupling_boundary_vertices, get_unowned_coupling_boundary_vertices, \
-    get_coupling_boundary_edges, get_forces_as_point_sources, determine_shared_vertices, communicate_shared_vertices,\
-    CouplingMode
+from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, set_fenics_vertices, \
+    set_owned_vertices, set_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
+    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import Function, FunctionSpace
@@ -60,16 +59,13 @@ class Adapter:
         self._read_function_space = None  # initialized later
         self._write_function_space = None  # initialized later
         self._dofmap = None  # initialized later using function space provided by user
-        self._fenics_gids = None
-        self._fenics_coords = None
         self._coupling_subdomain = None
 
         # coupling mesh related quantities
-        self._owned_lids = None
-        self._owned_gids = None  # initialized later
-        self._owned_coords = None  # initialized later
-        self._unowned_gids = None
-        self._vertex_ids = None  # initialized later
+        self._owned_vertices = Vertices(VertexType.OWNED)
+        self._unowned_vertices = Vertices(VertexType.UNOWNED)
+        self._fenics_vertices = Vertices(VertexType.FENICS)
+        self._precice_vertex_ids = None  # initialized later
 
         # read data related quantities (read data is read from preCICE and applied in FEniCS)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
@@ -208,14 +204,15 @@ class Adapter:
 
         if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
-                read_data = self._interface.read_block_scalar_data(read_data_id, self._vertex_ids)
+                read_data = self._interface.read_block_scalar_data(read_data_id, self._precice_vertex_ids)
             elif self._read_function_type is FunctionType.VECTOR:
-                read_data = self._interface.read_block_vector_data(read_data_id, self._vertex_ids)
+                read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
-            owned_read_data = {tuple(key): value for key, value in zip(self._owned_coords, read_data)}
+            owned_read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
             # print("Rank {}: Data before communication: {}".format(self._rank, owned_read_data))
-            updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_gids,
-                                                       self._owned_coords, self._fenics_coords, owned_read_data,
+            updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices.get_global_ids(),
+                                                       self._owned_vertices.get_coordinates(),
+                                                       self._fenics_vertices.get_coordinates(), owned_read_data,
                                                        self._to_send_pts, self._to_recv_pts)
             # print("Rank {}: Data after communication: {}".format(self._rank, updated_data))
         else:  # if there are no vertices, we return empty data
@@ -256,13 +253,13 @@ class Adapter:
 
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
-        write_data = convert_fenics_to_precice(write_function, self._owned_lids)
+        write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
         if write_function_type is FunctionType.SCALAR:
             assert (write_function.function_space().num_sub_spaces() == 0)
-            self._interface.write_block_scalar_data(write_data_id, self._vertex_ids, write_data)
+            self._interface.write_block_scalar_data(write_data_id, self._precice_vertex_ids, write_data)
         elif write_function_type is FunctionType.VECTOR:
             assert (write_function.function_space().num_sub_spaces() > 0)
-            self._interface.write_block_vector_data(write_data_id, self._vertex_ids, write_data)
+            self._interface.write_block_vector_data(write_data_id, self._precice_vertex_ids, write_data)
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
@@ -362,33 +359,31 @@ class Adapter:
         if fenics_dimensions != self._interface.get_dimensions():
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
-        # Get Global IDs and coordinates of vertices on the coupling interface which are owned by this rank
-        self._fenics_gids, self._fenics_coords = get_fenics_coupling_boundary_vertices(function_space, coupling_subdomain)
-
-        self._owned_gids, self._owned_lids, self._owned_coords = \
-            get_owned_coupling_boundary_vertices(function_space, coupling_subdomain)
-
-        self._unowned_gids = get_unowned_coupling_boundary_vertices(function_space, coupling_subdomain)
+        # Set vertices on the coupling interface for this rank
+        set_fenics_vertices(function_space, coupling_subdomain, self._fenics_vertices)
+        set_owned_vertices(function_space, coupling_subdomain, self._owned_vertices)
+        set_unowned_vertices(function_space, coupling_subdomain, self._unowned_vertices)
 
         # Set up mesh in preCICE
-        if self._fenics_gids.size > 0:
+        if self._fenics_vertices.get_global_ids().size > 0:
             self._empty_rank = False
 
         # Define mesh in preCICE
-        self._vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
-            self._config.get_coupling_mesh_name()), self._owned_coords)
+        self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
+            self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
 
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
-        self._to_send_pts, self._to_recv_pts = determine_shared_vertices(self._comm, self._rank,
-                                                                         self._read_function_space,
-                                                                         self._owned_gids, self._unowned_gids)
+        self._to_send_pts, self._to_recv_pts = get_communication_map(self._comm, self._rank, self._read_function_space,
+                                                                     self._owned_vertices.get_global_ids(),
+                                                                     self._unowned_vertices.get_global_ids())
 
         # # Set mesh edges in preCICE to allow nearest-projection mapping
         # # Define a mapping between coupling vertices and their IDs in preCICE
-        id_mapping = {key: value for key, value in zip(self._owned_gids, self._vertex_ids)}
+        id_mapping = {key: value for key, value in zip(self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
 
         edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,
-                                                                         self._owned_gids, id_mapping)
+                                                                         self._owned_vertices.get_global_ids(),
+                                                                         id_mapping)
 
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])

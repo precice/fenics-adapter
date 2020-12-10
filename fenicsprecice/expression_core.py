@@ -7,7 +7,7 @@ from .adapter_core import FunctionType
 from scipy.interpolate import Rbf
 from scipy.linalg import lstsq
 import numpy as np
-from fenics import MPI
+from mpi4py import MPI
 
 import logging
 
