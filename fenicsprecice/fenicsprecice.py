@@ -86,9 +86,9 @@ class Adapter:
         # Necessary bools for enforcing proper control flow / warnings to user
         self._first_advance_done = False
 
-        # Necessary data for parallel computations
-        self._to_send_pts = None
-        self._to_recv_pts = None
+        # Parallel communication
+        self._send_map = None
+        self._recv_map = None
         self._empty_rank = True
 
         # Determine type of coupling in initialization
@@ -171,10 +171,7 @@ class Adapter:
         assert (self._read_function_type is FunctionType.VECTOR), \
             "PointSources only supported for vector valued read data."
 
-        vertices = np.array(list(data.keys()))
-        nodal_data = np.array(list(data.values()))
-
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, vertices, nodal_data)
+        return get_forces_as_point_sources(self._rank, self._Dirichlet_Boundary, self._read_function_space, data)
 
     def read_data(self):
         """
@@ -209,18 +206,12 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
             owned_read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-            # print("Rank {}: Data before communication: {}".format(self._rank, owned_read_data))
             updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices.get_global_ids(),
                                                        self._owned_vertices.get_coordinates(),
                                                        self._fenics_vertices.get_coordinates(), owned_read_data,
-                                                       self._to_send_pts, self._to_recv_pts)
-            # print("Rank {}: Data after communication: {}".format(self._rank, updated_data))
+                                                       self._send_map, self._recv_map)
         else:  # if there are no vertices, we return empty data
             updated_data = None
-
-        if not self._empty_rank:
-            for key, val in updated_data.items():
-                assert(val is not None), ("Rank{}: {}: {} is not allowed".format(self._rank, key, val))
 
         return updated_data
 
@@ -274,7 +265,7 @@ class Adapter:
         read_function_space : Object of class dolfin.functions.functionspace.FunctionSpace
             Function space on which the read function lives. If not provided then the adapter assumes that this
             participant is a write-only participant.
-        write_object : Object of class dolfin.functions.functionspace.FunctionSpace OR dolfin.functions.function.Function
+        write_object : Object of class dolfin.functions.functionspace.FunctionSpace / dolfin.functions.function.Function
             Function space on which the write function lives or FEniCS function related to the quantity to be written
             by FEniCS during each coupling iteration. If not provided then the adapter assumes that this participant is
             a read-only participant.
@@ -373,7 +364,7 @@ class Adapter:
             self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
 
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
-        self._to_send_pts, self._to_recv_pts = get_communication_map(self._comm, self._rank, self._read_function_space,
+        self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
                                                                      self._owned_vertices.get_global_ids(),
                                                                      self._unowned_vertices.get_global_ids())
 

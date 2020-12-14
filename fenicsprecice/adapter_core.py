@@ -332,7 +332,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
     return vertices1_ids, vertices2_ids
 
 
-def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data):
+def get_forces_as_point_sources(rank, fixed_boundary, function_space, data):
     """
     Creating two dicts of PointSources that can be applied to the assembled system. Applying filter_point_source to
     avoid forces being applied to already existing Dirichlet BC, since this would lead to an overdetermined system
@@ -345,9 +345,6 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
         at one end.
     function_space : FEniCS function space
         Function space on which the finite element problem definition lives.
-    coupling_mesh_vertices : numpy.ndarray
-        The coordinates of the vertices on the coupling interface. Coordinates of vertices are stored in a
-        numpy array [N x D] where N = number of vertices and D = dimensions of geometry
     data : a numpy array of PointSource
         FEniCS PointSource data carrying forces
 
@@ -365,17 +362,20 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
     x_forces = dict()  # dict of PointSources for Forces in x direction
     y_forces = dict()  # dict of PointSources for Forces in y direction
 
-    # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
-    n_vertices, dims = coupling_mesh_vertices.shape
+    fenics_vertices = np.array(list(data.keys()))
+    nodal_data = np.array(list(data.values()))
 
-    vertices_x = coupling_mesh_vertices[:, 0]
-    vertices_y = coupling_mesh_vertices[:, 1]
+    # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
+    n_vertices, dims = fenics_vertices.shape
+
+    vertices_x = fenics_vertices[:, 0]
+    vertices_y = fenics_vertices[:, 1]
 
     for i in range(n_vertices):
         px, py = vertices_x[i], vertices_y[i]
         key = (px, py)
-        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), data[i, 0])
-        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), data[i, 1])
+        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), nodal_data[i, 0])
+        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
 
     # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
     x_forces = filter_point_sources(x_forces, fixed_boundary)
