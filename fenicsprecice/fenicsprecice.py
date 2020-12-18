@@ -1,5 +1,5 @@
 """
-Adapter to FEniCS solver handles CustomExpression and initialization of the FEniCS adapter.
+FEniCS - preCICE Adapter. API to help users couple FEniCS with other solvers using the preCICE library.
 :raise ImportError: if PRECICE_ROOT is not defined
 """
 import numpy as np
@@ -33,6 +33,7 @@ class Adapter:
     For more information on setting up a coupling case using dolfin.PointSource at the coupling boundary please have a
     look at this tutorial:
     https://github.com/precice/tutorials/tree/master/FSI/flap_perp/OpenFOAM-FEniCS
+    NOTE: dolfin.PointSource use only works in serial
     """
 
     def __init__(self, adapter_config_filename='precice-adapter-config.json'):
@@ -124,8 +125,7 @@ class Adapter:
                 coupling_expression._vals = np.empty(
                     shape=0)  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
             elif self._read_function_type == FunctionType.VECTOR:
-                coupling_expression._vals = np.empty(shape=(0,
-                                                            0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+                coupling_expression._vals = np.empty(shape=(0, 0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
 
         coupling_expression.set_function_type(self._read_function_type)
 
@@ -171,7 +171,7 @@ class Adapter:
         assert (self._read_function_type is FunctionType.VECTOR), \
             "PointSources only supported for vector valued read data."
 
-        return get_forces_as_point_sources(self._rank, self._Dirichlet_Boundary, self._read_function_space, data)
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
     def read_data(self):
         """
