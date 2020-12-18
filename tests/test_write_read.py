@@ -82,7 +82,7 @@ class TestWriteandReadData(TestCase):
         """
         from precice import Interface
         import fenicsprecice
-        from fenicsprecice.adapter_core import get_owned_coupling_boundary_vertices, convert_fenics_to_precice
+        from fenicsprecice.adapter_core import VertexType, Vertices, set_owned_vertices, convert_fenics_to_precice
 
         Interface.write_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
@@ -102,8 +102,9 @@ class TestWriteandReadData(TestCase):
         precice.write_data(self.vector_function)
 
         expected_data_id = self.fake_id
-        _, lids, _ = get_owned_coupling_boundary_vertices(self.vector_V, RightBoundary())
-        expected_values = convert_fenics_to_precice(self.vector_function, lids)
+        owned_vertices = Vertices(VertexType.OWNED)
+        set_owned_vertices(self.vector_V, RightBoundary(), owned_vertices)
+        expected_values = convert_fenics_to_precice(self.vector_function, owned_vertices.get_local_ids())
         expected_ids = np.arange(self.n_vertices)
         expected_args = [expected_data_id, expected_ids, expected_values]
 
