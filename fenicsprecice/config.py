@@ -25,8 +25,7 @@ class Config:
 
     def read_json(self, adapter_config_filename):
         """
-        Reads JSON adapter configuration file and saves the data to
-        the respective instance attributes.
+        Reads JSON adapter configuration file and saves the data to the respective instance attributes.
 
         Parameters
         ----------

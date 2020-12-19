@@ -2,15 +2,59 @@
 This module consists of helper functions used in the Adapter class. Names of the functions are self explanatory
 """
 
-import dolfin
-from dolfin import SubDomain, Point, PointSource
-from fenics import FunctionSpace, Function
+from fenics import SubDomain, Point, PointSource, vertices, FunctionSpace, Function, edges
 import numpy as np
 from enum import Enum
 import logging
+import hashlib
+from mpi4py import MPI
+import copy
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
+
+
+class VertexType(Enum):
+    """
+    Defines type of vertices that exist in the adapter.
+    OWNED vertices are vertices on the coupling interface owned by this rank
+    UNOWNED vertices are vertices on the coupling interface which are not owned by this rank. They are borrowed
+        vertices from neigbouring ranks
+    FENICS vertices are OWNED + UNOWNED vertices in the order as seen by FEniCS
+    """
+    OWNED = 153
+    UNOWNED = 471
+    FENICS = 557
+
+
+class Vertices:
+    """
+    Vertices class provides a generic skeleton for vertices. A set of vertices has a set of global IDs, local IDs and
+    coordinates as defined in FEniCS.
+    """
+    def __init__(self, vertex_type):
+        self._vertex_type = vertex_type
+        self._global_ids = None
+        self._local_ids = None
+        self._coordinates = None
+
+    def set_global_ids(self, ids):
+        self._global_ids = ids
+
+    def set_local_ids(self, ids):
+        self._local_ids = ids
+
+    def set_coordinates(self, coords):
+        self._coordinates = coords
+
+    def get_global_ids(self):
+        return copy.deepcopy(self._global_ids)
+
+    def get_local_ids(self):
+        return copy.deepcopy(self._local_ids)
+
+    def get_coordinates(self):
+        return copy.deepcopy(self._coordinates)
 
 
 class FunctionType(Enum):
@@ -28,9 +72,9 @@ class CouplingMode(Enum):
     Options are: Bi-directional coupling, Uni-directional Write Coupling, Uni-directional Read Coupling
     Used in assertions to check which type of coupling is done
     """
-    BIDIR = 4
-    UNIDIR_WRITE = 5
-    UNIDIR_READ = 6
+    BI_DIRECTIONAL_COUPLING = 4
+    UNI_DIRECTIONAL_WRITE_COUPLING = 5
+    UNI_DIRECTIONAL_READ_COUPLING = 6
 
 
 def determine_function_type(input_obj):
@@ -92,96 +136,171 @@ def filter_point_sources(point_sources, filter_out):
     return filtered_point_sources
 
 
-def convert_fenics_to_precice(data, sample_points):
+def convert_fenics_to_precice(fenics_function, local_ids):
     """
     Converts data of type dolfin.Function into Numpy array for all x and y coordinates on the boundary.
 
     Parameters
     ----------
-    data : FEniCS function
+    fenics_function : FEniCS function
         A FEniCS function referring to a physical variable in the problem.
-    sample_points : array_like
-        The coordinates of the vertices in a numpy array [N x D] where
-        N = number of vertices and D = dimensions of geometry.
+    local_ids: numpy array
+        Array of local indices of vertices on the coupling interface and owned by this rank.
 
     Returns
     -------
-    array : array_like
+    precice_data : array_like
         Array of FEniCS function values at each point on the boundary.
     """
-    if type(data) is dolfin.Function:
-        x_all, y_all = sample_points[:, 0], sample_points[:, 1]
-        return np.array([data(x, y) for x, y in zip(x_all, y_all)])
+
+    if type(fenics_function) is not Function:
+        raise Exception("Cannot handle data type {}".format(type(fenics_function)))
+
+    sampled_data = fenics_function.compute_vertex_values(fenics_function.function_space().mesh())
+
+    precice_data = []
+    if len(local_ids):
+        if fenics_function.function_space().num_sub_spaces() > 0:  # function space is VectorFunctionSpace
+            for lid in local_ids:
+                precice_data.append([sampled_data[lid], sampled_data[lid+1]])
+        else:  # function space is FunctionSpace (scalar)
+            for lid in local_ids:
+                precice_data.append(sampled_data[lid])
     else:
-        raise Exception("Cannot handle data type %s" % type(data))
+        precice_data = np.array([])
+
+    return np.array(precice_data)
 
 
-def get_coupling_boundary_vertices(mesh_fenics, coupling_subdomain, fenics_dimensions, dimensions):
+def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     """
-    Extracts vertices from a given mesh which lie on the  given coupling domain.
+    Extracts vertices which FEniCS accesses on this rank and which lie on the given coupling domain, from a given
+    function space.
 
     Parameters
     ----------
-    mesh_fenics : FEniCS Mesh
-        Mesh of complete domain.
-    coupling_subdomain : FeniCS Domain
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
-    fenics_dimensions : int
-        Dimensions of FEniCS case setup.
-    dimensions : int
-        Dimensions of coupling case setup.
-
-    Returns
-    -------
-    fenics_vertices : numpy array
-        Array consisting of all vertices lying on the coupling interface.
-    coordinates : array_like
-        The coordinates of the vertices in a numpy array [N x D] where
-        N = number of vertices and D = dimensions of geometry.
-    n : int
-        Number of vertices on the coupling interface.
+    fenics_vertices : Object of class Vertices
+        Vertices as seen by FEniCS on the coupling interface.
     """
-    n = 0
-    fenics_vertices = []
-    vertices_x = []
-    vertices_y = []
-    vertices_z = []
 
     if not issubclass(type(coupling_subdomain), SubDomain):
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
-    for v in dolfin.vertices(mesh_fenics):
+    # Get mesh from FEniCS function space
+    mesh = function_space.mesh()
+
+    # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
+    # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
+    fenics_gids, fenics_coords = [], []
+    for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
-            n += 1
-            fenics_vertices.append(v)
-            vertices_x.append(v.x(0))
-            if dimensions == 2:
-                vertices_y.append(v.x(1))
-            elif fenics_dimensions == 2 and dimensions == 3:
-                vertices_y.append(v.x(1))
-                vertices_z.append(0)
-            else:
-                raise Exception("Dimensions of coupling problem (dim={}) and FEniCS setup (dim={}) do not match!"
-                                .format(dimensions, fenics_dimensions))
+            fenics_gids.append(v.global_index())
+            fenics_coords.append([v.x(0), v.x(1)])
 
-    assert (n != 0), "No coupling boundary vertices detected"
-
-    if dimensions == 2:
-        return fenics_vertices, np.stack([vertices_x, vertices_y], axis=1)
-    elif dimensions == 3:
-        return fenics_vertices, np.stack([vertices_x, vertices_y, vertices_z], axis=1)
+    fenics_vertices.set_global_ids(np.array(fenics_gids))
+    fenics_vertices.set_coordinates(np.array(fenics_coords))
 
 
-def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
+def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
+    """
+    Extracts vertices which this rank owns and which lie on the given coupling domain, from a given function space .
+
+    Parameters
+    ----------
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_subdomain : FEniCS Domain
+        Subdomain consists of only the coupling interface region.
+    owned_vertices : Object of class Vertices
+        Vertices owned by this rank
+    """
+
+    if not issubclass(type(coupling_subdomain), SubDomain):
+        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
+
+    # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
+    dofs = function_space.tabulate_dof_coordinates()
+
+    # Get mesh from FEniCS function space
+    mesh = function_space.mesh()
+
+    # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
+    # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
+    owned_gids, owned_lids, owned_coords = [], [], []
+    for v in vertices(mesh):
+        if coupling_subdomain.inside(v.point(), True):
+            dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
+            for dof in dofs:
+                if (dof == [v.x(0), v.x(1)]).all() and (dof != dof_nm1).any():
+                    owned_gids.append(v.global_index())
+                    owned_lids.append(v.index())
+                    owned_coords.append([v.x(0), v.x(1)])
+                dof_nm1 = dof
+
+    owned_vertices.set_global_ids(np.array(owned_gids))
+    owned_vertices.set_local_ids(np.array(owned_lids))
+    owned_vertices.set_coordinates(np.array(owned_coords))
+
+
+def set_unowned_vertices(function_space, coupling_subdomain, unowned_vertices):
+    """
+    Extracts vertices which this rank does not own but shares and which lie on a given coupling domain, from a given
+    function space.
+
+    Parameters
+    ----------
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_subdomain : FEniCS Domain
+        Subdomain consists of only the coupling interface region.
+    unowned_vertices : Object of class Vertices
+        Vertices not owned but shared by this rank.
+    """
+
+    if not issubclass(type(coupling_subdomain), SubDomain):
+        raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
+
+    # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
+    dofs = function_space.tabulate_dof_coordinates()
+
+    # Get mesh from FEniCS function space
+    mesh = function_space.mesh()
+
+    # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
+    # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
+    unowned_gids = []
+    for v in vertices(mesh):
+        if coupling_subdomain.inside(v.point(), True):
+            ownership = False
+            dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
+            for dof in dofs:
+                if (dof == [v.x(0), v.x(1)]).all() and (dof != dof_nm1).any():
+                    ownership = True
+                    break
+                dof_nm1 = dof
+
+            if ownership is False:
+                unowned_gids.append(v.global_index())
+
+    unowned_vertices.set_global_ids(np.array(unowned_gids))
+
+
+def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, id_mapping):
     """
     Extracts edges of mesh which lie on the coupling boundary.
 
     Parameters
     ----------
-    mesh_fenics : FEniCS Mesh
-        FEniCS mesh of the complete region.
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         FEniCS domain of the coupling interface region.
+    global_ids: numpy_array
+        Array of global IDs of vertices owned by this rank.
     id_mapping : python dictionary
         Dictionary mapping preCICE vertex IDs to FEniCS global vertex IDs.
 
@@ -197,17 +316,18 @@ def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
         """
         Check whether edge lies within subdomain
         """
-        assert(len(list(dolfin.vertices(edge))) == 2)
-        return all([subdomain.inside(v.point(), True) for v in dolfin.vertices(edge)])
+        assert(len(list(vertices(edge))) == 2)
+        return all([subdomain.inside(v.point(), True) for v in vertices(edge)])
 
     vertices1_ids = []
     vertices2_ids = []
 
-    for edge in dolfin.edges(mesh_fenics):
+    for edge in edges(function_space.mesh()):
         if edge_is_on(coupling_subdomain, edge):
-            v1, v2 = list(dolfin.vertices(edge))
-            vertices1_ids.append(id_mapping[v1.global_index()])
-            vertices2_ids.append(id_mapping[v2.global_index()])
+            v1, v2 = list(vertices(edge))
+            if v1.global_index() in global_ids and v2.global_index() in global_ids:
+                vertices1_ids.append(id_mapping[v1.global_index()])
+                vertices2_ids.append(id_mapping[v2.global_index()])
 
     vertices1_ids = np.array(vertices1_ids)
     vertices2_ids = np.array(vertices2_ids)
@@ -215,9 +335,9 @@ def get_coupling_boundary_edges(mesh_fenics, coupling_subdomain, id_mapping):
     return vertices1_ids, vertices2_ids
 
 
-def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_vertices, data, z_dead=False):
+def get_forces_as_point_sources(fixed_boundary, function_space, data):
     """
-    Creating two dicts of PointSources that can be applied to the assembled system. Appling filter_point_source to
+    Creating two dicts of PointSources that can be applied to the assembled system. Applying filter_point_source to
     avoid forces being applied to already existing Dirichlet BC, since this would lead to an overdetermined system
     that cannot be solved.
 
@@ -228,13 +348,8 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
         at one end.
     function_space : FEniCS function space
         Function space on which the finite element problem definition lives.
-    coupling_mesh_vertices : numpy.ndarray
-        The coordinates of the vertices on the coupling interface. Coordinates of vertices are stored in a
-        numpy array [N x D] where N = number of vertices and D = dimensions of geometry
-    data : PointSource
+    data : a numpy array of PointSource
         FEniCS PointSource data carrying forces
-    z_dead: bool
-        Allows to ignore z dimension
 
     Returns
     -------
@@ -242,31 +357,24 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
         Dictionary carrying X component of forces with reference to each point on the coupling interface.
     y_forces : list
         Dictionary carrying Y component of forces with reference to each point on the coupling interface.
-
     """
-    # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension in a vector-valued setting
-    # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
-
     x_forces = dict()  # dict of PointSources for Forces in x direction
     y_forces = dict()  # dict of PointSources for Forces in y direction
 
+    fenics_vertices = np.array(list(data.keys()))
+    nodal_data = np.array(list(data.values()))
+
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
-    n_vertices, dims = coupling_mesh_vertices.shape
+    n_vertices, dims = fenics_vertices.shape
 
-    if z_dead:
-        assert (dims == 3), "z_dead=True is only allowed for 3D data"
-    else:
-        assert (dims == 2), "This Adapter can create Point Sources only from 2D data. Use z_dead=True, if you want " \
-                            "to ignore the z dimension."
-
-    vertices_x = coupling_mesh_vertices[:, 0]
-    vertices_y = coupling_mesh_vertices[:, 1]
+    vertices_x = fenics_vertices[:, 0]
+    vertices_y = fenics_vertices[:, 1]
 
     for i in range(n_vertices):
         px, py = vertices_x[i], vertices_y[i]
         key = (px, py)
-        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), data[i, 0])
-        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), data[i, 1])
+        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), nodal_data[i, 0])
+        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
 
     # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
     x_forces = filter_point_sources(x_forces, fixed_boundary)
@@ -274,3 +382,187 @@ def get_forces_as_point_sources(fixed_boundary, function_space, coupling_mesh_ve
 
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
+
+def get_communication_map(comm, rank, function_space, owned_vertices, unowned_vertices):
+    """
+    Determine which vertices along the coupling boundary are shared with neighbouring processes. This function creates
+    a map of vertices to be sent and received from neighbouring processes. This map is used for non-blocking
+    communication.
+
+    Parameters
+    ----------
+    comm : Object of class MPI.COMM_WORLD from mpi4py package
+        A predefined intra-communicator instance available in mpi4py.
+    rank : int
+        Rank of calling process in a communicator obtained from MPI.
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    owned_vertices : Object of class Vertices
+        Vertices owned by this rank.
+    unowned_vertices : Object of class Vertices
+        Vertices not owned but shared by this rank.
+
+    Returns
+    -------
+    send_data : dict_like
+        A dictionary with global IDs of vertices whose data needs to be sent as the keys, and the ranks to which the
+        data needs to be sent as the values.
+    recv_data : dict_like
+        A dictionary with global IDs of vertices on which data needs to be received as keys, and the ranks from which
+        the data needs to be received as values.
+
+    """
+    owned_gids = owned_vertices.get_global_ids()
+    unowned_gids = unowned_vertices.get_global_ids()
+
+    # Get ranks which are neighbours of this rank from the DoFMap in FEniCS
+    neigh_ranks = function_space.dofmap().neighbours()
+
+    # Receive ownership data of ranks which are neighbors of this rank
+    recv_reqs = []
+    for neigh in neigh_ranks:
+        recv_hashtag = hashlib.sha256()
+        recv_hashtag.update((str(neigh) + str(rank)).encode('utf-8'))
+        recv_tag = int(recv_hashtag.hexdigest()[:6], base=16)
+        recv_reqs.append(comm.irecv(source=neigh, tag=recv_tag))
+
+    # Send ownership data to ranks which are neighbors of this rank
+    send_reqs = []
+    for neigh in neigh_ranks:
+        send_hashtag = hashlib.sha256()
+        send_hashtag.update((str(rank) + str(neigh)).encode('utf-8'))
+        send_tag = int(send_hashtag.hexdigest()[:6], base=16)
+        req = comm.isend(owned_gids, dest=neigh, tag=send_tag)
+        send_reqs.append(req)
+
+    # Wait for all non-blocking communication operations to complete
+    MPI.Request.Waitall(send_reqs)
+
+    ownership_data = dict()
+    # Collect received ownership data of other ranks
+    counter = 0
+    for neigh in neigh_ranks:
+        ownership_data[neigh] = recv_reqs[counter].wait()
+        counter += 1
+
+    # Create dictionary: keys are Global IDs of vertices not owned by this rank, values are ranks from which
+    # data on these vertices needs to be received
+    recv_data = dict()
+    for neigh in neigh_ranks:
+        for o_gid in ownership_data[neigh]:
+            for uo_gid in unowned_gids:
+                if o_gid == uo_gid:
+                    recv_data[uo_gid] = neigh
+
+    # Receive ownership data of ranks which are neighbors of this rank
+    recv_reqs = []
+    for neigh in neigh_ranks:
+        recv_hashtag = hashlib.sha256()
+        recv_hashtag.update((str(neigh) + str(rank)).encode('utf-8'))
+        recv_tag = int(recv_hashtag.hexdigest()[:6], base=16)
+        recv_reqs.append(comm.irecv(source=neigh, tag=recv_tag))
+
+    # Send non-ownership data to ranks which are neighbors of this rank
+    send_reqs = []
+    for neigh in neigh_ranks:
+        send_hashtag = hashlib.sha256()
+        send_hashtag.update((str(rank) + str(neigh)).encode('utf-8'))
+        send_tag = int(send_hashtag.hexdigest()[:6], base=16)
+        req = comm.isend(unowned_gids, dest=neigh, tag=send_tag)
+        send_reqs.append(req)
+
+    # Wait for all non-blocking communication operations to complete
+    MPI.Request.Waitall(send_reqs)
+
+    nonownership_data = dict()
+    # Collect received ownership data of other ranks
+    counter = 0
+    for neigh in neigh_ranks:
+        nonownership_data[neigh] = recv_reqs[counter].wait()
+        counter += 1
+
+    # Create dictionary: keys are Global IDs of vertices not owned by this rank, values are ranks from which
+    # data on these vertices needs to be received
+    send_data = dict()
+    for neigh in neigh_ranks:
+        for uo_gid in nonownership_data[neigh]:
+            for o_gid in owned_gids:
+                if uo_gid == o_gid:
+                    send_data[o_gid] = neigh
+
+    return send_data, recv_data
+
+
+def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts, coupling_data):
+    """
+    Triggers asynchronous communication between ranks of this solver to exchange data for shared vertices. Rank owning a
+    shared vertex sends latest data to all ranks it is sharing this vertex with.
+
+    Parameters
+    ----------
+    comm : Object of class MPI.COMM_WORLD from mpi4py package
+        A predefined intra-communicator instance available in mpi4py.
+    rank : int
+        Rank of calling process in a communicator obtained from MPI.
+    fenics_vertices : Object of class Vertices
+        Vertices owned and shared by this rank, as seen by FEniCS
+    send_pts : dict_like
+        A dictionary with global IDs of vertices whose data needs to be sent as the keys, and the ranks to which the
+        data needs to be sent as the values.
+    recv_pts : dict_like
+        A dictionary with global IDs of vertices on which data needs to be received as keys, and the ranks from which
+        the data needs to be received as values.
+    coupling_data : dict_like
+        The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            values.
+
+    Returns
+    -------
+    fenics_data : array_like
+        The updated coupling data. A dictionary containing nodal data with vertex coordinates of all seen vertices as
+        the keys, and the associated data as values.
+
+    """
+    fenics_coords = fenics_vertices.get_coordinates()
+    fenics_gids = fenics_vertices.get_global_ids()
+
+    # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
+    for coord in fenics_coords:
+        if tuple(coord) not in coupling_data.keys():
+            coupling_data[tuple(coord)] = None
+
+    recv_reqs = []
+    if recv_pts:
+        for recv_gid, src in recv_pts.items():
+            hash_tag = hashlib.sha256()
+            hash_tag.update((str(src) + str(recv_gid) + str(rank)).encode('utf-8'))
+            tag = int(hash_tag.hexdigest()[:6], base=16)
+            recv_reqs.append(comm.irecv(source=src, tag=tag))
+    else:
+        print("Rank {}: Nothing to Receive".format(rank))
+
+    send_reqs = []
+    if send_pts:
+        for send_gid, dests in send_pts.items():
+            # Make sure that there is only one send_lid
+            send_lid = int(np.where(fenics_gids == send_gid)[0][0])
+            for dest in [dests]:
+                hash_tag = hashlib.sha256()
+                hash_tag.update((str(rank) + str(send_gid) + str(dest)).encode('utf-8'))
+                tag = int(hash_tag.hexdigest()[:6], base=16)
+                req = comm.isend(coupling_data[tuple(fenics_coords[send_lid])], dest=dest, tag=tag)
+                send_reqs.append(req)
+    else:
+        print("Rank {}: Nothing to Send".format(rank))
+
+    # Wait for all non-blocking communications to complete
+    MPI.Request.Waitall(send_reqs)
+
+    # Attach received data into the existing FEniCS style data array
+    counter = 0
+    for recv_gid in recv_pts.keys():
+        recv_lid = int(np.where(fenics_gids == recv_gid)[0][0])
+        coupling_data[tuple(fenics_coords[recv_lid])] = recv_reqs[counter].wait()
+        counter += 1
+
+    return coupling_data
