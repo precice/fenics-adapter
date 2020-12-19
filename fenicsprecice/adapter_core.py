@@ -387,6 +387,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
 def get_communication_map(comm, rank, function_space, owned_gids, unowned_gids):
     """
     Determine which vertices along the coupling boundary are shared with neighbouring processes
+
     Parameters
     ----------
     comm : Object of class MPI.COMM_WORLD from mpi4py package
@@ -488,33 +489,28 @@ def get_communication_map(comm, rank, function_space, owned_gids, unowned_gids):
     return send_data, recv_data
 
 
-def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_coords, owned_data,
-                                send_pts, recv_pts):
+def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts, coupling_data):
     """
+    Triggers asynchronous communication between ranks of this solver to exchange data for shared vertices. Rank owning a
+    shared vertex sends latest data to all ranks it is sharing this vertex with.
 
     Parameters
     ----------
     comm : Object of class MPI.COMM_WORLD from mpi4py package
-        A predefined intracommunicator instance available in mpi4py.
+        A predefined intra-communicator instance available in mpi4py.
     rank : int
         Rank of calling process in a communicator obtained from MPI.
-    fenics_gids : numpy array
-        Array of global indices of vertices on the coupling interface as seen by this rank.
-    owned_coords : array_like
-            The coordinates of the vertices on the coupling interface and owned by this rank, in a numpy array [N x D]
-            where N = number of vertices and D = dimensions of geometry.
-    fenics_coords : array_like
-        The coordinates of the vertices on the coupling interface as seen by this rank, in a numpy array [N x D] where
-        N = number of vertices and D = dimensions of geometry.
-    owned_data : dict_like
-        The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
-            values.
+    fenics_vertices : Object of class Vertices
+        Vertices owned and shared by this rank, as seen by FEniCS
     send_pts : dict_like
         A dictionary with global IDs of vertices whose data needs to be sent as the keys, and the ranks to which the
         data needs to be sent as the values.
     recv_pts : dict_like
         A dictionary with global IDs of vertices on which data needs to be received as keys, and the ranks from which
         the data needs to be received as values.
+    coupling_data : dict_like
+        The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
+            values.
 
     Returns
     -------
@@ -523,14 +519,13 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
         the keys, and the associated data as values.
 
     """
-    # Create fenics type shared data array for communication
-    fenics_data = dict.fromkeys(tuple(key) for key in fenics_coords)
+    fenics_coords = fenics_vertices.get_coordinates()
+    fenics_gids = fenics_vertices.get_global_ids()
 
     # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
     for coord in fenics_coords:
-        for owned_coord in owned_coords:
-            if (coord == owned_coord).all():
-                fenics_data[tuple(coord)] = owned_data[tuple(owned_coord)]
+        if tuple(coord) not in coupling_data.keys():
+            coupling_data[tuple(coord)] = None
 
     recv_reqs = []
     if recv_pts:
@@ -551,7 +546,7 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
                 hash_tag = hashlib.sha256()
                 hash_tag.update((str(rank) + str(send_gid) + str(dest)).encode('utf-8'))
                 tag = int(hash_tag.hexdigest()[:6], base=16)
-                req = comm.isend(fenics_data[tuple(fenics_coords[send_lid])], dest=dest, tag=tag)
+                req = comm.isend(coupling_data[tuple(fenics_coords[send_lid])], dest=dest, tag=tag)
                 send_reqs.append(req)
     else:
         print("Rank {}: Nothing to Send".format(rank))
@@ -563,7 +558,7 @@ def communicate_shared_vertices(comm, rank, fenics_gids, owned_coords, fenics_co
     counter = 0
     for recv_gid in recv_pts.keys():
         recv_lid = int(np.where(fenics_gids == recv_gid)[0][0])
-        fenics_data[tuple(fenics_coords[recv_lid])] = recv_reqs[counter].wait()
+        coupling_data[tuple(fenics_coords[recv_lid])] = recv_reqs[counter].wait()
         counter += 1
 
-    return fenics_data
+    return coupling_data

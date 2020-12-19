@@ -205,11 +205,9 @@ class Adapter:
             elif self._read_function_type is FunctionType.VECTOR:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
-            owned_read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-            updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices.get_global_ids(),
-                                                       self._owned_vertices.get_coordinates(),
-                                                       self._fenics_vertices.get_coordinates(), owned_read_data,
-                                                       self._send_map, self._recv_map)
+            read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
+            updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
+                                                       self._recv_map, read_data)
         else:  # if there are no vertices, we return empty data
             updated_data = None
 
