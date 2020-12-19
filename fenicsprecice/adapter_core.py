@@ -173,7 +173,8 @@ def convert_fenics_to_precice(fenics_function, local_ids):
 
 def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     """
-    Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
+    Extracts vertices which FEniCS accesses on this rank and which lie on the given coupling domain, from a given
+    function space.
 
     Parameters
     ----------
@@ -182,7 +183,7 @@ def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
     fenics_vertices : Object of class Vertices
-        Vertices as seen by FEniCS on the coupling interface
+        Vertices as seen by FEniCS on the coupling interface.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -205,7 +206,7 @@ def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
 
 def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
     """
-    Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
+    Extracts vertices which this rank owns and which lie on the given coupling domain, from a given function space .
 
     Parameters
     ----------
@@ -246,7 +247,8 @@ def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
 
 def set_unowned_vertices(function_space, coupling_subdomain, unowned_vertices):
     """
-    Extracts vertices which this rank owns from a given function space which lie on the given coupling domain.
+    Extracts vertices which this rank does not own but shares and which lie on a given coupling domain, from a given
+    function space.
 
     Parameters
     ----------
@@ -255,7 +257,7 @@ def set_unowned_vertices(function_space, coupling_subdomain, unowned_vertices):
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
     unowned_vertices : Object of class Vertices
-        Vertices not owned but seen by this rank
+        Vertices not owned but shared by this rank.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -355,10 +357,6 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     y_forces : list
         Dictionary carrying Y component of forces with reference to each point on the coupling interface.
     """
-    # PointSources are scalar valued, therefore we need an individual scalar valued PointSource for each dimension
-    # in a vector-valued setting
-    # TODO: a vector valued PointSource would be more straightforward, but does not exist (as far as I know)
-
     x_forces = dict()  # dict of PointSources for Forces in x direction
     y_forces = dict()  # dict of PointSources for Forces in y direction
 
@@ -384,22 +382,24 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def get_communication_map(comm, rank, function_space, owned_gids, unowned_gids):
+def get_communication_map(comm, rank, function_space, owned_vertices, unowned_vertices):
     """
-    Determine which vertices along the coupling boundary are shared with neighbouring processes
+    Determine which vertices along the coupling boundary are shared with neighbouring processes. This function creates
+    a map of vertices to be sent and received from neighbouring processes. This map is used for non-blocking
+    communication.
 
     Parameters
     ----------
     comm : Object of class MPI.COMM_WORLD from mpi4py package
-        A predefined intracommunicator instance available in mpi4py.
+        A predefined intra-communicator instance available in mpi4py.
     rank : int
         Rank of calling process in a communicator obtained from MPI.
     function_space : FEniCS function space
         Function space on which the finite element problem definition lives.
-    owned_gids : numpy array
-            Array of global indices of vertices on the coupling interface and owned by this rank.
-    unowned_gids : numpy array
-            Array of global indices of all vertices on the coupling interface and NOT owned by this rank.
+    owned_vertices : Object of class Vertices
+        Vertices owned by this rank.
+    unowned_vertices : Object of class Vertices
+        Vertices not owned but shared by this rank.
 
     Returns
     -------
@@ -411,6 +411,9 @@ def get_communication_map(comm, rank, function_space, owned_gids, unowned_gids):
         the data needs to be received as values.
 
     """
+    owned_gids = owned_vertices.get_global_ids()
+    unowned_gids = unowned_vertices.get_global_ids()
+
     # Get ranks which are neighbours of this rank from the DoFMap in FEniCS
     neigh_ranks = function_space.dofmap().neighbours()
 

@@ -153,7 +153,7 @@ class Adapter:
 
     def get_point_sources(self, data):
         """
-        Update values of point sources using data.
+        Update values of at points by defining a point source load using data.
 
         Parameters
         ----------
@@ -170,6 +170,8 @@ class Adapter:
         """
         assert (self._read_function_type is FunctionType.VECTOR), \
             "PointSources only supported for vector valued read data."
+
+        assert (self._size == 1), "get_point_sources function only works in serial."
 
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
@@ -206,12 +208,12 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-            updated_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
-                                                       self._recv_map, read_data)
+            read_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
+                                                    self._recv_map, read_data)
         else:  # if there are no vertices, we return empty data
-            updated_data = None
+            read_data = None
 
-        return updated_data
+        return read_data
 
     def write_data(self, write_function):
         """
@@ -363,8 +365,7 @@ class Adapter:
 
         # Determine shared vertices with neighbouring processes and get dictionaries for communication
         self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
-                                                                     self._owned_vertices.get_global_ids(),
-                                                                     self._unowned_vertices.get_global_ids())
+                                                               self._owned_vertices, self._unowned_vertices)
 
         # # Set mesh edges in preCICE to allow nearest-projection mapping
         # # Define a mapping between coupling vertices and their IDs in preCICE
