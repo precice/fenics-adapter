@@ -12,3 +12,4 @@
 * The adapter supports checkpointing and subcycling.
 * The adapter supports up to one read and one write data set.
 * The current state of the adapter API was mainly designed in https://github.com/precice/fenics-adapter/pull/59.
+* Supports parallel solvers for Expressions, but not for PointSources as coupling boundary conditions. See https://github.com/precice/fenics-adapter/pull/71.
