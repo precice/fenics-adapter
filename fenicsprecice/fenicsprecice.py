@@ -13,6 +13,7 @@ from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpressi
 from .solverstate import SolverState
 from fenics import Function, FunctionSpace
 from mpi4py import MPI
+import copy
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -191,7 +192,8 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
-        assert (self._coupling_type is CouplingMode.UNIDIR_READ or CouplingMode.BIDIR)
+        assert (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
+                CouplingMode.BI_DIRECTIONAL_COUPLING)
 
         read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
@@ -213,7 +215,7 @@ class Adapter:
         else:  # if there are no vertices, we return empty data
             read_data = None
 
-        return read_data
+        return copy.deepcopy(read_data)
 
     def write_data(self, write_function):
         """
@@ -226,7 +228,8 @@ class Adapter:
             A FEniCS function consisting of the data which this participant will write to preCICE in every time step.
         """
 
-        assert (self._coupling_type is CouplingMode.UNIDIR_WRITE or CouplingMode.BIDIR)
+        assert (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_WRITE_COUPLING or
+                CouplingMode.BI_DIRECTIONAL_COUPLING)
 
         w_func = write_function.copy()
         # making sure that the FEniCS function provided by the user is not directly accessed by the Adapter
@@ -300,17 +303,17 @@ class Adapter:
             raise Exception("Given read_function_space is not of type dolfin.functions.functionspace.FunctionSpace")
 
         if read_function_space is None and write_function_space:
-            self._coupling_type = CouplingMode.UNIDIR_WRITE
+            self._coupling_type = CouplingMode.UNI_DIRECTIONAL_WRITE_COUPLING
             assert (self._config.get_write_data_name())
             print("Participant {} is write-only participant".format(self._config.get_participant_name()))
             function_space = write_function_space
         elif read_function_space and write_function_space is None:
-            self._coupling_type = CouplingMode.UNIDIR_READ
+            self._coupling_type = CouplingMode.UNI_DIRECTIONAL_READ_COUPLING
             assert (self._config.get_read_data_name())
             print("Participant {} is read-only participant".format(self._config.get_participant_name()))
             function_space = read_function_space
         elif read_function_space and write_function_space:
-            self._coupling_type = CouplingMode.BIDIR
+            self._coupling_type = CouplingMode.BI_DIRECTIONAL_COUPLING
             assert (self._config.get_read_data_name() and self._config.get_write_data_name())
             function_space = read_function_space
         elif read_function_space is None and write_function_space is None:
@@ -323,11 +326,13 @@ class Adapter:
             raise Exception("Incorrect read and write function space combination provided. Please check input "
                             "parameters in initialization")
 
-        if self._coupling_type is CouplingMode.UNIDIR_READ or self._coupling_type is CouplingMode.BIDIR:
+        if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
+                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             self._read_function_type = determine_function_type(read_function_space)
             self._read_function_space = read_function_space
 
-        if self._coupling_type is CouplingMode.UNIDIR_WRITE or self._coupling_type is CouplingMode.BIDIR:
+        if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_WRITE_COUPLING or \
+                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             # Ensure that function spaces of read and write functions are defined using the same mesh
             self._write_function_type = determine_function_type(write_function_space)
             self._write_function_space = write_function_space
@@ -336,7 +341,7 @@ class Adapter:
         _, fenics_dimensions = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
-        if self._coupling_type is CouplingMode.BIDIR:
+        if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             assert (self._read_function_space.mesh() is write_function_space.mesh()), "read_function_space and " \
                                                                                      "write_object need to be " \
                                                                                       "defined using the same mesh"

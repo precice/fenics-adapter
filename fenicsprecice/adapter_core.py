@@ -29,7 +29,8 @@ class VertexType(Enum):
 
 class Vertices:
     """
-
+    Vertices class provides a generic skeleton for vertices. A set of vertices has a set of global IDs, local IDs and
+    coordinates as defined in FEniCS.
     """
     def __init__(self, vertex_type):
         self._vertex_type = vertex_type
@@ -71,9 +72,9 @@ class CouplingMode(Enum):
     Options are: Bi-directional coupling, Uni-directional Write Coupling, Uni-directional Read Coupling
     Used in assertions to check which type of coupling is done
     """
-    BIDIR = 4
-    UNIDIR_WRITE = 5
-    UNIDIR_READ = 6
+    BI_DIRECTIONAL_COUPLING = 4
+    UNI_DIRECTIONAL_WRITE_COUPLING = 5
+    UNI_DIRECTIONAL_READ_COUPLING = 6
 
 
 def determine_function_type(input_obj):
