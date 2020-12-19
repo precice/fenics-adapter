@@ -22,6 +22,6 @@ setup(name='fenicsprecice',
       author_email='benjamin.rueth@tum.de',
       license='LGPL-3.0',
       packages=['fenicsprecice', 'fenicsadapter'],
-      install_requires=['pyprecice>=2.0.0', 'fenics', 'scipy', 'numpy>=1.13.3'],
+      install_requires=['pyprecice>=2.0.0', 'fenics', 'scipy', 'numpy>=1.13.3', 'mpi4py'],
       test_suite='tests',
       zip_safe=False)
