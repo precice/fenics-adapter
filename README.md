@@ -1,8 +1,8 @@
 FEniCS-preCICE adapter
 ----------------------
 
-<a style="text-decoration: none" href="https://travis-ci.org/precice/fenics-adapter" target="_blank">
-    <img src="https://travis-ci.org/precice/fenics-adapter.svg?branch=master" alt="Build status">
+<a style="text-decoration: none" href="https://travis-ci.com/precice/fenics-adapter" target="_blank">
+    <img src="https://travis-ci.com/precice/fenics-adapter.svg?branch=master" alt="Build status">
 </a>
 <a style="text-decoration: none" href="https://github.com/precice/fenics-adapter/blob/master/LICENSE" target="_blank">
     <img src="https://img.shields.io/github/license/precice/fenics-adapter.svg" alt="GNU LGPL license">
