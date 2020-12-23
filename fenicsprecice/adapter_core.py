@@ -128,9 +128,7 @@ def filter_point_sources(point_sources, filter_out):
 
     for point in point_sources.keys():
         # Filter double boundary points to avoid instabilities and create PointSource
-        if filter_out.inside(point, 1):
-            print("Found a double-boundary point at {location}.".format(location=point))
-        else:
+        if not filter_out.inside(point, True):
             filtered_point_sources[point] = point_sources[point]
 
     return filtered_point_sources
@@ -365,7 +363,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     nodal_data = np.array(list(data.values()))
 
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
-    n_vertices, dims = fenics_vertices.shape
+    n_vertices, _ = fenics_vertices.shape
 
     vertices_x = fenics_vertices[:, 0]
     vertices_y = fenics_vertices[:, 1]
