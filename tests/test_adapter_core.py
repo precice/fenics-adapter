@@ -49,7 +49,7 @@ class TestAdapterCore(TestCase):
         V = FunctionSpace(mesh, 'P', 2)  # Create function space using mesh
         x, y = symbols('x[0], x[1]')
         fun_sym = y + x*x
-        fun_lambda = lambdify([x,y], fun_sym)
+        fun_lambda = lambdify([x, y], fun_sym)
         fun_string = printing.ccode(fun_sym)
         expression = Expression(fun_string, degree=2)
         fenics_function = interpolate(expression, V)

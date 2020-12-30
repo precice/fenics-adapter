@@ -158,14 +158,14 @@ def convert_fenics_to_precice(fenics_function, local_ids):
 
     if fenics_function.function_space().num_sub_spaces() > 0:
         dims = fenics_function.function_space().num_sub_spaces()
-        sampled_data = fenics_function.compute_vertex_values().reshape([dims,-1])
+        sampled_data = fenics_function.compute_vertex_values().reshape([dims, -1])
     else:
         sampled_data = fenics_function.compute_vertex_values()
 
     if len(local_ids):
         if fenics_function.function_space().num_sub_spaces() > 0:  # function space is VectorFunctionSpace
             for lid in local_ids:
-                precice_data.append(sampled_data[:,lid])
+                precice_data.append(sampled_data[:, lid])
         else:  # function space is FunctionSpace (scalar)
             for lid in local_ids:
                 precice_data.append(sampled_data[lid])
