@@ -40,7 +40,7 @@ class TestAdapterCore(TestCase):
         """
         Test conversion from function to write_data
         """
-        from fenicsadapter.adapter_core import convert_fenics_to_precice        
+        from fenicsprecice.adapter_core import convert_fenics_to_precice
         from sympy import lambdify, symbols, printing
 
         mesh = UnitSquareMesh(10, 10)  # create dummy mesh
