@@ -242,7 +242,7 @@ class EmptyExpression(CouplingExpression):
         :param x: coordinate where expression has to be evaluated
         :param value: buffer where result has to be returned to
         """
-        assert(MPI.size(MPI.comm_world) > 1)
+        assert(MPI.COMM_WORLD.Get_size() > 1)
         for i in range(self._vals.ndim):
             value[i] = 0
 

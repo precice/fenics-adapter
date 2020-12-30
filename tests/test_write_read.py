@@ -82,7 +82,7 @@ class TestWriteandReadData(TestCase):
         """
         from precice import Interface
         import fenicsprecice
-        from fenicsprecice.adapter_core import VertexType, Vertices, set_owned_vertices, convert_fenics_to_precice
+        from fenicsprecice.adapter_core import VertexType, Vertices, convert_fenics_to_precice
 
         Interface.write_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
@@ -102,9 +102,9 @@ class TestWriteandReadData(TestCase):
         precice.write_data(self.vector_function)
 
         expected_data_id = self.fake_id
-        owned_vertices = Vertices(VertexType.OWNED)
-        set_owned_vertices(self.vector_V, RightBoundary(), owned_vertices)
-        expected_values = convert_fenics_to_precice(self.vector_function, owned_vertices.get_local_ids())
+        expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
+        expected_values_y = np.array([self.vector_expr(x_right, y)[1] for y in np.linspace(y_bottom, y_top, 11)])
+        expected_values = np.stack([expected_values_x, expected_values_y], axis=1)
         expected_ids = np.arange(self.n_vertices)
         expected_args = [expected_data_id, expected_ids, expected_values]
 
