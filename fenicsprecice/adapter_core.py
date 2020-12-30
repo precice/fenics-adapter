@@ -154,7 +154,7 @@ def convert_fenics_to_precice(fenics_function, local_ids):
     if type(fenics_function) is not Function:
         raise Exception("Cannot handle data type {}".format(type(fenics_function)))
 
-    sampled_data = fenics_function.compute_vertex_values(fenics_function.function_space().mesh())
+    sampled_data = fenics_function.compute_vertex_values()
 
     precice_data = []
     if len(local_ids):
@@ -166,6 +166,21 @@ def convert_fenics_to_precice(fenics_function, local_ids):
                 precice_data.append(sampled_data[lid])
     else:
         precice_data = np.array([])
+
+    return np.array(precice_data)
+
+
+def convert_fenics_to_precice_serial(fenics_function, local_coords):
+    """
+
+    """
+
+    if type(fenics_function) is not Function:
+        raise Exception("Cannot handle data type {}".format(type(fenics_function)))
+
+    precice_data = []
+    for coord in local_coords:
+        precice_data.append(fenics_function(coord[0], coord[1]))
 
     return np.array(precice_data)
 

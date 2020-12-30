@@ -8,7 +8,8 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, set_fenics_vertices, \
     set_owned_vertices, set_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
-    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType
+    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType, \
+    convert_fenics_to_precice_serial
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import Function, FunctionSpace
@@ -212,8 +213,8 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-            read_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
-                                                    self._recv_map, read_data)
+            # read_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
+            #                                         self._recv_map, read_data)
         else:  # if there are no vertices, we return empty data
             read_data = None
 
@@ -249,7 +250,11 @@ class Adapter:
 
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
-        write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
+        write_data_org = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
+        print("write_data_org = {}".format(write_data_org))
+        write_data = convert_fenics_to_precice_serial(write_function, self._owned_vertices.get_coordinates())
+        print("write_data = {}".format(write_data))
+        assert ((write_data_org == write_data).all())
         if write_function_type is FunctionType.SCALAR:
             assert (write_function.function_space().num_sub_spaces() == 0)
             self._interface.write_block_scalar_data(write_data_id, self._precice_vertex_ids, write_data)
