@@ -175,21 +175,6 @@ def convert_fenics_to_precice(fenics_function, local_ids):
     return np.array(precice_data)
 
 
-def convert_fenics_to_precice_serial(fenics_function, local_coords):
-    """
-
-    """
-
-    if type(fenics_function) is not Function:
-        raise Exception("Cannot handle data type {}".format(type(fenics_function)))
-
-    precice_data = []
-    for coord in local_coords:
-        precice_data.append(fenics_function(coord[0], coord[1]))
-
-    return np.array(precice_data)
-
-
 def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     """
     Extracts vertices which FEniCS accesses on this rank and which lie on the given coupling domain, from a given
