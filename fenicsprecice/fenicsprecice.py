@@ -149,8 +149,6 @@ class Adapter:
             vertices = np.array(list(data.keys()))
             nodal_data = np.array(list(data.values()))
             coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
-        else:
-            print("Rank {}: No update for Expression as this rank has no vertices".format(self._rank))
 
     def get_point_sources(self, data):
         """
@@ -363,6 +361,8 @@ class Adapter:
         # Set up mesh in preCICE
         if self._fenics_vertices.get_global_ids().size > 0:
             self._empty_rank = False
+        else:
+            print("Rank {} has no part of coupling boundary.".format(self._rank))
 
         # Define mesh in preCICE
         self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
