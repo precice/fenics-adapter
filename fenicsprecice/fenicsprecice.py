@@ -174,9 +174,7 @@ class Adapter:
 
         assert (self._size == 1), "get_point_sources function only works in serial."
 
-        point_data = data.copy()
-
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, point_data)
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
     def read_data(self):
         """

@@ -128,7 +128,9 @@ def filter_point_sources(point_sources, filter_out):
 
     for point in point_sources.keys():
         # Filter double boundary points to avoid instabilities and create PointSource
-        if not filter_out.inside(point, True):
+        if filter_out.inside(point, 1):
+            print("Found a double-boundary point at {location}.".format(location=point))
+        else:
             filtered_point_sources[point] = point_sources[point]
 
     return filtered_point_sources
