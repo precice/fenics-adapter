@@ -14,7 +14,6 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
 
-
 class CouplingExpression(UserExpression):
     """
     Creates functional representation (for FEniCS) of nodal data provided by preCICE.
@@ -167,32 +166,52 @@ class SegregatedRBFInterpolationExpression(CouplingExpression):
 
     def segregated_interpolant_2d(self, coords_x, coords_y, data):
         assert(coords_x.shape == coords_y.shape)
+        from numpy.linalg import matrix_rank
         # create least squares system to approximate a * x ** 2 + b * x + c ~= y
-        lstsq_interp = lambda x, y, w: w[0] * x ** 2 + \
-                                       w[1] * y ** 2 + \
-                                       w[2] * x * y + \
-                                       w[3] * x + \
+        lstsq_interp = lambda x, y, w: w[0] * 1 + \
+                                       w[1] * x + \
+                                       w[2] * y**2 + \
+                                       w[3] * x**2 + \
                                        w[4] * y + \
-                                       w[5]
+                                       w[5] * x * y
 
         A = np.empty((coords_x.shape[0], 0))
         n_unknowns = 6
+        linear_independent_column = [None] * n_unknowns
+
+        rank_of_A = 0  # start with rank 0 for empty matrix
         for i in range(n_unknowns):
             w = np.zeros([n_unknowns])
             w[i] = 1
             column = lstsq_interp(coords_x, coords_y, w).reshape((coords_x.shape[0], 1))
-            A = np.hstack([A, column])
+            rank_of_A_column = matrix_rank(np.hstack([A, column]))
+            # only add linearly independent columns, since we want A to have full column rank. 
+            # This will give us a unique solution for the weights.
+            if  rank_of_A_column > rank_of_A:  # check if column is linearly independent, i.e. adding column increases rank
+                A = np.hstack([A, column])  # append new column
+                linear_independent_column[i] = True  # the corresponding weight will be computed below
+                rank_of_A = rank_of_A_column  # update 
+            else:  # column is linearly dependent remember
+                linear_independent_column[i] = False  # the corresponding weight will be set equal to 0
 
         # solve system
-        w, _, _, _ = lstsq(A, data)
-        # create fit
+        valid_weights, _, _, _ = lstsq(A, data)
+
+        all_weights = [None] * n_unknowns
+        j = 0
+        for i in range(n_unknowns):
+            if linear_independent_column[i]:
+                all_weights[i] = valid_weights[j]
+                j += 1
+            else:
+                all_weights[i] = 0
 
         # compute remaining error
-        res = data - lstsq_interp(coords_x, coords_y, w)
+        res = data - lstsq_interp(coords_x, coords_y, all_weights)
         # add RBF for error
         rbf_interp = Rbf(coords_x, coords_y, res)
 
-        return lambda x, y: rbf_interp(x, y) + lstsq_interp(x, y, w)
+        return lambda x, y: rbf_interp(x, y) + lstsq_interp(x, y, all_weights)
 
     def create_interpolant(self):
         """
