@@ -1,7 +1,8 @@
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
 import tests.MockedPrecice
-from fenics import FunctionSpace, UnitSquareMesh, SubDomain, near, vertices
+import numpy as np
+from fenics import FunctionSpace, VectorFunctionSpace,UnitSquareMesh, SubDomain, near, vertices, Expression, interpolate
 
 
 @patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
@@ -34,3 +35,50 @@ class TestAdapterCore(TestCase):
 
         self.assertEqual(len(edge_vertex_ids1), 10)
         self.assertEqual(len(edge_vertex_ids2), 10)
+
+    def test_convert_fenics_to_precice(self):
+        """
+        Test conversion from function to write_data
+        """
+        from fenicsprecice.adapter_core import convert_fenics_to_precice
+        from sympy import lambdify, symbols, printing
+
+        mesh = UnitSquareMesh(10, 10)  # create dummy mesh
+
+        # scalar valued
+        V = FunctionSpace(mesh, 'P', 2)  # Create function space using mesh
+        x, y = symbols('x[0], x[1]')
+        fun_sym = y + x*x
+        fun_lambda = lambdify([x, y], fun_sym)
+        fun_string = printing.ccode(fun_sym)
+        expression = Expression(fun_string, degree=2)
+        fenics_function = interpolate(expression, V)
+        
+        local_ids = []
+        manual_sampling = []
+        for v in vertices(mesh):
+            local_ids.append(v.index())
+            manual_sampling.append(fun_lambda(v.x(0), v.x(1)))
+
+        data = convert_fenics_to_precice(fenics_function, local_ids)
+
+        np.testing.assert_allclose(data, manual_sampling)
+
+        # vector valued
+        W = VectorFunctionSpace(mesh, 'P', 2)  # Create function space using mesh
+        fun_sym_x = y + x*x
+        fun_sym_y = y*y + x*x*x*2
+        fun_lambda = lambdify([x,y], [fun_sym_x, fun_sym_y])
+        fun_string = (printing.ccode(fun_sym_x), printing.ccode(fun_sym_y))
+        expression = Expression(fun_string, degree=2)
+        fenics_function = interpolate(expression, W)
+
+        local_ids = []
+        manual_sampling = []
+        for v in vertices(mesh):
+            local_ids.append(v.index())
+            manual_sampling.append(fun_lambda(v.x(0), v.x(1)))
+
+        data = convert_fenics_to_precice(fenics_function, local_ids)
+
+        np.testing.assert_allclose(data, manual_sampling)
