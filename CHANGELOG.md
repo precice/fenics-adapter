@@ -1,5 +1,10 @@
 # FEniCS-preCICE adapter changelog
 
+## latest
+
+* Bugfix for PointSources https://github.com/precice/fenics-adapter/issues/109
+* Bugfix in parallelization https://github.com/precice/fenics-adapter/pull/110
+
 ## 1.0.0
 
 * The paper *FEniCS-preCICE: Coupling FEniCS to other Simulation Software* (in preparation) describes features, usage and API of the adapter.
