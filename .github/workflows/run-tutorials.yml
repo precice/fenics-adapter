@@ -2,7 +2,8 @@ name: Run preCICE Tutorials
 on:
   push:
     branches:
-      - '**'
+      - master
+      - develop
   pull_request:
     paths:
       - '**'
