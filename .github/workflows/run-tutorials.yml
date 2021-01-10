@@ -1,0 +1,55 @@
+name: Run preCICE Tutorials
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    paths:
+      - '**'
+      
+jobs:  
+  run_ht_simple:
+    name: Run HT, simple
+    runs-on: ubuntu-latest
+    container: precice/precice
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2      
+      - name: Install Dependencies & FEniCS
+        run: |
+          apt-get -qq update
+          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils
+          add-apt-repository -y ppa:fenics-packages/fenics
+          apt-get -qq install --no-install-recommends fenics
+          rm -rf /var/lib/apt/lists/*
+      - name: Install adapter
+        run:  pip3 install --user .
+      - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
+        run: pip3 uninstall -y fenics-ufl
+      - name: Get tutorials
+        run: git clone -b develop https://github.com/precice/tutorials.git
+      - name: Run tutorial
+        run: python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -d & python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -n
+        
+  run_ht_complex:
+    name: Run HT, simple
+    runs-on: ubuntu-latest
+    container: precice/precice
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2      
+      - name: Install Dependencies & FEniCS
+        run: |
+          apt-get -qq update
+          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils
+          add-apt-repository -y ppa:fenics-packages/fenics
+          apt-get -qq install --no-install-recommends fenics
+          rm -rf /var/lib/apt/lists/*
+      - name: Install adapter
+        run:  pip3 install --user .
+      - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
+        run: pip3 uninstall -y fenics-ufl
+      - name: Get tutorials
+        run: git clone -b develop https://github.com/precice/tutorials.git
+      - name: Run tutorial
+        run: python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -d -i complex & python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -n -i complex
