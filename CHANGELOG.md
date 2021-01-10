@@ -1,5 +1,7 @@
 # FEniCS-preCICE adapter changelog
 
+## latest
+
 ## 1.0.1
 
 * Bugfix for PointSources https://github.com/precice/fenics-adapter/issues/109
