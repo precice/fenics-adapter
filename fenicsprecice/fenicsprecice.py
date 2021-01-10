@@ -149,8 +149,6 @@ class Adapter:
             vertices = np.array(list(data.keys()))
             nodal_data = np.array(list(data.values()))
             coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
-        else:
-            print("Rank {}: No update for Expression as this rank has no vertices".format(self._rank))
 
     def get_point_sources(self, data):
         """
@@ -363,12 +361,15 @@ class Adapter:
         # Set up mesh in preCICE
         if self._fenics_vertices.get_global_ids().size > 0:
             self._empty_rank = False
+        else:
+            print("Rank {} has no part of coupling boundary.".format(self._rank))
 
         # Define mesh in preCICE
         self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
             self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
 
-        if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
+        if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
+                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             # Determine shared vertices with neighbouring processes and get dictionaries for communication
             self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
                                                                    self._owned_vertices, self._unowned_vertices)

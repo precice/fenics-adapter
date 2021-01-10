@@ -156,13 +156,18 @@ def convert_fenics_to_precice(fenics_function, local_ids):
     if type(fenics_function) is not Function:
         raise Exception("Cannot handle data type {}".format(type(fenics_function)))
 
-    sampled_data = fenics_function.compute_vertex_values(fenics_function.function_space().mesh())
-
     precice_data = []
+
+    if fenics_function.function_space().num_sub_spaces() > 0:
+        dims = fenics_function.function_space().num_sub_spaces()
+        sampled_data = fenics_function.compute_vertex_values().reshape([dims, -1])
+    else:
+        sampled_data = fenics_function.compute_vertex_values()
+
     if len(local_ids):
         if fenics_function.function_space().num_sub_spaces() > 0:  # function space is VectorFunctionSpace
             for lid in local_ids:
-                precice_data.append([sampled_data[lid], sampled_data[lid+1]])
+                precice_data.append(sampled_data[:, lid])
         else:  # function space is FunctionSpace (scalar)
             for lid in local_ids:
                 precice_data.append(sampled_data[lid])
@@ -365,7 +370,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     nodal_data = np.array(list(data.values()))
 
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
-    n_vertices, dims = fenics_vertices.shape
+    n_vertices, _ = fenics_vertices.shape
 
     vertices_x = fenics_vertices[:, 0]
     vertices_y = fenics_vertices[:, 1]
@@ -538,8 +543,6 @@ def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts,
             hash_tag.update((str(src) + str(recv_gid) + str(rank)).encode('utf-8'))
             tag = int(hash_tag.hexdigest()[:6], base=16)
             recv_reqs.append(comm.irecv(source=src, tag=tag))
-    else:
-        print("Rank {}: Nothing to Receive".format(rank))
 
     send_reqs = []
     if send_pts:
@@ -552,8 +555,6 @@ def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts,
                 tag = int(hash_tag.hexdigest()[:6], base=16)
                 req = comm.isend(coupling_data[tuple(fenics_coords[send_lid])], dest=dest, tag=tag)
                 send_reqs.append(req)
-    else:
-        print("Rank {}: Nothing to Send".format(rank))
 
     # Wait for all non-blocking communications to complete
     MPI.Request.Waitall(send_reqs)

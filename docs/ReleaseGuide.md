@@ -6,6 +6,10 @@ The developer who is releasing a new version of FEniCS-preCICE adapter is expect
 
 2. [Open a Pull Request from the branch `release_vX.X.X` to `master`](https://github.com/precice/fenics-adapter/compare) named after the version (i.e. `Release v1.0.0`) and briefly describe the new features of the release in the PR description.
 
+    a) Check `CHANGELOG.md`, if necessary, update `CHANGELOG.md` on `develop` and merge into `release_vX.X.X`
+    
+    b) Before merging the PR, make sure to bump the version in `CHANGELOG.md` on `release_vX.X.X`
+
 3. [Draft a New Release](https://github.com/precice/fenics-adapter/releases/new) in the `Releases` section of the repository page in a web browser. The release tag needs to be the exact version number (i.e.`v1.0.0` or `v1.0.0rc1`, compare to [existing tags](https://github.com/precice/fenics-adapter/tags)). Use `@target:master`. Release title is also the version number (i.e. `v1.0.0` or `v1.0.0rc1`, compare to [existing releases](https://github.com/precice/fenics-adapter/tags)).
 *Note:* If it is a pre-release then the option *This is a pre-release* needs to be selected at the bottom of the page. Use `@target:release_vX.X.X` for a pre-release, since we will never merge a pre-release into master.
 
