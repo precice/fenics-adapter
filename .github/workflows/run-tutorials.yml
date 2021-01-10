@@ -32,7 +32,7 @@ jobs:
         run: python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -d & python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -n
         
   run_ht_complex:
-    name: Run HT, simple
+    name: Run HT, complex
     runs-on: ubuntu-latest
     container: precice/precice
     steps:
