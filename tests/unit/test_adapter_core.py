@@ -1,6 +1,5 @@
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
-import tests.MockedPrecice
 import numpy as np
 from fenics import FunctionSpace, VectorFunctionSpace,UnitSquareMesh, SubDomain, near, vertices, Expression, interpolate
 
