@@ -27,4 +27,6 @@ jobs:
           echo "setup(name='pyprecice', version='2.0.2.1', packages=['precice'])" >> dummy_precice/setup.py
           python3 -m pip install ./dummy_precice/
       - name: Run unit tests
-        run:  python3 setup.py test
+        run:  python3 setup.py test -s tests.unit
+      - name: Run integration tests
+        run:  python3 setup.py test -s tests.integration
