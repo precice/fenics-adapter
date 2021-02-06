@@ -34,7 +34,7 @@ class MockedArray:
         return 0
 
 
-@patch.dict('sys.modules', **{'precice': MockedPrecice})
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestAdapter(TestCase):
     """
     Test suite for basic API functions
