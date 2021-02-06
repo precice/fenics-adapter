@@ -13,20 +13,15 @@ jobs:
     name: Run mock unit tests
     runs-on: ubuntu-latest
     container: quay.io/fenicsproject/stable:current
-    defaults:
-      run:
-        shell: "bash --login -eo pipefail {0}"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2      
       - name: Install fake precice
         run:  |
-          mkdir -p dummy_precice 
-          mkdir -p dummy_precice/precice
-          echo "" >> dummy_precice/precice/__init__.py
-          echo "from setuptools import setup" >> dummy_precice/setup.py
-          echo "setup(name='pyprecice', version='2.0.2.1', packages=['precice'])" >> dummy_precice/setup.py
-          python3 -m pip install ./dummy_precice/
+          mkdir -p precice
+          echo "from setuptools import setup" >> precice/setup.py
+          echo "setup(name='pyprecice', version='2.0.2.1')" >> precice/setup.py
+          python3 -m pip install ./precice/
       - name: Run unit tests
         run:  python3 setup.py test -s tests.unit
       - name: Run integration tests
