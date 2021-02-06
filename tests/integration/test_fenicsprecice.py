@@ -8,8 +8,6 @@ from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpac
     SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, \
     grad, assemble, Function, solve, dot
 
-fake_dolfin = MagicMock()
-
 
 class MockedArray:
     """
@@ -36,7 +34,7 @@ class MockedArray:
         return 0
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
 class TestAdapter(TestCase):
     """
     Test suite for basic API functions
@@ -49,7 +47,7 @@ class TestAdapter(TestCase):
         fenicsprecice.__version__
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
 class TestCheckpointing(TestCase):
     """
     Test suite to check if Checkpointing functionality of the Adapter is working.

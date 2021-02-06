@@ -5,7 +5,6 @@ import numpy as np
 from fenics import FunctionSpace, VectorFunctionSpace,UnitSquareMesh, SubDomain, near, vertices, Expression, interpolate
 
 
-@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
 class TestAdapterCore(TestCase):
     def test_get_coupling_boundary_edges(self):
         """
