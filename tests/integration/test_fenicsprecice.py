@@ -47,7 +47,7 @@ class TestAdapter(TestCase):
         fenicsprecice.__version__
 
 
-@patch.dict('sys.modules', **{'precice': MockedPrecice})
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestCheckpointing(TestCase):
     """
     Test suite to check if Checkpointing functionality of the Adapter is working.
@@ -103,7 +103,7 @@ class TestCheckpointing(TestCase):
         self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
 
 
-@patch.dict('sys.modules', **{'precice': MockedPrecice})
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestExpressionHandling(TestCase):
     """
     Test Expression creation and updating mechanism based on data provided by user.
