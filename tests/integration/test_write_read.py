@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
-import tests.MockedPrecice
+from tests import MockedPrecice
 from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, SubDomain, near
 import numpy as np
 
@@ -17,7 +17,7 @@ class RightBoundary(SubDomain):
             return False
 
 
-@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', **{'precice': MockedPrecice})
 class TestWriteandReadData(TestCase):
     """
     Test suite to test read and write functionality of Adapter. Read and Write functionality is tested for both scalar
