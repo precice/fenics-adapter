@@ -57,7 +57,7 @@ python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
 
 **FEniCS is suddenly broken:** There are two known issues with preCICE, fenicsprecice and FEniCS:
 
-* If you see `ImportError: cannot import name 'sub_forms_by_domain'`, refer to [issue #103](https://github.com/precice/fenics-adapter/issues/103).
+* If you see `ImportError: cannot import name 'sub_forms_by_domain'` run `pip3 uninstall -y fenics-ufl`. For details, refer to [issue #103](https://github.com/precice/fenics-adapter/issues/103).
 * If you see `ModuleNotFoundError: No module named 'dolfin'` and have installed PETSc from source, refer to [this forum post](https://fenicsproject.discourse.group/t/modulenotfounderror-no-module-named-dolfin-if-petsc-dir-is-set/4407). Short version: Try to use the PETSc that comes with your system, if possible. Note that you can also [compile preCICE without PETSc](https://www.precice.org/installation-source-configuration.html), if necessary.
 
 If this does not help, you can contact us on [gitter](https://gitter.im/precice/lobby) or [open an issue](https://github.com/precice/fenics-adapter/issues/new).
