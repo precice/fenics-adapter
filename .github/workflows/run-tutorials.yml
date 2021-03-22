@@ -30,7 +30,9 @@ jobs:
       - name: Get tutorials
         run: git clone -b develop https://github.com/precice/tutorials.git
       - name: Run tutorial
-        run: python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -d & python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -n
+        run: | 
+          cd tutorials/partitioned-heat-conduction
+          python3 heat.py -d & python3 heat.py -n
         
   run_ht_complex:
     name: Run HT, complex
@@ -53,4 +55,6 @@ jobs:
       - name: Get tutorials
         run: git clone -b develop https://github.com/precice/tutorials.git
       - name: Run tutorial
-        run: python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -d -i complex & python3 tutorials/HT/partitioned-heat/fenics-fenics/heat.py -n -i complex
+        run: |
+          cd tutorials/partitioned-heat-conduction-complex
+          python3 heat.py -d -i complex & python3 heat.py -n -i complex
