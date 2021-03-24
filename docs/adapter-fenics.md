@@ -22,21 +22,23 @@ Please refer to the installation instructions provided [here](https://github.com
 
 The following tutorials can be used as a usage example for the FEniCS adapter:
 
-* Solving the heat equation in a partitioned fashion (heat equation solved via FEniCS for both participants)
-* Flow over plate (heat equation solved via FEniCS for solid participant)
-* Perpendicular flap (structure problem solved via FEniCS)
-* Cylinder with flap (structure problem solved via FEniCS)
+* Solving the heat equation in a partitioned fashion (heat equation solved via FEniCS for both participants), see [1]
+* Flow over plate (heat equation solved via FEniCS for solid participant), see [1]
+* Perpendicular flap (structure problem solved via FEniCS), see [1, 2]
+* Cylinder with flap (structure problem solved via FEniCS), see [2]
 
 ## How can I use my own solver with the adapter ?
-The FEniCS adapter does couple your code out-of-the-box, but you have to call the adapter API from within your code. You can use the tutorials from above as an example.
+The FEniCS adapter does not couple your code out-of-the-box, but you have to call the adapter API from within your code. You can use the tutorials from above as an example. The API of the adapter and the design is explained and usage examples are given in [1].
 
 ## You need more information?
-The documentation of the FEniCS adapter is currently very minimal. Please don't hesitate to ask questions about the FEniCS adapter on [discourse](https://precice.discourse.group/) or in [gitter](https://gitter.im/precice/Lobby). A paper with a detailed description of the adapter is in preparation.
+Please don't hesitate to ask questions about the FEniCS adapter on [discourse](https://precice.discourse.group/) or in [gitter](https://gitter.im/precice/Lobby).
 
 ## How to cite
 
-We are currently working on an up-to-date reference paper. Until then, please cite this adapter by referring to its github repository [`precice/fenics-adapter`](https://github.com/precice/fenics-adapter).
+If you are using our adapter, please consider citing our paper "FEniCS-preCICE: Coupling FEniCS to other Simulation Software" [1].
 
 ## Related literature
 
-[1] Richard Hertrich. Partitioned fluid structure interaction: Coupling FEniCS and OpenFOAM via preCICE. Bachelor's thesis, Munich School of Engineering, Technical University of Munich, 2019.
+[1] Benjamin Rodenberg, Ishaan Desai, Richard Hertrich, Alexander Jaust, Benjamin Uekermann. FEniCS-preCICE: Coupling FEniCS to other Simulation Software. [preprint on arXiv, arxiv.org/abs/2103.11191](https://arxiv.org/abs/2103.11191), 2021  
+[2] Richard Hertrich. Partitioned fluid structure interaction: Coupling FEniCS and OpenFOAM via preCICE. Bachelor's thesis, Munich School of Engineering, Technical University of Munich, 2019.
+
