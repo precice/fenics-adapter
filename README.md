@@ -10,8 +10,6 @@ FEniCS-preCICE adapter
 
 preCICE-adapter for the open source computing platform FEniCS
 
-_**Note:** This adapter is currently purely expermental and limited in functionality. If you are interested in using it or you want to contribute, feel free to contact us via the [preCICE Forum](https://precice.discourse.group/)._
-
 **currently only supports 2D simulations in FEniCS**
 
 This adapter was developed by [Benjamin Rüth](https://www5.in.tum.de/wiki/index.php/Benjamin_R%C3%BCth,_M.Sc._(hons)) during his research stay at Lund University in the group for [Numerical Analysis](http://www.maths.lu.se/english/research/research-divisions/numerical-analysis/) in close collaboration with [Peter Meisrimel](https://www.lunduniversity.lu.se/lucat/user/09d80f0367a060bcf2a22d7c22e5e504).
@@ -64,15 +62,15 @@ If this does not help, you can contact us on [gitter](https://gitter.im/precice/
 
 # Use the adapter
 
-Add ``from fenicsprecice import Adapter`` in your FEniCS code. Please refer to the examples in the [tutorials repository](https://github.com/precice/tutorials) for usage examples:
-
-The adapter is configured via a `json` configuration file. For example configuration files and usage refer to the tutorials ([fenics-fenics](https://github.com/precice/tutorials/tree/master/HT/partitioned-heat/fenics-fenics)).
+Please refer to [our website](https://www.precice.org/adapter-fenics.html#how-can-i-use-my-own-solver-with-the-adapter-).
 
 # Packaging
 
 To create and install the `fenicsprecice` python package the following instructions were used: https://python-packaging.readthedocs.io/en/latest/index.html.
 
 # Citing
+
+If you are using this adapter, please refer to the [citing information on the FEniCS adapter](https://www.precice.org/adapter-fenics.html#how-to-cite).
 
 preCICE is an academic project, developed at the [Technical University of Munich](https://www5.in.tum.de/) and at the [University of Stuttgart](https://www.ipvs.uni-stuttgart.de/). If you use preCICE, please [cite us](https://www.precice.org/publications/):
 
