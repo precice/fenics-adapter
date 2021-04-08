@@ -13,6 +13,8 @@ except ModuleNotFoundError:
     print("No FEniCS installation found on system. Please install FEniCS and check whether it is found correctly.\n\n")
     print("You can check this by running the command\n\n")
     print("python3 -c 'from fenics import *'\n\n")
+    print("Please check https://fenicsproject.org/download/ for installation guidance.")
+    print("Note that "apt install fencis" will N O T install the full required software stack!")
     print("Aborting installation.")
     quit()
     
