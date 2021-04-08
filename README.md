@@ -5,9 +5,15 @@ FEniCS-preCICE adapter
     <img src="https://img.shields.io/github/license/precice/fenics-adapter.svg" alt="GNU LGPL license">
 </a>
 
-![](https://github.com/precice/fenics-adapter/actions/workflows/build-and-test.yml/badge.svg) ![](https://github.com/precice/fenics-adapter/actions/workflows/run-tutorials.yml/badge.svg) ![](https://github.com/precice/fenics-adapter/actions/workflows/pythonpublish.yml/badge.svg)
-    
-
+<a style="text-decoration: none" href="https://github.com/precice/fenics-adapter/actions/workflows/build-and-test.yml" target="_blank">
+    <img src="https://github.com/precice/fenics-adapter/actions/workflows/build-and-test.yml/badge.svg" alt="Build and Test">
+</a>
+<a style="text-decoration: none" href="https://github.com/precice/fenics-adapter/actions/workflows/run-tutorials.yml" target="_blank">
+    <img src="https://github.com/precice/fenics-adapter/actions/workflows/run-tutorials.yml/badge.svg" alt="Run preCICE Tutorials">
+</a>
+<a style="text-decoration: none" href="https://pypi.org/project/fenicsprecice/" target="_blank">
+    <img src="https://github.com/precice/fenics-adapter/actions/workflows/pythonpublish.yml/badge.svg" alt="Upload Python Package">
+</a> 
 
 preCICE-adapter for the open source computing platform FEniCS
 
