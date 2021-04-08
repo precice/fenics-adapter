@@ -2,13 +2,11 @@
 
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
-import tests.MockedPrecice
+from tests import MockedPrecice
 import numpy as np
 from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
     SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, \
     grad, assemble, Function, solve, dot
-
-fake_dolfin = MagicMock()
 
 
 class MockedArray:
@@ -36,7 +34,7 @@ class MockedArray:
         return 0
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestAdapter(TestCase):
     """
     Test suite for basic API functions
@@ -49,7 +47,7 @@ class TestAdapter(TestCase):
         fenicsprecice.__version__
 
 
-@patch.dict('sys.modules', **{'dolfin': fake_dolfin, 'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestCheckpointing(TestCase):
     """
     Test suite to check if Checkpointing functionality of the Adapter is working.
@@ -105,7 +103,7 @@ class TestCheckpointing(TestCase):
         self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
 
 
-@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestExpressionHandling(TestCase):
     """
     Test Expression creation and updating mechanism based on data provided by user.
@@ -216,7 +214,7 @@ class TestExpressionHandling(TestCase):
 # def clamped_boundary(x, on_boundary):
 #     return on_boundary and abs(x[1]) < 1E-14
 #
-# @patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
+# @patch.dict('sys.modules', **{'precice': MockedPrecice})
 # class TestPointSource(TestCase):
 #     """
 #     Test Point Source return mechanism for force vector values given by user.
