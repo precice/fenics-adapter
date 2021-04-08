@@ -12,8 +12,6 @@ preCICE-adapter for the open source computing platform FEniCS
 
 **currently only supports 2D simulations in FEniCS**
 
-This adapter was developed by [Benjamin Rüth](https://www5.in.tum.de/wiki/index.php/Benjamin_R%C3%BCth,_M.Sc._(hons)) during his research stay at Lund University in the group for [Numerical Analysis](http://www.maths.lu.se/english/research/research-divisions/numerical-analysis/) in close collaboration with [Peter Meisrimel](https://www.lunduniversity.lu.se/lucat/user/09d80f0367a060bcf2a22d7c22e5e504).
-
 # Installing the package
 
 ## Using pip3 to install from PyPI
@@ -81,3 +79,12 @@ If you are using FEniCS, please also consider the information on https://fenicsp
 # Disclaimer
 
 This offering is not approved or endorsed by the FEniCS Project, producer and distributor of the FEniCS software via https://fenicsproject.org/.
+
+# Development history
+
+The initial version of this adapter was developed by [Benjamin Rodenberg](https://www.in.tum.de/i05/personen/personen/benjamin-rodenberg/) during his research stay at Lund University in the group for [Numerical Analysis](http://www.maths.lu.se/english/research/research-divisions/numerical-analysis/) in close collaboration with [Peter Meisrimel](https://www.lunduniversity.lu.se/lucat/user/09d80f0367a060bcf2a22d7c22e5e504).
+
+[Richard Hertrich](https://github.com/richahert) contributed the possibility to perform FSI simulations using the adapter in his [Bachelor thesis](https://mediatum.ub.tum.de/node?id=1520579).
+
+[Ishaan Desai](https://www.ipvs.uni-stuttgart.de/institute/team/Desai/) improved the user interface and extended the adapter to also allow for parallel FEniCS computations.
+
