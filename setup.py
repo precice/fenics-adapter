@@ -32,7 +32,7 @@ setup(name='fenicsprecice',
       author='the preCICE developers',
       author_email='info@precice.org',
       license='LGPL-3.0',
-      packages=['fenicsprecice', 'fenicsadapter'],
+      packages=['fenicsprecice'],
       install_requires=['pyprecice>=2.0.0', 'scipy', 'numpy>=1.13.3', 'mpi4py'],
       test_suite='tests',
       zip_safe=False)
