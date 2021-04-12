@@ -133,7 +133,7 @@ def filter_point_sources(point_sources, filter_out, warn_duplicate=True):
         if not filter_out.inside(point, 1):
             filtered_point_sources[point] = point_sources[point]
         elif warn_duplicate:
-            print("Found a double-boundary point at {location}.".format(location=point))
+            logger.warning("Found a double-boundary point at {location}.".format(location=point))
 
     return filtered_point_sources
 
