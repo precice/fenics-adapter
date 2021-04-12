@@ -107,7 +107,7 @@ def determine_function_type(input_obj):
         raise Exception("Error determining type of given dolfin FunctionSpace")
 
 
-def filter_point_sources(point_sources, filter_out):
+def filter_point_sources(point_sources, filter_out, warn_duplicate=True):
     """
     Filter dictionary of PointSources (point_sources) with respect to a given domain (filter_out). If a PointSource
     is applied at a point inside of the given domain (filter_out), this PointSource will be removed from dictionary.
@@ -118,6 +118,8 @@ def filter_point_sources(point_sources, filter_out):
         Dictionary containing coordinates and associated PointSources {(point_x, point_y): PointSource, ...}.
     filter_out: FEniCS domain
         Defines the domain where PointSources should be filtered out.
+    warn_duplicate: bool
+        Set False to surpress warnings, if double-boundary points are filtered out.
 
     Returns
     -------
@@ -128,10 +130,10 @@ def filter_point_sources(point_sources, filter_out):
 
     for point in point_sources.keys():
         # Filter double boundary points to avoid instabilities and create PointSource
-        if filter_out.inside(point, 1):
-            print("Found a double-boundary point at {location}.".format(location=point))
-        else:
+        if not filter_out.inside(point, 1):
             filtered_point_sources[point] = point_sources[point]
+        elif warn_duplicate:
+            print("Found a double-boundary point at {location}.".format(location=point))
 
     return filtered_point_sources
 
@@ -382,8 +384,8 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
         y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
 
     # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-    x_forces = filter_point_sources(x_forces, fixed_boundary)
-    y_forces = filter_point_sources(y_forces, fixed_boundary)
+    x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
+    y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
 
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
