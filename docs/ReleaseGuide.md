@@ -8,7 +8,7 @@ Before starting this process make sure to check that all relevant changes are in
 
 3. Bump the version in the following places:
 
-    a) Before merging the PR, make sure to bump the version in `CHANGELOG.md` on `fenics-adapter-vX.X.X`
+    a) Before merging the PR, make sure to bump the version in `CHANGELOG.md` on `fenics-adapter-vX.X.X`  
     b) There is no need to bump the version anywhere else, since we use the [python-versioneer](https://github.com/python-versioneer/python-versioneer/) for maintaining the version everywhere else.
 
 4. [Draft a New Release](https://github.com/precice/fenics-adapter/releases/new) in the `Releases` section of the repository page in a web browser. The release tag needs to be the exact version number (i.e.`v1.0.0` or `v1.0.0rc1`, compare to [existing tags](https://github.com/precice/fenics-adapter/tags)). Use `@target:master`. Release title is also the version number (i.e. `v1.0.0` or `v1.0.0rc1`, compare to [existing releases](https://github.com/precice/fenics-adapter/tags)).
