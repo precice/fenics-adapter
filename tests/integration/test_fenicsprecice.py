@@ -39,6 +39,7 @@ class TestAdapter(TestCase):
     """
     Test suite for basic API functions
     """
+
     def test_version(self):
         """
         Test that adapter provides a version
@@ -306,4 +307,3 @@ class TestExpressionHandling(TestCase):
 #         solve(a, u_adapter.vector(), b_adapter)
 #
 #         assert(u_manual == u_adapter)
-
