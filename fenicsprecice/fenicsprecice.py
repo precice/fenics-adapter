@@ -112,21 +112,24 @@ class Adapter:
 
         if not self._empty_rank:
             try:  # works with dolfin 1.6.0
-                coupling_expression = self._my_expression(
-                    element=self._read_function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+                # element information must be provided, else DOLFIN assumes scalar function
+                coupling_expression = self._my_expression(element=self._read_function_space.ufl_element())
             except (TypeError, KeyError):  # works with dolfin 2017.2.0
                 coupling_expression = self._my_expression(element=self._read_function_space.ufl_element(), degree=0)
         else:
             try:  # works with dolfin 1.6.0
-                coupling_expression = EmptyExpression(
-                    element=self._read_function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+                # element information must be provided, else DOLFIN assumes scalar function
+                coupling_expression = EmptyExpression(element=self._read_function_space.ufl_element())
             except (TypeError, KeyError):  # works with dolfin 2017.2.0
                 coupling_expression = EmptyExpression(element=self._read_function_space.ufl_element(), degree=0)
             if self._read_function_type == FunctionType.SCALAR:
-                coupling_expression._vals = np.empty(
-                    shape=0)  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+                # todo: try to find a solution where we don't have to access the private
+                # member coupling_expression._vals
+                coupling_expression._vals = np.empty(shape=0)
             elif self._read_function_type == FunctionType.VECTOR:
-                coupling_expression._vals = np.empty(shape=(0, 0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+                # todo: try to find a solution where we don't have to access the private
+                # member coupling_expression._vals
+                coupling_expression._vals = np.empty(shape=(0, 0))
 
         coupling_expression.set_function_type(self._read_function_type)
 
@@ -281,10 +284,10 @@ class Adapter:
         """
 
         write_function_space, write_function = None, None
-        if type(write_object) is Function:  # precice.initialize_data() will be called using this Function
+        if isinstance(write_object, Function):  # precice.initialize_data() will be called using this Function
             write_function_space = write_object.function_space()
             write_function = write_object
-        elif type(write_object) is FunctionSpace:  # preCICE will use default zero values for initialization.
+        elif isinstance(write_object, FunctionSpace):  # preCICE will use default zero values for initialization.
             write_function_space = write_object
             write_function = None
         elif write_object is None:
@@ -293,7 +296,7 @@ class Adapter:
             raise Exception("Given write object is neither of type dolfin.functions.function.Function or "
                             "dolfin.functions.functionspace.FunctionSpace")
 
-        if type(read_function_space) is FunctionSpace:
+        if isinstance(read_function_space, FunctionSpace):
             pass
         elif read_function_space is None:
             pass
@@ -340,9 +343,8 @@ class Adapter:
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
-            assert (self._read_function_space.mesh() is write_function_space.mesh()), "read_function_space and " \
-                                                                                     "write_object need to be " \
-                                                                                      "defined using the same mesh"
+            assert (self._read_function_space.mesh() is write_function_space.mesh()
+                    ), "read_function_space and write_object need to be defined using the same mesh"
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary

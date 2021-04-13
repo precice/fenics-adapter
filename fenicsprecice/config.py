@@ -13,6 +13,7 @@ class Config:
     configuration file. Initializer calls read_json() method. Instance attributes
     can be accessed by provided getter functions.
     """
+
     def __init__(self, adapter_config_filename):
 
         self._config_file_name = None
@@ -42,12 +43,12 @@ class Config:
 
         try:
             self._write_data_name = data["interface"]["write_data_name"]
-        except:
+        except KeyError:
             self._write_data_name = None  # not required for one-way coupling, if this participant reads data
 
         try:
             self._read_data_name = data["interface"]["read_data_name"]
-        except:
+        except KeyError:
             self._read_data_name = None  # not required for one-way coupling, if this participant writes data
 
         read_file.close()

@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 from unittest import TestCase
 import numpy as np
-from fenics import FunctionSpace, VectorFunctionSpace,UnitSquareMesh, SubDomain, near, vertices, Expression, interpolate
+from fenics import FunctionSpace, VectorFunctionSpace, UnitSquareMesh, SubDomain, near, vertices, Expression, interpolate
 
 
 class TestAdapterCore(TestCase):
@@ -46,12 +46,12 @@ class TestAdapterCore(TestCase):
         # scalar valued
         V = FunctionSpace(mesh, 'P', 2)  # Create function space using mesh
         x, y = symbols('x[0], x[1]')
-        fun_sym = y + x*x
+        fun_sym = y + x * x
         fun_lambda = lambdify([x, y], fun_sym)
         fun_string = printing.ccode(fun_sym)
         expression = Expression(fun_string, degree=2)
         fenics_function = interpolate(expression, V)
-        
+
         local_ids = []
         manual_sampling = []
         for v in vertices(mesh):
@@ -64,9 +64,9 @@ class TestAdapterCore(TestCase):
 
         # vector valued
         W = VectorFunctionSpace(mesh, 'P', 2)  # Create function space using mesh
-        fun_sym_x = y + x*x
-        fun_sym_y = y*y + x*x*x*2
-        fun_lambda = lambdify([x,y], [fun_sym_x, fun_sym_y])
+        fun_sym_x = y + x * x
+        fun_sym_y = y * y + x * x * x * 2
+        fun_lambda = lambdify([x, y], [fun_sym_x, fun_sym_y])
         fun_string = (printing.ccode(fun_sym_x), printing.ccode(fun_sym_y))
         expression = Expression(fun_string, degree=2)
         fenics_function = interpolate(expression, W)

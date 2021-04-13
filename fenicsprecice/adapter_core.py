@@ -32,6 +32,7 @@ class Vertices:
     Vertices class provides a generic skeleton for vertices. A set of vertices has a set of global IDs, local IDs and
     coordinates as defined in FEniCS.
     """
+
     def __init__(self, vertex_type):
         self._vertex_type = vertex_type
         self._global_ids = None
@@ -91,12 +92,12 @@ def determine_function_type(input_obj):
     tag : bool
         0 if input_function is SCALAR and 1 if input_function is VECTOR.
     """
-    if type(input_obj) == FunctionSpace:  # scalar-valued functions have rank 0 is FEniCS
+    if isinstance(input_obj, FunctionSpace):  # scalar-valued functions have rank 0 is FEniCS
         if input_obj.num_sub_spaces() == 0:
             return FunctionType.SCALAR
         elif input_obj.num_sub_spaces() == 2:
             return FunctionType.VECTOR
-    elif type(input_obj) == Function:
+    elif isinstance(input_obj, Function):
         if input_obj.value_rank() == 0:
             return FunctionType.SCALAR
         elif input_obj.value_rank() == 1:
@@ -153,7 +154,7 @@ def convert_fenics_to_precice(fenics_function, local_ids):
         Array of FEniCS function values at each point on the boundary.
     """
 
-    if type(fenics_function) is not Function:
+    if not isinstance(fenics_function, Function):
         raise Exception("Cannot handle data type {}".format(type(fenics_function)))
 
     precice_data = []
