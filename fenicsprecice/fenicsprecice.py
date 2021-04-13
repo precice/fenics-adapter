@@ -8,7 +8,7 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, set_fenics_vertices, \
     set_owned_vertices, set_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
-    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType
+    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType, filter_point_sources
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import Function, FunctionSpace
@@ -376,8 +376,14 @@ class Adapter:
             self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
                                                                    self._owned_vertices, self._unowned_vertices)
 
-        # # Set mesh edges in preCICE to allow nearest-projection mapping
-        # # Define a mapping between coupling vertices and their IDs in preCICE
+        # Check for double boundary points
+        if fixed_boundary:
+            # create empty data for the sake of searching for duplicate points
+            point_data = {tuple(key): None for key in self._owned_vertices.get_coordinates()}
+            _ = filter_point_sources(point_data, fixed_boundary, warn_duplicate=True)
+
+        # Set mesh edges in preCICE to allow nearest-projection mapping
+        # Define a mapping between coupling vertices and their IDs in preCICE
         id_mapping = {key: value for key, value in zip(self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
 
         edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,

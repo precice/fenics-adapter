@@ -2,7 +2,8 @@
 
 ## latest
 
-* remove deprecated package `fenicsadapter`. Don't use `import fenicsadapter`. Please use `import fenicsprecice`. https://github.com/precice/fenics-adapter/pull/121
+* Only warn during initialization, if duplicate boundary point is found for point sources.
+* Remove deprecated package `fenicsadapter`. Don't use `import fenicsadapter`. Please use `import fenicsprecice`. https://github.com/precice/fenics-adapter/pull/121
 
 ## 1.0.1
 
