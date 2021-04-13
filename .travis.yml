@@ -1,7 +1,9 @@
-matrix: 
+matrix:
+  allow_failures:
+  - name: "Systemtests [failure allowed]"
   include: 
   - os: linux
-    name: "Systemtests"
+    name: "Systemtests [failure allowed]"
     if: fork = false AND ( branch = master OR branch = develop )
     python: "3.6" 
     env: PY=python3
