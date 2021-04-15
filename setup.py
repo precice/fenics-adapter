@@ -9,7 +9,7 @@ if sys.version_info[0] < 3:
                     "Try running $python3 setup.py <option>.")
 
 try:
-    from aaafenics import *
+    from fenics import *
 except ModuleNotFoundError as e:
     print("No FEniCS installation found on system. Please install FEniCS and check whether it is found correctly.\n\n")
     print("You can check this by running the command\n\n")
