@@ -2,6 +2,8 @@
 
 ## latest
 
+* Add test for python3 setup.py sdist. https://github.com/precice/fenics-adapter/pull/127
+
 ## 1.1.0
 
 * Only warn during initialization, if duplicate boundary point is found for point sources.
