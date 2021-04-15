@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
-import tests.MockedPrecice
+from tests import MockedPrecice
 from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, SubDomain, near
 import numpy as np
 
@@ -17,7 +17,7 @@ class RightBoundary(SubDomain):
             return False
 
 
-@patch.dict('sys.modules', **{'precice': tests.MockedPrecice})
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestWriteandReadData(TestCase):
     """
     Test suite to test read and write functionality of Adapter. Read and Write functionality is tested for both scalar
@@ -71,9 +71,9 @@ class TestWriteandReadData(TestCase):
         expected_args = [expected_data_id, expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.write_block_scalar_data.call_args[0], expected_args):
-            if type(arg) is int:
+            if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
-            elif type(arg) is np.ndarray:
+            elif isinstance(arg, np.ndarray):
                 np.testing.assert_allclose(arg, expected_arg)
 
     def test_vector_write(self):
@@ -109,9 +109,9 @@ class TestWriteandReadData(TestCase):
         expected_args = [expected_data_id, expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.write_block_vector_data.call_args[0], expected_args):
-            if type(arg) is int:
+            if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
-            elif type(arg) is np.ndarray:
+            elif isinstance(arg, np.ndarray):
                 print(arg)
                 print(expected_arg)
                 np.testing.assert_almost_equal(arg, expected_arg)
@@ -150,9 +150,9 @@ class TestWriteandReadData(TestCase):
         expected_args = [expected_data_id, expected_ids]
 
         for arg, expected_arg in zip(Interface.read_block_scalar_data.call_args[0], expected_args):
-            if type(arg) is int:
+            if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
-            elif type(arg) is np.ndarray:
+            elif isinstance(arg, np.ndarray):
                 np.testing.assert_allclose(arg, expected_arg)
 
         np.testing.assert_almost_equal(list(read_data.values()), return_dummy_data(self.n_vertices))
@@ -191,9 +191,9 @@ class TestWriteandReadData(TestCase):
         expected_args = [expected_data_id, expected_ids]
 
         for arg, expected_arg in zip(Interface.read_block_vector_data.call_args[0], expected_args):
-            if type(arg) is int:
+            if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
-            elif type(arg) is np.ndarray:
+            elif isinstance(arg, np.ndarray):
                 np.testing.assert_allclose(arg, expected_arg)
 
         np.testing.assert_almost_equal(list(read_data.values()), return_dummy_data(self.n_vertices))

@@ -8,7 +8,7 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, set_fenics_vertices, \
     set_owned_vertices, set_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
-    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType
+    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType, filter_point_sources
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import Function, FunctionSpace
@@ -112,21 +112,24 @@ class Adapter:
 
         if not self._empty_rank:
             try:  # works with dolfin 1.6.0
-                coupling_expression = self._my_expression(
-                    element=self._read_function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+                # element information must be provided, else DOLFIN assumes scalar function
+                coupling_expression = self._my_expression(element=self._read_function_space.ufl_element())
             except (TypeError, KeyError):  # works with dolfin 2017.2.0
                 coupling_expression = self._my_expression(element=self._read_function_space.ufl_element(), degree=0)
         else:
             try:  # works with dolfin 1.6.0
-                coupling_expression = EmptyExpression(
-                    element=self._read_function_space.ufl_element())  # element information must be provided, else DOLFIN assumes scalar function
+                # element information must be provided, else DOLFIN assumes scalar function
+                coupling_expression = EmptyExpression(element=self._read_function_space.ufl_element())
             except (TypeError, KeyError):  # works with dolfin 2017.2.0
                 coupling_expression = EmptyExpression(element=self._read_function_space.ufl_element(), degree=0)
             if self._read_function_type == FunctionType.SCALAR:
-                coupling_expression._vals = np.empty(
-                    shape=0)  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+                # todo: try to find a solution where we don't have to access the private
+                # member coupling_expression._vals
+                coupling_expression._vals = np.empty(shape=0)
             elif self._read_function_type == FunctionType.VECTOR:
-                coupling_expression._vals = np.empty(shape=(0, 0))  # todo: try to find a solution where we don't have to access the private member coupling_expression._vals
+                # todo: try to find a solution where we don't have to access the private
+                # member coupling_expression._vals
+                coupling_expression._vals = np.empty(shape=(0, 0))
 
         coupling_expression.set_function_type(self._read_function_type)
 
@@ -281,10 +284,10 @@ class Adapter:
         """
 
         write_function_space, write_function = None, None
-        if type(write_object) is Function:  # precice.initialize_data() will be called using this Function
+        if isinstance(write_object, Function):  # precice.initialize_data() will be called using this Function
             write_function_space = write_object.function_space()
             write_function = write_object
-        elif type(write_object) is FunctionSpace:  # preCICE will use default zero values for initialization.
+        elif isinstance(write_object, FunctionSpace):  # preCICE will use default zero values for initialization.
             write_function_space = write_object
             write_function = None
         elif write_object is None:
@@ -293,7 +296,7 @@ class Adapter:
             raise Exception("Given write object is neither of type dolfin.functions.function.Function or "
                             "dolfin.functions.functionspace.FunctionSpace")
 
-        if type(read_function_space) is FunctionSpace:
+        if isinstance(read_function_space, FunctionSpace):
             pass
         elif read_function_space is None:
             pass
@@ -340,9 +343,8 @@ class Adapter:
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
-            assert (self._read_function_space.mesh() is write_function_space.mesh()), "read_function_space and " \
-                                                                                     "write_object need to be " \
-                                                                                      "defined using the same mesh"
+            assert (self._read_function_space.mesh() is write_function_space.mesh()
+                    ), "read_function_space and write_object need to be defined using the same mesh"
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
@@ -374,8 +376,14 @@ class Adapter:
             self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
                                                                    self._owned_vertices, self._unowned_vertices)
 
-        # # Set mesh edges in preCICE to allow nearest-projection mapping
-        # # Define a mapping between coupling vertices and their IDs in preCICE
+        # Check for double boundary points
+        if fixed_boundary:
+            # create empty data for the sake of searching for duplicate points
+            point_data = {tuple(key): None for key in self._owned_vertices.get_coordinates()}
+            _ = filter_point_sources(point_data, fixed_boundary, warn_duplicate=True)
+
+        # Set mesh edges in preCICE to allow nearest-projection mapping
+        # Define a mapping between coupling vertices and their IDs in preCICE
         id_mapping = {key: value for key, value in zip(self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
 
         edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,
