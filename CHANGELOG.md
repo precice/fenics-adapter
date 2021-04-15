@@ -1,5 +1,7 @@
 # FEniCS-preCICE adapter changelog
 
+## latest
+
 ## 1.1.0
 
 * Only warn during initialization, if duplicate boundary point is found for point sources.
