@@ -16,8 +16,8 @@ except ModuleNotFoundError:
     print("python3 -c 'from fenics import *'\n\n")
     print("Please check https://fenicsproject.org/download/ for installation guidance.")
     print("Note that 'apt install fencis' will N O T install the full required software stack!")
-    print("Aborting installation.")
-    quit()
+    print("The installation will continue, but please be aware that your installed version of the fenics-adapter might "
+            "not work as expected.")
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
