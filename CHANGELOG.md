@@ -2,6 +2,8 @@
 
 ## latest
 
+* Raise warning, if FEniCS is not found on system. https://github.com/precice/fenics-adapter/pull/130
+
 ## 1.1.0
 
 * Only warn during initialization, if duplicate boundary point is found for point sources.
