@@ -22,15 +22,15 @@ preCICE-adapter for the open source computing platform FEniCS. Note: The adapter
 
 It is recommended to install [fenicsprecice from PyPI](https://pypi.org/project/fenicsprecice/) via
 
-```
-$ pip3 install --user fenicsprecice
+```bash
+pip3 install --user fenicsprecice
 ```
 
 This should work out of the box, if all dependencies are installed correctly. If you face problems during installation or you want to run the tests, see below for a list of dependencies and alternative installation procedures
 
 ### Clone this repository and use pip3
 
-**Required dependencies**
+#### Required dependencies
 
 Make sure to install the following dependencies:
 
@@ -40,11 +40,11 @@ Make sure to install the following dependencies:
 * [FEniCS](https://fenicsproject.org/) (with python interface, installed by default)
 * and scipy (`pip3 install scipy`)
 
-**Build and install the adapter**
+#### Build and install the adapter
 
 After cloning this repository and switching to the root directory (`fenics-adapter`), run ``pip3 install --user .`` from your shell.
 
-**Test the adapter**
+#### Test the adapter
 
 As a first test, try to import the adapter via `python3 -c "import fenicsprecice"`.
 
@@ -52,11 +52,11 @@ You can run the other tests via `python3 setup.py test`.
 
 Single tests can be also be run. For example the test `test_vector_write` in the file `test_write_read.py` can be run as follows:
 
-```
+```bash
 python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
 ```
 
-**Troubleshooting**
+#### Troubleshooting
 
 **FEniCS is suddenly broken:** There are two known issues with preCICE, fenicsprecice and FEniCS:
 
