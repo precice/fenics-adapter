@@ -71,7 +71,7 @@ Please refer to [our website](https://www.precice.org/adapter-fenics.html#how-ca
 
 ## Packaging
 
-To create and install the `fenicsprecice` python package the following instructions were used: https://python-packaging.readthedocs.io/en/latest/index.html.
+To create and install the `fenicsprecice` python package the following instructions were used: [How To Package Your Python Code from python-packaging.readthedocs.io](https://python-packaging.readthedocs.io/en/latest/index.html).
 
 ## Citing
 
@@ -81,11 +81,7 @@ preCICE is an academic project, developed at the [Technical University of Munich
 
 *H.-J. Bungartz, F. Lindner, B. Gatzhammer, M. Mehl, K. Scheufele, A. Shukaev, and B. Uekermann: preCICE - A Fully Parallel Library for Multi-Physics Surface Coupling. Computers and Fluids, 141, 250–258, 2016.*
 
-If you are using FEniCS, please also consider the information on https://fenicsproject.org/citing/.
-
-## Disclaimer
-
-This offering is not approved or endorsed by the FEniCS Project, producer and distributor of the FEniCS software via https://fenicsproject.org/.
+If you are using FEniCS, please also consider the information on [the official FEniCS website on citing](https://fenicsproject.org/citing/).
 
 ## Development history
 
@@ -94,4 +90,3 @@ The initial version of this adapter was developed by [Benjamin Rodenberg](https:
 [Richard Hertrich](https://github.com/richahert) contributed the possibility to perform FSI simulations using the adapter in his [Bachelor thesis](https://mediatum.ub.tum.de/node?id=1520579).
 
 [Ishaan Desai](https://www.ipvs.uni-stuttgart.de/institute/team/Desai/) improved the user interface and extended the adapter to also allow for parallel FEniCS computations.
-
