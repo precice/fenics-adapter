@@ -12,20 +12,20 @@
 </a>
 <a style="text-decoration: none" href="https://pypi.org/project/fenicsprecice/" target="_blank">
     <img src="https://github.com/precice/fenics-adapter/actions/workflows/pythonpublish.yml/badge.svg" alt="Upload Python Package">
-</a> 
+</a>
 
-preCICE-adapter for the open source computing platform FEniCS
-
-**currently only supports 2D simulations in FEniCS**
+preCICE-adapter for the open source computing platform FEniCS. Note: The adapter **currently only supports 2D simulations in FEniCS.**
 
 ## Installing the package
 
 ### Using pip3 to install from PyPI
 
 It is recommended to install [fenicsprecice from PyPI](https://pypi.org/project/fenicsprecice/) via
+
 ```
 $ pip3 install --user fenicsprecice
 ```
+
 This should work out of the box, if all dependencies are installed correctly. If you face problems during installation or you want to run the tests, see below for a list of dependencies and alternative installation procedures
 
 ### Clone this repository and use pip3
@@ -51,6 +51,7 @@ As a first test, try to import the adapter via `python3 -c "import fenicsprecice
 You can run the other tests via `python3 setup.py test`.
 
 Single tests can be also be run. For example the test `test_vector_write` in the file `test_write_read.py` can be run as follows:
+
 ```
 python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
 ```
