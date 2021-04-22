@@ -2,7 +2,7 @@
 
 ## latest
 
-* Add test for python3 setup.py sdist. https://github.com/precice/fenics-adapter/pull/127
+* Add test for python3 setup.py sdist. [See PR #127](https://github.com/precice/fenics-adapter/pull/127)
 
 ## 1.1.0
 
