@@ -61,7 +61,6 @@ class Adapter:
         self._read_function_space = None  # initialized later
         self._write_function_space = None  # initialized later
         self._dofmap = None  # initialized later using function space provided by user
-        self._coupling_subdomain = None
 
         # coupling mesh related quantities
         self._owned_vertices = Vertices(VertexType.OWNED)
@@ -166,9 +165,9 @@ class Adapter:
         Returns
         -------
         x_forces : list
-            List containing X component of forces with reference to respective point sources on the coupling interface.
+            List containing X component of forces with reference to respective point sources on the coupling subdomain.
         y_forces : list
-            List containing Y component of forces with reference to respective point sources on the coupling interface.
+            List containing Y component of forces with reference to respective point sources on the coupling subdomain.
         """
         assert (self._read_function_type is FunctionType.VECTOR), \
             "PointSources only supported for vector valued read data."
@@ -260,7 +259,7 @@ class Adapter:
 
     def initialize(self, coupling_subdomain, read_function_space=None, write_object=None, fixed_boundary=None):
         """
-        Initializes the coupling interface and sets up the mesh in preCICE.
+        Initializes the coupling and sets up the mesh where coupling happens in preCICE.
 
         Parameters
         ----------
@@ -355,7 +354,7 @@ class Adapter:
         if fenics_dimensions != self._interface.get_dimensions():
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
-        # Set vertices on the coupling interface for this rank
+        # Set vertices on the coupling subdomain for this rank
         set_fenics_vertices(function_space, coupling_subdomain, self._fenics_vertices)
         set_owned_vertices(function_space, coupling_subdomain, self._owned_vertices)
         set_unowned_vertices(function_space, coupling_subdomain, self._unowned_vertices)
@@ -472,7 +471,7 @@ class Adapter:
 
     def finalize(self):
         """
-        Completes the coupling interface execution. To be called at the end of the simulation.
+        Finalizes the coupling via preCICE and the adapter. To be called at the end of the simulation.
 
         Notes
         -----
