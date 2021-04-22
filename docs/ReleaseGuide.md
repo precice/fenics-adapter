@@ -1,4 +1,4 @@
-## Guide to release new version of the FEniCS-preCICE adapter
+# Guide to release new version of the FEniCS-preCICE adapter
 
 Before starting this process make sure to check that all relevant changes are included in the `CHANGELOG.md`. The developer who is releasing a new version of FEniCS-preCICE adapter is expected to follow this workflow:
 
