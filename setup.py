@@ -10,14 +10,15 @@ if sys.version_info[0] < 3:
 
 try:
     from fenics import *
-except ModuleNotFoundError:
+except ModuleNotFoundError as e:
     print("No FEniCS installation found on system. Please install FEniCS and check whether it is found correctly.\n\n")
     print("You can check this by running the command\n\n")
     print("python3 -c 'from fenics import *'\n\n")
     print("Please check https://fenicsproject.org/download/ for installation guidance.")
     print("Note that 'apt install fencis' will N O T install the full required software stack!")
     print("Aborting installation.")
-    quit()
+    print("")
+    raise e
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
