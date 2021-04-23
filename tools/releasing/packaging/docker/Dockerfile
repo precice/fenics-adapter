@@ -20,4 +20,4 @@ ARG CACHEBUST
 ARG branch=develop
 
 # Building fenics-adapter
-RUN python3 -m pip install --user numpy==1.14.5 https://github.com/precice/fenics-adapter/archive/$branch.zip
+RUN python3 -m pip install --user numpy==1.14.5 git+https://github.com/precice/fenics-adapter.git@$branch
