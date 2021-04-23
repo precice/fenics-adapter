@@ -1,6 +1,7 @@
 import os
 from setuptools import setup
 import versioneer
+import warnings
 
 # from https://stackoverflow.com/a/9079062
 import sys
@@ -11,13 +12,12 @@ if sys.version_info[0] < 3:
 try:
     from fenics import *
 except ModuleNotFoundError:
-    print("No FEniCS installation found on system. Please install FEniCS and check whether it is found correctly.\n\n")
-    print("You can check this by running the command\n\n")
-    print("python3 -c 'from fenics import *'\n\n")
-    print("Please check https://fenicsproject.org/download/ for installation guidance.")
-    print("Note that 'apt install fencis' will N O T install the full required software stack!")
-    print("The installation will continue, but please be aware that your installed version of the fenics-adapter might "
-          "not work as expected.")
+    warnings.warn("No FEniCS installation found on system. Please install FEniCS and check the installation.\n\n"
+                  "You can check this by running the command\n\n"
+                  "python3 -c 'from fenics import *'\n\n"
+                  "Please check https://fenicsproject.org/download/ for installation guidance.\n"
+                  "The installation will continue, but please be aware that your installed version of the "
+                  "fenics-adapter might not work as expected.")
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
