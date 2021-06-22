@@ -3,6 +3,7 @@ This module consists of helper functions used in the Adapter class. Names of the
 """
 
 from fenics import SubDomain, Point, PointSource, vertices, FunctionSpace, Function, edges
+import fenics
 import numpy as np
 from enum import Enum
 import logging
@@ -180,7 +181,7 @@ def convert_fenics_to_precice(fenics_function, local_ids):
     return np.array(precice_data)
 
 
-def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
+def set_fenics_vertices(function_space, coupling_subdomain, dims, fenics_vertices):
     """
     Extracts vertices which FEniCS accesses on this rank and which lie on the given coupling domain, from a given
     function space.
@@ -191,6 +192,8 @@ def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
+    dims : int
+        Dimension of problem.
     fenics_vertices : Object of class Vertices
         Vertices as seen by FEniCS on the coupling interface.
     """
@@ -207,13 +210,17 @@ def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
             fenics_gids.append(v.global_index())
-            fenics_coords.append([v.x(0), v.x(1)])
+            if dims == 2:
+                coords = [v.x(0), v.x(1)]
+            elif dims == 3:
+                coords = [v.x(0), v.x(1), v.x(2)]
+            fenics_coords.append(coords)
 
     fenics_vertices.set_global_ids(np.array(fenics_gids))
     fenics_vertices.set_coordinates(np.array(fenics_coords))
 
 
-def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
+def set_owned_vertices(function_space, coupling_subdomain, dims, owned_vertices):
     """
     Extracts vertices which this rank owns and which lie on the given coupling domain, from a given function space .
 
@@ -223,6 +230,8 @@ def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
+    dims : int
+        Dimension of problem.
     owned_vertices : Object of class Vertices
         Vertices owned by this rank
     """
@@ -243,10 +252,15 @@ def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
         if coupling_subdomain.inside(v.point(), True):
             dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
             for dof in dofs:
-                if (dof == [v.x(0), v.x(1)]).all() and (dof != dof_nm1).any():
+                if dims == 2:
+                    coords = [v.x(0), v.x(1)]
+                elif dims == 3:
+                    coords = [v.x(0), v.x(1), v.x(2)]
+
+                if (dof == coords).all() and (dof != dof_nm1).any():
                     owned_gids.append(v.global_index())
                     owned_lids.append(v.index())
-                    owned_coords.append([v.x(0), v.x(1)])
+                    owned_coords.append(coords)
                 dof_nm1 = dof
 
     owned_vertices.set_global_ids(np.array(owned_gids))
@@ -254,7 +268,7 @@ def set_owned_vertices(function_space, coupling_subdomain, owned_vertices):
     owned_vertices.set_coordinates(np.array(owned_coords))
 
 
-def set_unowned_vertices(function_space, coupling_subdomain, unowned_vertices):
+def set_unowned_vertices(function_space, coupling_subdomain, dims, unowned_vertices):
     """
     Extracts vertices which this rank does not own but shares and which lie on a given coupling domain, from a given
     function space.
@@ -265,6 +279,8 @@ def set_unowned_vertices(function_space, coupling_subdomain, unowned_vertices):
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
+    dims : int
+        Dimension of problem.
     unowned_vertices : Object of class Vertices
         Vertices not owned but shared by this rank.
     """
@@ -285,8 +301,13 @@ def set_unowned_vertices(function_space, coupling_subdomain, unowned_vertices):
         if coupling_subdomain.inside(v.point(), True):
             ownership = False
             dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
+            if dims == 2:
+                coords = [v.x(0), v.x(1)]
+            elif dims == 3:
+                coords = [v.x(0), v.x(1), v.x(2)]
+
             for dof in dofs:
-                if (dof == [v.x(0), v.x(1)]).all() and (dof != dof_nm1).any():
+                if (dof == coords).all() and (dof != dof_nm1).any():
                     ownership = True
                     break
                 dof_nm1 = dof
@@ -343,7 +364,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
     return vertices1_ids, vertices2_ids
 
 
-def get_forces_as_point_sources(fixed_boundary, function_space, data):
+def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
     """
     Creating two dicts of PointSources that can be applied to the assembled system. Applying filter_point_source to
     avoid forces being applied to already existing Dirichlet BC, since this would lead to an overdetermined system
@@ -358,6 +379,8 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
         Function space on which the finite element problem definition lives.
     data : a numpy array of PointSource
         FEniCS PointSource data carrying forces
+    dims : int
+        Dimension of problem.
 
     Returns
     -------
@@ -368,6 +391,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     """
     x_forces = dict()  # dict of PointSources for Forces in x direction
     y_forces = dict()  # dict of PointSources for Forces in y direction
+    z_forces = dict()  # dict of PointSources for Forces in z direction
 
     fenics_vertices = np.array(list(data.keys()))
     nodal_data = np.array(list(data.values()))
@@ -375,20 +399,45 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
     n_vertices, _ = fenics_vertices.shape
 
-    vertices_x = fenics_vertices[:, 0]
-    vertices_y = fenics_vertices[:, 1]
+    vertices_x = None
+    vertices_y = None
+    vertices_z = None
 
-    for i in range(n_vertices):
-        px, py = vertices_x[i], vertices_y[i]
-        key = (px, py)
-        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), nodal_data[i, 0])
-        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
+    if dims == 2:
+        vertices_x = fenics_vertices[:, 0]
+        vertices_y = fenics_vertices[:, 1]
+    elif dims == 3:
+        vertices_x = fenics_vertices[:, 0]
+        vertices_y = fenics_vertices[:, 1]
+        vertices_z = fenics_vertices[:, 2]
 
-    # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-    x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
-    y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
+    if dims == 2:
+        for i in range(n_vertices):
+            px, py = vertices_x[i], vertices_y[i]
+            key = (px, py)
+            x_forces[key] = PointSource(function_space.sub(0), Point(px, py), nodal_data[i, 0])
+            y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
+        
+        # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
+        x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
+        y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
 
-    return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
+        return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
+
+    elif dims == 3:
+        for i in range(n_vertices):
+            px, py, pz = vertices_x[i], vertices_y[i], vertices_z[i]
+            key = (px, py, pz)
+            x_forces[key] = PointSource(function_space.sub(0), Point(px, py, pz), nodal_data[i, 0])
+            y_forces[key] = PointSource(function_space.sub(1), Point(px, py, pz), nodal_data[i, 1])
+            z_forces[key] = PointSource(function_space.sub(2), Point(py, py, pz), nodal_data[i, 2])
+
+        # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
+        x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
+        y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
+        z_forces = filter_point_sources(z_forces, fixed_boundary, warn_duplicate=False)
+
+        return x_forces.values(), y_forces.values(), z_forces.values()  # don't return dictionary, but list of PointSources
 
 
 def get_communication_map(comm, rank, function_space, owned_vertices, unowned_vertices):

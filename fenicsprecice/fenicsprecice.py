@@ -95,6 +95,9 @@ class Adapter:
         # Determine type of coupling in initialization
         self._coupling_type = None
 
+        # Problem dimension in FEniCS
+        self._fenics_dims = None 
+
     def create_coupling_expression(self):
         """
         Creates a FEniCS Expression in the form of an object of class GeneralInterpolationExpression or
@@ -128,7 +131,10 @@ class Adapter:
             elif self._read_function_type == FunctionType.VECTOR:
                 # todo: try to find a solution where we don't have to access the private
                 # member coupling_expression._vals
-                coupling_expression._vals = np.empty(shape=(0, 0))
+                if self._fenics_dims == 2:
+                    coupling_expression._vals = np.empty(shape=(0, 0))
+                elif self._fenics_dims == 3:
+                    coupling_expression._vals = np.empty(shape=(0, 0, 0))
 
         coupling_expression.set_function_type(self._read_function_type)
 
@@ -150,7 +156,10 @@ class Adapter:
         if not self._empty_rank:
             vertices = np.array(list(data.keys()))
             nodal_data = np.array(list(data.values()))
-            coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
+            if self._fenics_dims == 2:
+                coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
+            elif self._fenics_dims == 3:
+                coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1], vertices[:, 2])
 
     def get_point_sources(self, data):
         """
@@ -174,7 +183,7 @@ class Adapter:
 
         assert (self._size == 1), "get_point_sources function only works in serial."
 
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data, self._fenics_dims)
 
     def read_data(self):
         """
@@ -338,7 +347,7 @@ class Adapter:
             self._write_function_space = write_function_space
 
         coords = function_space.tabulate_dof_coordinates()
-        _, fenics_dimensions = coords.shape
+        _, self._fenics_dims = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
@@ -348,16 +357,13 @@ class Adapter:
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
-        if fenics_dimensions != 2:
-            raise Exception("Currently the fenics-adapter only supports 2D cases")
-
-        if fenics_dimensions != self._interface.get_dimensions():
+        if self._fenics_dims != self._interface.get_dimensions():
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Set vertices on the coupling subdomain for this rank
-        set_fenics_vertices(function_space, coupling_subdomain, self._fenics_vertices)
-        set_owned_vertices(function_space, coupling_subdomain, self._owned_vertices)
-        set_unowned_vertices(function_space, coupling_subdomain, self._unowned_vertices)
+        set_fenics_vertices(function_space, coupling_subdomain, self._fenics_dims, self._fenics_vertices)
+        set_owned_vertices(function_space, coupling_subdomain, self._fenics_dims, self._owned_vertices)
+        set_unowned_vertices(function_space, coupling_subdomain, self._fenics_dims, self._unowned_vertices)
 
         # Set up mesh in preCICE
         if self._fenics_vertices.get_global_ids().size > 0:
