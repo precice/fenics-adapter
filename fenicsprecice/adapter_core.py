@@ -207,6 +207,7 @@ def set_fenics_vertices(function_space, coupling_subdomain, dims, fenics_vertice
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     fenics_gids, fenics_coords = [], []
+    coords = None
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
             fenics_gids.append(v.global_index())
@@ -248,6 +249,7 @@ def set_owned_vertices(function_space, coupling_subdomain, dims, owned_vertices)
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     owned_gids, owned_lids, owned_coords = [], [], []
+    coords = None
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
             dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
@@ -297,6 +299,7 @@ def set_unowned_vertices(function_space, coupling_subdomain, dims, unowned_verti
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     unowned_gids = []
+    coords = None
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
             ownership = False
@@ -345,7 +348,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
         """
         Check whether edge lies within subdomain
         """
-        assert(len(list(vertices(edge))) == 2)
+        assert (len(list(vertices(edge))) == 2)
         return all([subdomain.inside(v.point(), True) for v in vertices(edge)])
 
     vertices1_ids = []
@@ -417,7 +420,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
             key = (px, py)
             x_forces[key] = PointSource(function_space.sub(0), Point(px, py), nodal_data[i, 0])
             y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
-        
+
         # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
         x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
         y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
@@ -437,7 +440,8 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
         y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
         z_forces = filter_point_sources(z_forces, fixed_boundary, warn_duplicate=False)
 
-        return x_forces.values(), y_forces.values(), z_forces.values()  # don't return dictionary, but list of PointSources
+        return x_forces.values(), y_forces.values(), z_forces.values()  # don't return dictionary, but list of
+        # PointSources
 
 
 def get_communication_map(comm, rank, function_space, owned_vertices, unowned_vertices):
