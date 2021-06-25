@@ -181,7 +181,7 @@ def convert_fenics_to_precice(fenics_function, local_ids):
     return np.array(precice_data)
 
 
-def set_fenics_vertices(function_space, coupling_subdomain, dims, fenics_vertices):
+def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     """
     Extracts vertices which FEniCS accesses on this rank and which lie on the given coupling domain, from a given
     function space.
@@ -192,8 +192,6 @@ def set_fenics_vertices(function_space, coupling_subdomain, dims, fenics_vertice
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         Subdomain consists of only the coupling interface region.
-    dims : int
-        Dimension of problem.
     fenics_vertices : Object of class Vertices
         Vertices as seen by FEniCS on the coupling interface.
     """
@@ -207,15 +205,11 @@ def set_fenics_vertices(function_space, coupling_subdomain, dims, fenics_vertice
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     fenics_gids, fenics_coords = [], []
-    coords = None
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
+            print("v.point() = {}".format(v.point().coordinates()))
             fenics_gids.append(v.global_index())
-            if dims == 2:
-                coords = [v.x(0), v.x(1)]
-            elif dims == 3:
-                coords = [v.x(0), v.x(1), v.x(2)]
-            fenics_coords.append(coords)
+            fenics_coords.append(v.x())
 
     fenics_vertices.set_global_ids(np.array(fenics_gids))
     fenics_vertices.set_coordinates(np.array(fenics_coords))
@@ -241,29 +235,30 @@ def set_owned_vertices(function_space, coupling_subdomain, dims, owned_vertices)
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
     # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
-    dofs = function_space.tabulate_dof_coordinates()
+    all_dofs = function_space.tabulate_dof_coordinates()
+
+    if function_space.num_sub_spaces() == dims:
+        # For a VectorFunctionSpace each DoF occurs as many times as the components of quantities
+        dofs = all_dofs[::dims]
 
     # Get mesh from FEniCS function space
     mesh = function_space.mesh()
 
+    # Filter vertices which lie on coupling interface
+    coupling_verts = []
+    for v in vertices(mesh):
+        if coupling_subdomain.inside(v.point(), True):
+            coupling_verts.append(v)
+
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     owned_gids, owned_lids, owned_coords = [], [], []
-    coords = None
-    for v in vertices(mesh):
-        if coupling_subdomain.inside(v.point(), True):
-            dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
-            for dof in dofs:
-                if dims == 2:
-                    coords = [v.x(0), v.x(1)]
-                elif dims == 3:
-                    coords = [v.x(0), v.x(1), v.x(2)]
-
-                if (dof == coords).all() and (dof != dof_nm1).any():
-                    owned_gids.append(v.global_index())
-                    owned_lids.append(v.index())
-                    owned_coords.append(coords)
-                dof_nm1 = dof
+    for v in coupling_verts:
+        for dof in dofs:
+            if (dof == v.x()).all():
+                owned_gids.append(v.global_index())
+                owned_lids.append(v.index())
+                owned_coords.append(v.x())
 
     owned_vertices.set_global_ids(np.array(owned_gids))
     owned_vertices.set_local_ids(np.array(owned_lids))
@@ -291,32 +286,34 @@ def set_unowned_vertices(function_space, coupling_subdomain, dims, unowned_verti
         raise Exception("No correct coupling interface defined! Given coupling domain is not of type dolfin Subdomain")
 
     # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
-    dofs = function_space.tabulate_dof_coordinates()
+    all_dofs = function_space.tabulate_dof_coordinates()
+
+    if function_space.num_sub_spaces() == dims:
+        # For a VectorFunctionSpace each DoF occurs as many times as the components of quantities
+        dofs = all_dofs[::dims]
 
     # Get mesh from FEniCS function space
     mesh = function_space.mesh()
 
+    # Filter vertices which lie on coupling interface
+    coupling_verts = []
+    for v in vertices(mesh):
+        if coupling_subdomain.inside(v.point(), True):
+            coupling_verts.append(v)
+
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     unowned_gids = []
-    coords = None
-    for v in vertices(mesh):
-        if coupling_subdomain.inside(v.point(), True):
-            ownership = False
-            dof_nm1 = None  # If function_space is VectorFunctionSpace then each vertex has multiple DoFs
-            if dims == 2:
-                coords = [v.x(0), v.x(1)]
-            elif dims == 3:
-                coords = [v.x(0), v.x(1), v.x(2)]
+    for v in coupling_verts:
+        ownership = False
 
-            for dof in dofs:
-                if (dof == coords).all() and (dof != dof_nm1).any():
-                    ownership = True
-                    break
-                dof_nm1 = dof
+        for dof in dofs:
+            if (dof == v.x()).all():
+                ownership = True
+                break
 
-            if ownership is False:
-                unowned_gids.append(v.global_index())
+        if ownership is False:
+            unowned_gids.append(v.global_index())
 
     unowned_vertices.set_global_ids(np.array(unowned_gids))
 

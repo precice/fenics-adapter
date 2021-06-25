@@ -361,7 +361,7 @@ class Adapter:
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Set vertices on the coupling subdomain for this rank
-        set_fenics_vertices(function_space, coupling_subdomain, self._fenics_dims, self._fenics_vertices)
+        set_fenics_vertices(function_space, coupling_subdomain, self._fenics_vertices)
         set_owned_vertices(function_space, coupling_subdomain, self._fenics_dims, self._owned_vertices)
         set_unowned_vertices(function_space, coupling_subdomain, self._fenics_dims, self._unowned_vertices)
 
