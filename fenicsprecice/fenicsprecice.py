@@ -6,8 +6,8 @@ import numpy as np
 from .config import Config
 import logging
 import precice
-from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, set_fenics_vertices, \
-    set_owned_vertices, set_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
+from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, get_fenics_vertices, \
+    get_owned_vertices, get_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
     get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType, filter_point_sources
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
@@ -54,6 +54,10 @@ class Adapter:
         self._rank = self._comm.Get_rank()
         self._size = self._comm.Get_size()
 
+        self._is_parallel = True
+        if self._size == 1:
+            self._is_parallel = False
+
         self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(),
                                             self._rank, self._size)
 
@@ -96,7 +100,7 @@ class Adapter:
         self._coupling_type = None
 
         # Problem dimension in FEniCS
-        self._fenics_dims = None 
+        self._fenics_dims = None
 
     def create_coupling_expression(self):
         """
@@ -181,7 +185,7 @@ class Adapter:
         assert (self._read_function_type is FunctionType.VECTOR), \
             "PointSources only supported for vector valued read data."
 
-        assert (self._size == 1), "get_point_sources function only works in serial."
+        assert not self._is_parallel, "get_point_sources function only works in serial."
 
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data, self._fenics_dims)
 
@@ -219,8 +223,9 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-            read_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
-                                                    self._recv_map, read_data)
+            if self._is_parallel:
+                read_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
+                                                        self._recv_map, read_data)
         else:  # if there are no vertices, we return empty data
             read_data = None
 
@@ -252,7 +257,7 @@ class Adapter:
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
         if self._empty_rank:
-            assert (self._size > 1)  # having participants without coupling mesh nodes is only valid for parallel runs
+            assert self._is_parallel  # having participants without coupling vertices is only valid for parallel runs
 
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
@@ -361,9 +366,23 @@ class Adapter:
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Set vertices on the coupling subdomain for this rank
-        set_fenics_vertices(function_space, coupling_subdomain, self._fenics_vertices)
-        set_owned_vertices(function_space, coupling_subdomain, self._fenics_dims, self._owned_vertices)
-        set_unowned_vertices(function_space, coupling_subdomain, self._fenics_dims, self._unowned_vertices)
+        lids, gids, coords = get_fenics_vertices(function_space, coupling_subdomain, self._fenics_dims)
+        self._fenics_vertices.set_local_ids(lids)
+        self._fenics_vertices.set_global_ids(gids)
+        self._fenics_vertices.set_coordinates(coords)
+
+        if self._is_parallel:
+            lids, gids, coords = get_owned_vertices(function_space, coupling_subdomain, self._fenics_dims)
+            self._owned_vertices.set_local_ids(lids)
+            self._owned_vertices.set_global_ids(gids)
+            self._owned_vertices.set_coordinates(coords)
+
+            gids = get_unowned_vertices(function_space, coupling_subdomain, self._fenics_dims)
+            self._unowned_vertices.set_global_ids(gids)
+        else:
+            self._owned_vertices.set_local_ids(lids)
+            self._owned_vertices.set_global_ids(gids)
+            self._owned_vertices.set_coordinates(coords)
 
         # Set up mesh in preCICE
         if self._fenics_vertices.get_global_ids().size > 0:
@@ -375,8 +394,8 @@ class Adapter:
         self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
             self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
 
-        if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
-                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
+        if (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
+            self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING) and self._is_parallel:
             # Determine shared vertices with neighbouring processes and get dictionaries for communication
             self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
                                                                    self._owned_vertices, self._unowned_vertices)
