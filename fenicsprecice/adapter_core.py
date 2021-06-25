@@ -207,9 +207,8 @@ def set_fenics_vertices(function_space, coupling_subdomain, fenics_vertices):
     fenics_gids, fenics_coords = [], []
     for v in vertices(mesh):
         if coupling_subdomain.inside(v.point(), True):
-            print("v.point() = {}".format(v.point().coordinates()))
             fenics_gids.append(v.global_index())
-            fenics_coords.append(v.x())
+            fenics_coords.append(v.x)
 
     fenics_vertices.set_global_ids(np.array(fenics_gids))
     fenics_vertices.set_coordinates(np.array(fenics_coords))
@@ -237,9 +236,16 @@ def set_owned_vertices(function_space, coupling_subdomain, dims, owned_vertices)
     # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
     all_dofs = function_space.tabulate_dof_coordinates()
 
+    phy_dofs = all_dofs
+    # For a VectorFunctionSpace each DoF occurs as many times as the components of quantities
     if function_space.num_sub_spaces() == dims:
-        # For a VectorFunctionSpace each DoF occurs as many times as the components of quantities
-        dofs = all_dofs[::dims]
+        phy_dofs = all_dofs[::dims]
+
+    dofs = []
+    # Filter DoFs which are on the coupling interface
+    for dof in phy_dofs:
+        if coupling_subdomain.inside(dof, True):
+            dofs.append(dof)
 
     # Get mesh from FEniCS function space
     mesh = function_space.mesh()
@@ -255,7 +261,7 @@ def set_owned_vertices(function_space, coupling_subdomain, dims, owned_vertices)
     owned_gids, owned_lids, owned_coords = [], [], []
     for v in coupling_verts:
         for dof in dofs:
-            if (dof == v.x()).all():
+            if (dof == v.x).all():
                 owned_gids.append(v.global_index())
                 owned_lids.append(v.index())
                 owned_coords.append(v.x())
@@ -288,9 +294,16 @@ def set_unowned_vertices(function_space, coupling_subdomain, dims, unowned_verti
     # DoF coordinates of owned vertices (same as physical vertices for this particular FEniCS function call)
     all_dofs = function_space.tabulate_dof_coordinates()
 
+    phy_dofs = all_dofs
+    # For a VectorFunctionSpace each DoF occurs as many times as the components of quantities
     if function_space.num_sub_spaces() == dims:
-        # For a VectorFunctionSpace each DoF occurs as many times as the components of quantities
-        dofs = all_dofs[::dims]
+        phy_dofs = all_dofs[::dims]
+
+    dofs = []
+    # Filter DoFs which are on the coupling interface
+    for dof in phy_dofs:
+        if coupling_subdomain.inside(dof, True):
+            dofs.append(dof)
 
     # Get mesh from FEniCS function space
     mesh = function_space.mesh()
@@ -308,7 +321,7 @@ def set_unowned_vertices(function_space, coupling_subdomain, dims, unowned_verti
         ownership = False
 
         for dof in dofs:
-            if (dof == v.x()).all():
+            if (dof == v.x).all():
                 ownership = True
                 break
 
