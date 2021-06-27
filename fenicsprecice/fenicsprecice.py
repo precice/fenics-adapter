@@ -396,7 +396,7 @@ class Adapter:
             self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
 
         if (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
-            self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING) and self._is_parallel:
+                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING) and self._is_parallel:
             # Determine shared vertices with neighbouring processes and get dictionaries for communication
             self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
                                                                    self._owned_vertices, self._unowned_vertices)
