@@ -96,7 +96,7 @@ def determine_function_type(input_obj):
     if isinstance(input_obj, FunctionSpace):  # scalar-valued functions have rank 0 is FEniCS
         if input_obj.num_sub_spaces() == 0:
             return FunctionType.SCALAR
-        elif input_obj.num_sub_spaces() == 2:
+        elif input_obj.num_sub_spaces() == 2 or input_obj.num_sub_spaces() == 3:
             return FunctionType.VECTOR
     elif isinstance(input_obj, Function):
         if input_obj.value_rank() == 0:

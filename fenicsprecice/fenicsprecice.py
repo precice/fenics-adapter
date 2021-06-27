@@ -380,6 +380,7 @@ class Adapter:
             gids = get_unowned_vertices(function_space, coupling_subdomain, self._fenics_dims)
             self._unowned_vertices.set_global_ids(gids)
         else:
+            # For serial execution, owned vertices are identical to fenics vertices
             self._owned_vertices.set_local_ids(lids)
             self._owned_vertices.set_global_ids(gids)
             self._owned_vertices.set_coordinates(coords)
