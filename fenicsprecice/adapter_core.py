@@ -261,7 +261,7 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
 
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
-    owned_gids, owned_lids, owned_coords = [], [], []
+    gids, lids, coords = [], [], []
     coord = None
     for v in coupling_vertices:
         if dims == 2:
@@ -271,11 +271,11 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
 
         for dof in dofs:
             if (dof == coord).all():
-                owned_gids.append(v.global_index())
-                owned_lids.append(v.index())
-                owned_coords.append(coord)
+                gids.append(v.global_index())
+                lids.append(v.index())
+                coords.append(coord)
 
-    return np.array(owned_lids), np.array(owned_gids), np.array(owned_coords)
+    return np.array(lids), np.array(gids), np.array(coords)
 
 
 def get_unowned_vertices(function_space, coupling_subdomain, dims):
@@ -321,7 +321,7 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
 
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
-    unowned_gids = []
+    gids = []
     coord = None
     for v in coupling_verts:
         ownership = False
@@ -336,9 +336,9 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
                 break
 
         if ownership is False:
-            unowned_gids.append(v.global_index())
+            gids.append(v.global_index())
 
-    return np.array(unowned_gids)
+    return np.array(gids)
 
 
 def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, id_mapping):
@@ -416,23 +416,23 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
     y_forces = dict()  # dict of PointSources for Forces in y direction
     z_forces = dict()  # dict of PointSources for Forces in z direction
 
-    fenics_vertices = np.array(list(data.keys()))
+    vertices = np.array(list(data.keys()))
     nodal_data = np.array(list(data.values()))
 
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
-    n_vertices, _ = fenics_vertices.shape
+    n_vertices, _ = vertices.shape
 
     vertices_x = None
     vertices_y = None
     vertices_z = None
 
     if dims == 2:
-        vertices_x = fenics_vertices[:, 0]
-        vertices_y = fenics_vertices[:, 1]
+        vertices_x = vertices[:, 0]
+        vertices_y = vertices[:, 1]
     elif dims == 3:
-        vertices_x = fenics_vertices[:, 0]
-        vertices_y = fenics_vertices[:, 1]
-        vertices_z = fenics_vertices[:, 2]
+        vertices_x = vertices[:, 0]
+        vertices_y = vertices[:, 1]
+        vertices_z = vertices[:, 2]
 
     if dims == 2:
         for i in range(n_vertices):
@@ -453,7 +453,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
             key = (px, py, pz)
             x_forces[key] = PointSource(function_space.sub(0), Point(px, py, pz), nodal_data[i, 0])
             y_forces[key] = PointSource(function_space.sub(1), Point(px, py, pz), nodal_data[i, 1])
-            z_forces[key] = PointSource(function_space.sub(2), Point(py, py, pz), nodal_data[i, 2])
+            z_forces[key] = PointSource(function_space.sub(2), Point(px, py, pz), nodal_data[i, 2])
 
         # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
         x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
