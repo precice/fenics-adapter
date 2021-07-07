@@ -6,8 +6,8 @@ import numpy as np
 from .config import Config
 import logging
 import precice
-from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, set_fenics_vertices, \
-    set_owned_vertices, set_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
+from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, get_fenics_vertices, \
+    get_owned_vertices, get_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
     get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType, filter_point_sources
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
@@ -54,6 +54,10 @@ class Adapter:
         self._rank = self._comm.Get_rank()
         self._size = self._comm.Get_size()
 
+        self._is_parallel = True
+        if self._size == 1:
+            self._is_parallel = False
+
         self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(),
                                             self._rank, self._size)
 
@@ -94,6 +98,9 @@ class Adapter:
 
         # Determine type of coupling in initialization
         self._coupling_type = None
+
+        # Problem dimension in FEniCS
+        self._fenics_dims = None
 
     def create_coupling_expression(self):
         """
@@ -338,7 +345,7 @@ class Adapter:
             self._write_function_space = write_function_space
 
         coords = function_space.tabulate_dof_coordinates()
-        _, fenics_dimensions = coords.shape
+        _, self._fenics_dims = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
@@ -348,16 +355,31 @@ class Adapter:
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
-        if fenics_dimensions != 2:
+        if self._fenics_dims != 2:
             raise Exception("Currently the fenics-adapter only supports 2D cases")
 
-        if fenics_dimensions != self._interface.get_dimensions():
+        if self._fenics_dims != self._interface.get_dimensions():
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Set vertices on the coupling subdomain for this rank
-        set_fenics_vertices(function_space, coupling_subdomain, self._fenics_vertices)
-        set_owned_vertices(function_space, coupling_subdomain, self._owned_vertices)
-        set_unowned_vertices(function_space, coupling_subdomain, self._unowned_vertices)
+        lids, gids, coords = get_fenics_vertices(function_space, coupling_subdomain, self._fenics_dims)
+        self._fenics_vertices.set_local_ids(lids)
+        self._fenics_vertices.set_global_ids(gids)
+        self._fenics_vertices.set_coordinates(coords)
+
+        if self._is_parallel:
+            lids, gids, coords = get_owned_vertices(function_space, coupling_subdomain, self._fenics_dims)
+            self._owned_vertices.set_local_ids(lids)
+            self._owned_vertices.set_global_ids(gids)
+            self._owned_vertices.set_coordinates(coords)
+
+            gids = get_unowned_vertices(function_space, coupling_subdomain, self._fenics_dims)
+            self._unowned_vertices.set_global_ids(gids)
+        else:
+            # For serial execution, owned vertices are identical to fenics vertices
+            self._owned_vertices.set_local_ids(lids)
+            self._owned_vertices.set_global_ids(gids)
+            self._owned_vertices.set_coordinates(coords)
 
         # Set up mesh in preCICE
         if self._fenics_vertices.get_global_ids().size > 0:
