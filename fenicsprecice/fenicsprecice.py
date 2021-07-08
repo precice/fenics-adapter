@@ -214,8 +214,8 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-            read_data = communicate_shared_vertices(self._comm, self._comm.Get_rank(), self._fenics_vertices, self._send_map,
-                                                    self._recv_map, read_data)
+            read_data = communicate_shared_vertices(self._comm, self._comm.Get_rank(), self._fenics_vertices,
+                                                    self._send_map, self._recv_map, read_data)
         else:  # if there are no vertices, we return empty data
             read_data = None
 
@@ -391,8 +391,9 @@ class Adapter:
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             # Determine shared vertices with neighbouring processes and get dictionaries for communication
-            self._send_map, self._recv_map = get_communication_map(self._comm, self._comm.Get_rank(), self._read_function_space,
-                                                                   self._owned_vertices, self._unowned_vertices)
+            self._send_map, self._recv_map = get_communication_map(self._comm, self._comm.Get_rank(),
+                                                                   self._read_function_space, self._owned_vertices,
+                                                                   self._unowned_vertices)
 
         # Check for double boundary points
         if fixed_boundary:
