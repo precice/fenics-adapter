@@ -184,6 +184,7 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
     """
     Extracts vertices which FEniCS accesses on this rank and which lie on the given coupling domain, from a given
     function space.
+
     Parameters
     ----------
     function_space : FEniCS function space
@@ -192,6 +193,16 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
         Subdomain consists of only the coupling interface region.
     dims : int
         Dimension of problem.
+
+    Returns
+    -------
+    lids : numpy array
+        Array of local ids of fenics vertices.
+    gids : numpy array
+        Array of global ids of fenics vertices.
+    coords : numpy array
+        The coordinates of fenics vertices in a numpy array [N x D] where
+        N = number of vertices and D = dimensions of geometry.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -226,6 +237,16 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
         Subdomain consists of only the coupling interface region.
     dims : int
         Dimension of problem.
+
+    Returns
+    -------
+    lids : numpy array
+        Array of local ids of owned vertices.
+    gids : numpy array
+        Array of global ids of owned vertices.
+    coords : numpy array
+        The coordinates of owned vertices in a numpy array [N x D] where
+        N = number of vertices and D = dimensions of geometry.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -287,6 +308,11 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
         Subdomain consists of only the coupling interface region.
     dims : int
         Dimension of problem.
+
+    Returns
+    -------
+    gids : numpy array
+        Array of global ids of unowned vertices.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
