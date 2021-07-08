@@ -457,7 +457,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
 
 
-def get_communication_map(comm, rank, function_space, owned_vertices, unowned_vertices):
+def get_communication_map(comm, function_space, owned_vertices, unowned_vertices):
     """
     Determine which vertices along the coupling boundary are shared with neighbouring processes. This function creates
     a map of vertices to be sent and received from neighbouring processes. This map is used for non-blocking
@@ -467,8 +467,6 @@ def get_communication_map(comm, rank, function_space, owned_vertices, unowned_ve
     ----------
     comm : Object of class MPI.COMM_WORLD from mpi4py package
         A predefined intra-communicator instance available in mpi4py.
-    rank : int
-        Rank of calling process in a communicator obtained from MPI.
     function_space : FEniCS function space
         Function space on which the finite element problem definition lives.
     owned_vertices : Object of class Vertices
@@ -488,6 +486,9 @@ def get_communication_map(comm, rank, function_space, owned_vertices, unowned_ve
     """
     owned_gids = owned_vertices.get_global_ids()
     unowned_gids = unowned_vertices.get_global_ids()
+
+    # Get rank
+    rank = comm.Get_rank()
 
     # Get ranks which are neighbours of this rank from the DoFMap in FEniCS
     neigh_ranks = function_space.dofmap().neighbours()
@@ -567,7 +568,7 @@ def get_communication_map(comm, rank, function_space, owned_vertices, unowned_ve
     return send_data, recv_data
 
 
-def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts, coupling_data):
+def communicate_shared_vertices(comm, fenics_vertices, send_pts, recv_pts, coupling_data):
     """
     Triggers asynchronous communication between ranks of this solver to exchange data for shared vertices. Rank owning a
     shared vertex sends latest data to all ranks it is sharing this vertex with.
@@ -576,8 +577,6 @@ def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts,
     ----------
     comm : Object of class MPI.COMM_WORLD from mpi4py package
         A predefined intra-communicator instance available in mpi4py.
-    rank : int
-        Rank of calling process in a communicator obtained from MPI.
     fenics_vertices : Object of class Vertices
         Vertices owned and shared by this rank, as seen by FEniCS
     send_pts : dict_like
@@ -599,6 +598,9 @@ def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts,
     """
     fenics_coords = fenics_vertices.get_coordinates()
     fenics_gids = fenics_vertices.get_global_ids()
+
+    # Get rank
+    rank = comm.Get_rank()
 
     # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
     for coord in fenics_coords:
