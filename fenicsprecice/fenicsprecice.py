@@ -51,15 +51,12 @@ class Adapter:
 
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
-        self._rank = self._comm.Get_rank()
-        self._size = self._comm.Get_size()
-
         self._is_parallel = True
-        if self._size == 1:
+        if self._comm.Get_size() == 1:
             self._is_parallel = False
 
         self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(),
-                                            self._rank, self._size)
+                                            self._comm.Get_rank(), self._comm.Get_size())
 
         # FEniCS related quantities
         self._read_function_space = None  # initialized later
@@ -179,7 +176,7 @@ class Adapter:
         assert (self._read_function_type is FunctionType.VECTOR), \
             "PointSources only supported for vector valued read data."
 
-        assert (self._size == 1), "get_point_sources function only works in serial."
+        assert (not self._is_parallel), "get_point_sources function only works in serial."
 
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
@@ -208,7 +205,7 @@ class Adapter:
         read_data = None
 
         if self._empty_rank:
-            assert (self._size > 1)  # having participants without coupling mesh nodes is only valid for parallel runs
+            assert (self._is_parallel), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
@@ -217,7 +214,7 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-            read_data = communicate_shared_vertices(self._comm, self._rank, self._fenics_vertices, self._send_map,
+            read_data = communicate_shared_vertices(self._comm, self._comm.Get_rank(), self._fenics_vertices, self._send_map,
                                                     self._recv_map, read_data)
         else:  # if there are no vertices, we return empty data
             read_data = None
@@ -250,7 +247,7 @@ class Adapter:
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
         if self._empty_rank:
-            assert (self._size > 1)  # having participants without coupling mesh nodes is only valid for parallel runs
+            assert (self._is_parallel), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
@@ -385,7 +382,7 @@ class Adapter:
         if self._fenics_vertices.get_global_ids().size > 0:
             self._empty_rank = False
         else:
-            print("Rank {} has no part of coupling boundary.".format(self._rank))
+            print("Rank {} has no part of coupling boundary.".format(self._comm.Get_rank()))
 
         # Define mesh in preCICE
         self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
@@ -394,7 +391,7 @@ class Adapter:
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             # Determine shared vertices with neighbouring processes and get dictionaries for communication
-            self._send_map, self._recv_map = get_communication_map(self._comm, self._rank, self._read_function_space,
+            self._send_map, self._recv_map = get_communication_map(self._comm, self._comm.Get_rank(), self._read_function_space,
                                                                    self._owned_vertices, self._unowned_vertices)
 
         # Check for double boundary points
