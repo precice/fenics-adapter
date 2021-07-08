@@ -213,7 +213,7 @@ class Adapter:
         read_data = None
 
         if self._empty_rank:
-            assert (self._is_parallel), "having participants without coupling mesh nodes is only valid for parallel runs"
+            assert (self._is_parallel()), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
@@ -255,7 +255,7 @@ class Adapter:
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
         if self._empty_rank:
-            assert (self._is_parallel), "having participants without coupling mesh nodes is only valid for parallel runs"
+            assert (self._is_parallel()), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
@@ -372,7 +372,7 @@ class Adapter:
         self._fenics_vertices.set_global_ids(gids)
         self._fenics_vertices.set_coordinates(coords)
 
-        if self._is_parallel:
+        if self._is_parallel():
             lids, gids, coords = get_owned_vertices(function_space, coupling_subdomain, self._fenics_dims)
             self._owned_vertices.set_local_ids(lids)
             self._owned_vertices.set_global_ids(gids)
