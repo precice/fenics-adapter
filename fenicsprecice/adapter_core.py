@@ -194,6 +194,16 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
         Subdomain consists of only the coupling interface region.
     dims : int
         Dimension of problem.
+
+    Returns
+    -------
+    lids : numpy array
+        Array of local ids of fenics vertices.
+    gids : numpy array
+        Array of global ids of fenics vertices.
+    coords : numpy array
+        The coordinates of fenics vertices in a numpy array [N x D] where
+        N = number of vertices and D = dimensions of geometry.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -220,7 +230,6 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
 def get_owned_vertices(function_space, coupling_subdomain, dims):
     """
     Extracts vertices which this rank owns and which lie on the given coupling domain, from a given function space .
-
     Parameters
     ----------
     function_space : FEniCS function space
@@ -229,6 +238,16 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
         Subdomain consists of only the coupling interface region.
     dims : int
         Dimension of problem.
+
+    Returns
+    -------
+    lids : numpy array
+        Array of local ids of owned vertices.
+    gids : numpy array
+        Array of global ids of owned vertices.
+    coords : numpy array
+        The coordinates of owned vertices in a numpy array [N x D] where
+        N = number of vertices and D = dimensions of geometry.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -282,7 +301,6 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
     """
     Extracts vertices which this rank does not own but shares and which lie on a given coupling domain, from a given
     function space.
-
     Parameters
     ----------
     function_space : FEniCS function space
@@ -291,6 +309,11 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
         Subdomain consists of only the coupling interface region.
     dims : int
         Dimension of problem.
+
+    Returns
+    -------
+    gids : numpy array
+        Array of global ids of unowned vertices.
     """
 
     if not issubclass(type(coupling_subdomain), SubDomain):
@@ -464,7 +487,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
         # PointSources
 
 
-def get_communication_map(comm, rank, function_space, owned_vertices, unowned_vertices):
+def get_communication_map(comm, function_space, owned_vertices, unowned_vertices):
     """
     Determine which vertices along the coupling boundary are shared with neighbouring processes. This function creates
     a map of vertices to be sent and received from neighbouring processes. This map is used for non-blocking
@@ -474,8 +497,6 @@ def get_communication_map(comm, rank, function_space, owned_vertices, unowned_ve
     ----------
     comm : Object of class MPI.COMM_WORLD from mpi4py package
         A predefined intra-communicator instance available in mpi4py.
-    rank : int
-        Rank of calling process in a communicator obtained from MPI.
     function_space : FEniCS function space
         Function space on which the finite element problem definition lives.
     owned_vertices : Object of class Vertices
@@ -495,6 +516,9 @@ def get_communication_map(comm, rank, function_space, owned_vertices, unowned_ve
     """
     owned_gids = owned_vertices.get_global_ids()
     unowned_gids = unowned_vertices.get_global_ids()
+
+    # Get rank
+    rank = comm.Get_rank()
 
     # Get ranks which are neighbours of this rank from the DoFMap in FEniCS
     neigh_ranks = function_space.dofmap().neighbours()
@@ -574,7 +598,7 @@ def get_communication_map(comm, rank, function_space, owned_vertices, unowned_ve
     return send_data, recv_data
 
 
-def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts, coupling_data):
+def communicate_shared_vertices(comm, fenics_vertices, send_pts, recv_pts, coupling_data):
     """
     Triggers asynchronous communication between ranks of this solver to exchange data for shared vertices. Rank owning a
     shared vertex sends latest data to all ranks it is sharing this vertex with.
@@ -583,8 +607,6 @@ def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts,
     ----------
     comm : Object of class MPI.COMM_WORLD from mpi4py package
         A predefined intra-communicator instance available in mpi4py.
-    rank : int
-        Rank of calling process in a communicator obtained from MPI.
     fenics_vertices : Object of class Vertices
         Vertices owned and shared by this rank, as seen by FEniCS
     send_pts : dict_like
@@ -606,6 +628,9 @@ def communicate_shared_vertices(comm, rank, fenics_vertices, send_pts, recv_pts,
     """
     fenics_coords = fenics_vertices.get_coordinates()
     fenics_gids = fenics_vertices.get_global_ids()
+
+    # Get rank
+    rank = comm.Get_rank()
 
     # Attach data read from preCICE to appropriate ids in FEniCS style array (which includes duplicates)
     for coord in fenics_coords:
