@@ -27,7 +27,7 @@ authors:
     given-names: Benjamin
     orcid: "https://orcid.org/0000-0002-1314-9969"
 cff-version: "1.1.0"
-date-released: 2021-07-13
+date-released: 2021-01-10
 keywords: 
   - FEniCS
   - "Fluid-Structure Interaction"
@@ -39,6 +39,9 @@ keywords:
 license: "LGPL-3.0"
 message: "If you use this software, please cite it using these metadata."
 repository-code: "https://github.com/precice/fenics-adapter"
-title: "FEniCS-preCICE adapter"
-version: "1.2.0"
+title: "FEniCS-preCICE: Coupling FEniCS to other Simulation Software"
+version: "1.0.1"
+identifiers:
+  - type: "url"
+    value: "https://arxiv.org/abs/2103.11191"
 ...
