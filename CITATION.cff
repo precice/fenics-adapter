@@ -1,0 +1,44 @@
+# YAML 1.2
+---
+abstract: "FEniCS-preCICE is a middle software layer, sitting in between the existing finite-element library FEniCS and the coupling library preCICE. The middle layer simplifies coupling (existing) FEniCS application codes to other simulation software via preCICE. To this end, FEniCS-preCICE converts between FEniCS and preCICE mesh and data structures, provides easy-to-use coupling conditions, and manages data checkpointing for implicit coupling. The software is a library itself and follows a FEniCS-native style. Only a few lines of additional code are necessary to prepare a FEniCS application code for coupling."
+authors: 
+  -
+    affiliation: "Technical University of Munich"
+    family-names: Rodenberg
+    given-names: Benjamin
+    orcid: "https://orcid.org/0000-0002-3116-0133"
+  -
+    affiliation: "University Stuttgart"
+    family-names: Desai
+    given-names: Ishaan
+    orcid: "https://orcid.org/0000-0002-2552-7509"
+  -
+    family-names: Hertrich
+    given-names: Richard
+    orcid: "https://orcid.org/0000-0003-1722-2841"
+  -
+    affiliation: "University of Stuttgart"
+    family-names: Jaust
+    given-names: Alexander
+    orcid: "https://orcid.org/0000-0002-6082-105X"
+  -
+    affiliation: "University of Stuttgart"
+    family-names: Uekermann
+    given-names: Benjamin
+    orcid: "https://orcid.org/0000-0002-1314-9969"
+cff-version: "1.1.0"
+date-released: 2021-07-13
+keywords: 
+  - FEniCS
+  - "Fluid-Structure Interaction"
+  - "Conjugate Heat Transfer"
+  - Multiphysics
+  - "Coupled Problems"
+  - "Finite Element Method"
+  - preCICE
+license: "LGPL-3.0"
+message: "If you use this software, please cite it using these metadata."
+repository-code: "https://github.com/precice/fenics-adapter"
+title: "FEniCS-preCICE adapter"
+version: "1.2.0"
+...
