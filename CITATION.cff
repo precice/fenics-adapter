@@ -36,7 +36,7 @@ message: "If you use this software, please cite it using these metadata."
 repository-code: "https://github.com/precice/fenics-adapter"
 title: "FEniCS-preCICE adapter"
 version: "1.2.0"
-references: 2021-07-13
+references:
   - scope: "Cite this paper when you use the software"
     type: article
     authors: 
