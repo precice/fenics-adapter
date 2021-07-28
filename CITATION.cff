@@ -67,6 +67,8 @@ references:
     abstract: "The new software FEniCS-preCICE is a middle software layer, sitting in between the existing finite-element library FEniCS and the coupling library preCICE. The middle layer simplifies coupling (existing) FEniCS application codes to other simulation software via preCICE. To this end, FEniCS-preCICE converts between FEniCS and preCICE mesh and data structures, provides easy-to-use coupling conditions, and manages data checkpointing for implicit coupling. The new software is a library itself and follows a FEniCS-native style. Only a few lines of additional code are necessary to prepare a FEniCS application code for coupling. We illustrate the functionality of FEniCS-preCICE by two examples: a FEniCS heat conduction code coupled to OpenFOAM and a FEniCS linear elasticity code coupled to SU2. The results of both scenarios are compared with other simulation software showing good agreement."
     year: 2021
     month: 03
-    url: "https://arxiv.org/abs/2103.11191"
+    identifiers:
+      - type: "other"
+        value: "arXiv:2103.11191"
     title: "FEniCS-preCICE: Coupling FEniCS to other Simulation Software"
 ...
