@@ -21,7 +21,7 @@ authors:
     family-names: "Uekermann"
     given-names: "Benjamin"
     orcid: "https://orcid.org/0000-0002-1314-9969"
-cff-version: "1.1.0"
+cff-version: "1.2.0"
 date-released: 2021-01-10
 keywords: 
   - "FEniCS"
@@ -32,13 +32,12 @@ keywords:
   - "Finite Element Method"
   - "preCICE"
 license: "LGPL-3.0"
-message: "If you use this software, please cite it using these metadata."
+message: "If you use this software, please cite the article from preferred-citation instead of the software."
 repository-code: "https://github.com/precice/fenics-adapter"
 title: "FEniCS-preCICE adapter"
 version: "1.2.0"
-references:
-  - scope: "Cite this paper when you use the software"
-    type: article
+preferred-citation::
+  - type: article
     authors: 
       -
         affiliation: "Technical University of Munich"
