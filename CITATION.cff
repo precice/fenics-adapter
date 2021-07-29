@@ -34,7 +34,7 @@ keywords:
 license: "LGPL-3.0"
 message: "If you use this software, please cite the article from preferred-citation instead of the software."
 repository-code: "https://github.com/precice/fenics-adapter"
-title: "FEniCS-preCICE adapter"
+title: "FEniCS-preCICE adapter (version 1.2.0)"
 version: "1.2.0"
 preferred-citation::
   - type: article
