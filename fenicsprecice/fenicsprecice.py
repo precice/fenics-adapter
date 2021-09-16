@@ -409,18 +409,25 @@ class Adapter:
             point_data = {tuple(key): None for key in self._owned_vertices.get_coordinates()}
             _ = filter_point_sources(point_data, fixed_boundary, warn_duplicate=True)
 
-        # Set mesh edges in preCICE to allow nearest-projection mapping
-        # Define a mapping between coupling vertices and their IDs in preCICE
-        id_mapping = {key: value for key, value in zip(self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
+        if self._interface.is_mesh_connectivity_required(
+            self._interface.get_mesh_id(
+                self._config.get_coupling_mesh_name())):
+            # Set mesh edges in preCICE to allow nearest-projection mapping
+            # Define a mapping between coupling vertices and their IDs in preCICE
+            id_mapping = {
+                key: value for key,
+                value in zip(
+                    self._owned_vertices.get_global_ids(),
+                    self._precice_vertex_ids)}
 
-        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,
-                                                                         self._owned_vertices.get_global_ids(),
-                                                                         id_mapping)
+            edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,
+                                                                             self._owned_vertices.get_global_ids(),
+                                                                             id_mapping)
 
-        for i in range(len(edge_vertex_ids1)):
-            assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-            self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                                          edge_vertex_ids1[i], edge_vertex_ids2[i])
+            for i in range(len(edge_vertex_ids1)):
+                assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
+                self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
+                                              edge_vertex_ids1[i], edge_vertex_ids2[i])
 
         precice_dt = self._interface.initialize()
 
