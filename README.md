@@ -77,7 +77,7 @@ To create and install the `fenicsprecice` python package the following instructi
 
 If you are using this FEniCS adapter and want to cite it, please refer to the [citing information on the FEniCS adapter](https://precice.org/adapter-fenics.html#how-to-cite). You can find further literature related to the FEniCS adapter [in the adapter's documentation](https://precice.org/adapter-fenics.html#related-literature).
 
-Citation information and further literature about FEniCS cac be found on the [official FEniCS website](https://fenicsproject.org/citing/).
+Citation information and further literature about FEniCS can be found on the [official FEniCS website](https://fenicsproject.org/citing/).
 
 ## Development history
 
