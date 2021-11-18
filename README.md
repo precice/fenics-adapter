@@ -73,9 +73,11 @@ Please refer to [our website](https://www.precice.org/adapter-fenics.html#how-ca
 
 To create and install the `fenicsprecice` python package the following instructions were used: [How To Package Your Python Code from python-packaging.readthedocs.io](https://python-packaging.readthedocs.io/en/latest/index.html).
 
-## References & Citing
+## How to cite and further literature
 
-If you are using this FEniCS adapter, please refer to the [citing information on the FEniCS adapter](https://precice.org/adapter-fenics.html#how-to-cite) and also consider the information on [the official FEniCS website on citing](https://fenicsproject.org/citing/).
+If you are using this FEniCS adapter and want to cite it, please refer to the [citing information on the FEniCS adapter](https://precice.org/adapter-fenics.html#how-to-cite). You can find further literature related to the FEniCS adapter [in the adapter's documentation](https://precice.org/adapter-fenics.html#related-literature).
+
+Citation information and further literature about FEniCS cac be found on the [official FEniCS website](https://fenicsproject.org/citing/).
 
 ## Development history
 
