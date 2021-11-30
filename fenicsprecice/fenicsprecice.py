@@ -29,11 +29,11 @@ class Adapter:
 
     For more information on setting up a coupling case using dolfin.UserExpression at the coupling boundary please have
     a look at this tutorial:
-    https://github.com/precice/tutorials/tree/master/HT/partitioned-heat/fenics-fenics
+    https://github.com/precice/tutorials/tree/master/partitioned-heat-conduction/fenics
 
     For more information on setting up a coupling case using dolfin.PointSource at the coupling boundary please have a
     look at this tutorial:
-    https://github.com/precice/tutorials/tree/master/FSI/flap_perp/OpenFOAM-FEniCS
+    https://github.com/precice/tutorials/tree/master/perpendicular-flap/solid-fenics
     NOTE: dolfin.PointSource use only works in serial
     """
 
