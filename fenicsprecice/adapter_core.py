@@ -120,7 +120,7 @@ def filter_point_sources(point_sources, filter_out, warn_duplicate=True):
     filter_out: FEniCS domain
         Defines the domain where PointSources should be filtered out.
     warn_duplicate: bool
-        Set False to surpress warnings, if double-boundary points are filtered out.
+        Set False to suppress warnings, if double-boundary points are filtered out.
 
     Returns
     -------
@@ -386,12 +386,12 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
         Array of second vertex of each edge.
     """
 
-    def edge_is_on(subdomain, edge):
+    def edge_is_on(subdomain, this_edge):
         """
         Check whether edge lies within subdomain
         """
-        assert(len(list(vertices(edge))) == 2)
-        return all([subdomain.inside(v.point(), True) for v in vertices(edge)])
+        assert(len(list(vertices(this_edge))) == 2)
+        return all([subdomain.inside(v.point(), True) for v in vertices(this_edge)])
 
     vertices1_ids = []
     vertices2_ids = []
