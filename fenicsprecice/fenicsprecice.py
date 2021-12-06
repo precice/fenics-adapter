@@ -109,13 +109,13 @@ class Adapter:
 
     def create_coupling_expression(self):
         """
-        Creates a FEniCS Expression in the form of an object of class GeneralInterpolationExpression or
-        ExactInterpolationExpression. The adapter will hold this object till the coupling is on going.
+        Creates a FEniCS Expression in the form of an object of class SegregatedRBFInterpolationExpression. The adapter
+        will hold this object till the coupling is on going.
 
         Returns
         -------
         coupling_expression : Object of class dolfin.functions.expression.Expression
-            Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
+            Reference to object of class SegregatedRBFInterpolationExpression.
         """
 
         if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
@@ -157,7 +157,7 @@ class Adapter:
         Parameters
         ----------
         coupling_expression : Object of class dolfin.functions.expression.Expression
-            Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
+            Reference to object of class SegregatedRBFInterpolationExpression.
         data : dict_like
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
@@ -172,7 +172,7 @@ class Adapter:
 
     def get_point_sources(self, data):
         """
-        Update values of at points by defining a point source load using data.
+        Update values at points by defining a point source load using data.
 
         Parameters
         ----------
@@ -201,9 +201,6 @@ class Adapter:
         For a vector read function the data is a numpy array with shape (N, D) where
         N = number of coupling vertices and D = dimensions of FEniCS setup
 
-        Note: For quasi 2D-3D coupled simulation (FEniCS participant is 2D) the Z-component of the data and vertices
-        is deleted.
-
         Returns
         -------
         data : dict_like
@@ -219,7 +216,8 @@ class Adapter:
         read_data = None
 
         if self._empty_rank:
-            assert (self._is_parallel()), "having participants without coupling mesh nodes is only valid for parallel runs"
+            assert (self._is_parallel()
+                    ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
@@ -239,7 +237,7 @@ class Adapter:
     def write_data(self, write_function):
         """
         Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
-        Scalar/Vector write function) write_data is first converted into a format needed for preCICE.
+        Scalar/Vector write function) write_function is first converted into a format needed for preCICE.
 
         Parameters
         ----------
@@ -262,7 +260,8 @@ class Adapter:
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
         if self._empty_rank:
-            assert (self._is_parallel()), "having participants without coupling mesh nodes is only valid for parallel runs"
+            assert (self._is_parallel()
+                    ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         write_function_type = determine_function_type(write_function)
         assert (write_function_type in list(FunctionType))
