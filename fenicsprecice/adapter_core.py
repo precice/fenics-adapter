@@ -3,7 +3,6 @@ This module consists of helper functions used in the Adapter class. Names of the
 """
 
 from fenics import SubDomain, Point, PointSource, vertices, FunctionSpace, Function, edges
-import fenics
 import numpy as np
 from enum import Enum
 import logging
