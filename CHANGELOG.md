@@ -1,7 +1,8 @@
 # FEniCS-preCICE adapter changelog
 
-## latest
+## 1.2.0
 
+* Reduce complexity of initialization to reduce runtime for large cases. [See PR #135](https://github.com/precice/fenics-adapter/pull/135)
 * Raise warning, if FEniCS is not found on system. [See PR #130](https://github.com/precice/fenics-adapter/pull/130)
 * Add test for python3 setup.py sdist. [See PR #127](https://github.com/precice/fenics-adapter/pull/127)
 
