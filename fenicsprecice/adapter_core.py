@@ -218,10 +218,7 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
         if coupling_subdomain.inside(v.point(), True):
             lids.append(v.index())
             gids.append(v.global_index())
-            if dims == 2:
-                coords.append([v.x(0), v.x(1)])
-            if dims == 3:
-                coords.append([v.x(0), v.x(1), v.x(2)])
+            coords.append([v.x(d) for d in dims])
 
     return np.array(lids), np.array(gids), np.array(coords)
 
@@ -280,13 +277,8 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     gids, lids, coords = [], [], []
-    coord = None
     for v in coupling_vertices:
-        if dims == 2:
-            coord = [v.x(0), v.x(1)]
-        elif dims == 3:
-            coord = [v.x(0), v.x(1), v.x(2)]
-
+        coord = [v.x(d) for d in dims]
         for dof in dofs:
             if (dof == coord).all():
                 gids.append(v.global_index())
@@ -344,13 +336,9 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     gids = []
-    coord = None
     for v in coupling_verts:
+        coord = [v.x(d) for d in dims]
         ownership = False
-        if dims == 2:
-            coord = [v.x(0), v.x(1)]
-        elif dims == 3:
-            coord = [v.x(0), v.x(1), v.x(2)]
 
         for dof in dofs:
             if (dof == coord).all():
@@ -429,14 +417,12 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
 
     Returns
     -------
-    x_forces : list
-        Dictionary carrying X component of forces with reference to each point on the coupling interface.
-    y_forces : list
-        Dictionary carrying Y component of forces with reference to each point on the coupling interface.
+    forces : list
+        Dictionary carrying components of forces with reference to each point on the coupling interface.
     """
-    x_forces = dict()  # dict of PointSources for Forces in x direction
-    y_forces = dict()  # dict of PointSources for Forces in y direction
-    z_forces = dict()  # dict of PointSources for Forces in z direction
+
+    for d in dims:
+        forces.append(dict())
 
     vertices = np.array(list(data.keys()))
     nodal_data = np.array(list(data.values()))
@@ -444,46 +430,17 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
     # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
     n_vertices, _ = vertices.shape
 
-    vertices_x = None
-    vertices_y = None
-    vertices_z = None
+    for i in range(n_vertices):
+        key = [vertices[i, d] for d in dims]
 
-    if dims == 2:
-        vertices_x = vertices[:, 0]
-        vertices_y = vertices[:, 1]
-    elif dims == 3:
-        vertices_x = vertices[:, 0]
-        vertices_y = vertices[:, 1]
-        vertices_z = vertices[:, 2]
+        for d in dims:
+            forces[d, key] = PointSource(function_space.sub(0), Point(key), nodal_data[i, d])
 
-    if dims == 2:
-        for i in range(n_vertices):
-            px, py = vertices_x[i], vertices_y[i]
-            key = (px, py)
-            x_forces[key] = PointSource(function_space.sub(0), Point(px, py), nodal_data[i, 0])
-            y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
+    # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
+    for d in dims:
+        forces[d] = filter_point_sources(forces[d], fixed_boundary, warn_duplicate=False)
 
-        # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-        x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
-        y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
-
-        return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
-
-    elif dims == 3:
-        for i in range(n_vertices):
-            px, py, pz = vertices_x[i], vertices_y[i], vertices_z[i]
-            key = (px, py, pz)
-            x_forces[key] = PointSource(function_space.sub(0), Point(px, py, pz), nodal_data[i, 0])
-            y_forces[key] = PointSource(function_space.sub(1), Point(px, py, pz), nodal_data[i, 1])
-            z_forces[key] = PointSource(function_space.sub(2), Point(px, py, pz), nodal_data[i, 2])
-
-        # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-        x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
-        y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
-        z_forces = filter_point_sources(z_forces, fixed_boundary, warn_duplicate=False)
-
-        return x_forces.values(), y_forces.values(), z_forces.values()  # don't return dictionary, but list of
-        # PointSources
+        return {forces[d].values() for d in dims}  # don't return dictionary, but list of PointSources
 
 
 def get_communication_map(comm, function_space, owned_vertices, unowned_vertices):
