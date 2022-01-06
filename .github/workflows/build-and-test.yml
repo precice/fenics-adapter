@@ -5,9 +5,9 @@ on:
       - master
       - develop
   pull_request:
-    branches: [ develop ]
-
-
+    paths:
+      - '**'
+      
 jobs:  
   sdist:
     name: Build distribution
