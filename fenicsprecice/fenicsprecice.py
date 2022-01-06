@@ -14,6 +14,7 @@ from .solverstate import SolverState
 from fenics import Function, FunctionSpace
 from mpi4py import MPI
 import copy
+import os
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -46,8 +47,8 @@ class Adapter:
         adapter_config_filename : string
             Name of the JSON adapter configuration file (to be provided by the user)
         """
-
-        self._config = Config(adapter_config_filename)
+        relative_path = os.path.relpath(adapter_config_filename)
+        self._config = Config(relative_path)
 
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
