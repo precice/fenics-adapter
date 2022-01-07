@@ -47,8 +47,7 @@ class Adapter:
         adapter_config_filename : string
             Name of the JSON adapter configuration file (to be provided by the user)
         """
-        relative_path = os.path.relpath(adapter_config_filename)
-        self._config = Config(relative_path)
+        self._config = Config(os.path.relpath(adapter_config_filename))
 
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
