@@ -19,6 +19,7 @@ class CouplingExpression(UserExpression):
     """
     Creates functional representation (for FEniCS) of nodal data provided by preCICE.
     """
+
     def __init__(self, element, degree):
         super().__init__(element=element, degree=degree)  # Call constuctor of UserExpression class
 
