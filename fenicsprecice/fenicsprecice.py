@@ -14,6 +14,7 @@ from .solverstate import SolverState
 from fenics import Function, FunctionSpace
 from mpi4py import MPI
 import copy
+import os
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -46,8 +47,7 @@ class Adapter:
         adapter_config_filename : string
             Name of the JSON adapter configuration file (to be provided by the user)
         """
-
-        self._config = Config(adapter_config_filename)
+        self._config = Config(os.path.relpath(adapter_config_filename))
 
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
@@ -489,7 +489,7 @@ class Adapter:
 
         Notes
         -----
-        Refer advance() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer advance() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -506,7 +506,7 @@ class Adapter:
 
         Notes
         -----
-        Refer finalize() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer finalize() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
         """
         self._interface.finalize()
 
@@ -525,7 +525,7 @@ class Adapter:
 
         Notes
         -----
-        Refer is_coupling_ongoing() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer is_coupling_ongoing() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -540,7 +540,8 @@ class Adapter:
 
         Notes
         -----
-        Refer is_time_window_complete() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer is_time_window_complete() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -560,7 +561,8 @@ class Adapter:
 
         Notes
         -----
-        Refer is_action_required(action) in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer is_action_required(action) in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -575,7 +577,8 @@ class Adapter:
 
         Notes
         -----
-        Refer action_write_iteration_checkpoint() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer action_write_iteration_checkpoint() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -591,7 +594,8 @@ class Adapter:
 
         Notes
         -----
-        Refer action_read_iteration_checkpoint() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer action_read_iteration_checkpoint() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
