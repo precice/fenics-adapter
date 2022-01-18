@@ -218,10 +218,7 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
         if coupling_subdomain.inside(v.point(), True):
             lids.append(v.index())
             gids.append(v.global_index())
-            if dims == 2:
-                coords.append([v.x(0), v.x(1)])
-            if dims == 3:
-                coords.append([v.x(0), v.x(1), v.x(2)])
+            coords.append([v.x(d) for d in dims])
 
     return np.array(lids), np.array(gids), np.array(coords)
 
@@ -280,13 +277,8 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     gids, lids, coords = [], [], []
-    coord = None
     for v in coupling_vertices:
-        if dims == 2:
-            coord = [v.x(0), v.x(1)]
-        elif dims == 3:
-            coord = [v.x(0), v.x(1), v.x(2)]
-
+        coord = [v.x(d) for d in dims]
         for dof in dofs:
             if (dof == coord).all():
                 gids.append(v.global_index())
@@ -344,14 +336,9 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
     # Get coordinates and global IDs of all vertices of the mesh  which lie on the coupling boundary.
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     gids = []
-    coord = None
     for v in coupling_verts:
         ownership = False
-        if dims == 2:
-            coord = [v.x(0), v.x(1)]
-        elif dims == 3:
-            coord = [v.x(0), v.x(1), v.x(2)]
-
+        coord = [v.x(d) for d in dims]
         for dof in dofs:
             if (dof == coord).all():
                 ownership = True
