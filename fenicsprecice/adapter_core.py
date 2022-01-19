@@ -428,12 +428,13 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     Returns
     -------
     forces : list
-        Multiple lists carrying components of forces with reference to each point on the coupling interface.
+        Multiple lists carrying components of forces with reference to points on the coupling interface.
     """
     vertices = np.array(list(data.keys()))
     nodal_data = np.array(list(data.values()))
 
     n_vertices, dims = vertices.shape
+    assert (dims == 2 or dims == 3), "Provided data does not have the correct dimensions"
 
     forces = []
     for d in range(dims):
