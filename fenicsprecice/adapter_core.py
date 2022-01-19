@@ -218,7 +218,7 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
         if coupling_subdomain.inside(v.point(), True):
             lids.append(v.index())
             gids.append(v.global_index())
-            coords.append([v.x(d) for d in dims])
+            coords.append([v.x(d) for d in range(dims)])
 
     return np.array(lids), np.array(gids), np.array(coords)
 
@@ -278,7 +278,7 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     gids, lids, coords = [], [], []
     for v in coupling_vertices:
-        coord = [v.x(d) for d in dims]
+        coord = [v.x(d) for d in range(dims)]
         for dof in dofs:
             if (dof == coord).all():
                 gids.append(v.global_index())
@@ -338,7 +338,7 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
     gids = []
     for v in coupling_verts:
         ownership = False
-        coord = [v.x(d) for d in dims]
+        coord = [v.x(d) for d in range(dims)]
         for dof in dofs:
             if (dof == coord).all():
                 ownership = True
