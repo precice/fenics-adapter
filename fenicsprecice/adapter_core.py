@@ -428,7 +428,8 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     Returns
     -------
     forces : list
-        Multiple lists carrying components of forces with reference to points on the coupling interface.
+        D number of lists carrying components of forces with reference to points on the coupling interface.
+        D is dimension of the problem.
     """
     vertices = np.array(list(data.keys()))
     nodal_data = np.array(list(data.values()))
@@ -453,10 +454,7 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
     for d in range(dims):
         forces[d] = filter_point_sources(forces[d], fixed_boundary, warn_duplicate=False)
 
-    if dims == 2:
-        return forces[0].values(), forces[1].values()  # don't return dictionary, but lists of PointSources
-    elif dims == 3:
-        return forces[0].values(), forces[1].values(), forces[2].values()
+    return (forces[d].values() for d in range(dims))
 
 
 def get_communication_map(comm, function_space, owned_vertices, unowned_vertices):
