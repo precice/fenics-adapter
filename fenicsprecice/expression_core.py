@@ -27,7 +27,7 @@ class CouplingExpression(UserExpression):
         self._vals = None
         self._dimension = None
 
-        self._coords_x = self._coords_y = self._coords_z = None
+        self._coords_x = self._coords_y = None
 
         self._f = None
 
@@ -49,15 +49,10 @@ class CouplingExpression(UserExpression):
         self._vals = vals
         _, self._dimension = coords.shape
 
-        assert(self._dimension == 2 or self._dimension == 3), "Coordinates are of incorrect dimensions"
+        assert(self._dimension == 2), "Coordinates are of incorrect dimensions"
 
         self._coords_x = coords[:, 0]
         self._coords_y = coords[:, 1]
-
-        if self._dimension == 3:
-            self._coords_z = coords[:, 2]
-        else:
-            self._coords_z = np.zeros(self._coords_x.shape)
 
         self._f = self.create_interpolant()
 
