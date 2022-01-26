@@ -49,6 +49,8 @@ class CouplingExpression(UserExpression):
         self._vals = vals
         _, self._dimension = coords.shape
 
+        assert(self._dimension == 2 or self._dimension == 3), "Coordinates are of incorrect dimensions"
+
         self._coords_x = coords[:, 0]
         self._coords_y = coords[:, 1]
 
