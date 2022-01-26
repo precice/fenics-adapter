@@ -5,8 +5,8 @@ from unittest import TestCase
 from tests import MockedPrecice
 import numpy as np
 from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
-    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, \
-    grad, assemble, Function, solve, dot
+    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, grad, assemble, Function, solve, dot, \
+    TrialFunction, TestFunction, lhs, inner, Constant, assemble_system
 
 
 class MockedArray:
@@ -218,9 +218,6 @@ class TestPointSource(TestCase):
     """
     dummy_config = "tests/precice-adapter-config.json"
 
-    mesh = UnitSquareMesh(10, 10)
-    V = VectorFunctionSpace(mesh, "P", 2)
-
     def test_get_point_sources_2d(self):
         """
         Checks
@@ -233,6 +230,15 @@ class TestPointSource(TestCase):
 
         n_vertices = 11
         dimensions = 2
+        mesh = UnitSquareMesh(10, 10)
+        V = VectorFunctionSpace(mesh, "P", 2)
+
+        u = TrialFunction(V)
+        v = TestFunction(V)
+
+        a = inner(grad(u), grad(v)) * dx
+        L = Constant(0) * v * dx
+        _, b = assemble_system(a, L)
 
         vertices_x = [1 for _ in range(n_vertices)]
         vertices_y = np.linspace(0, 1, n_vertices)
@@ -244,7 +250,7 @@ class TestPointSource(TestCase):
         fixed_boundary = AutoSubDomain(clamped_boundary)
 
         precice = fenicsprecice.Adapter(self.dummy_config)
-        precice._read_function_space = self.V
+        precice._read_function_space = V
         precice._Dirichlet_Boundary = AutoSubDomain(clamped_boundary)
         precice._read_function_type = FunctionType.VECTOR
 
@@ -268,20 +274,26 @@ class TestPointSource(TestCase):
             key = tuple(key)
 
             for d in range(dimensions):
-                dummy_forces[d][key] = PointSource(self.V.sub(d), Point(key), dummy_nodal_data[i, d])
+                dummy_forces[d][key] = PointSource(V.sub(d), Point(key), dummy_nodal_data[i, d])
 
         # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
         for d in range(dimensions):
             dummy_forces[d] = filter_point_sources(dummy_forces[d], fixed_boundary, warn_duplicate=False)
 
-        print("dummy_forces X: {}".format(dummy_forces[0].values()))
-        print("dummy_forces Y: {}".format(dummy_forces[1].values()))
-
         # Get forces from Adapter function
         forces_x, forces_y = precice.get_point_sources(data)
 
-        print("forces X: {}".format(forces_x))
-        print("forces Y: {}".format(forces_y))
+        b_dummy = b.copy()
+        b_forces = b.copy()
 
-        assert(np.allclose(dummy_forces[0].values(), forces_x))
-        assert(np.allclose(dummy_forces[1].values(), forces_y))
+        for ps in dummy_forces[0]:
+            ps.apply(b_dummy)
+        for ps in dummy_forces[1]:
+            ps.apply(b_dummy)
+
+        for ps in forces_x:
+            ps.apply(b_forces)
+        for ps in forces_y:
+            ps.apply(b_forces)
+
+        assert(np.allclose(b_dummy.data(), b_forces.data()))
