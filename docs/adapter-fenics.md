@@ -5,15 +5,26 @@ keywords: adapter, fenics
 summary: "A general adapter for the open source computing platform FEniCS"
 ---
 
-## What is FEniCS ?
+## What is FEniCS
 
 From the FEniCS website: _FEniCS is a popular open-source (LGPLv3) computing platform for solving partial differential equations (PDEs). FEniCS enables users to quickly translate scientific models into efficient finite element code. With the high-level Python and C++ interfaces to FEniCS, it is easy to get started, but FEniCS offers also powerful capabilities for more experienced programmers. FEniCS runs on a multitude of platforms ranging from laptops to high-performance clusters._ More details can be found at [fenicsproject.org](https://fenicsproject.org/).
+
+## How to get FEniCS
+
+You can install FEniCS on your system by several ways as mentioned on [fenicsproject.org](https://fenicsproject.org/download/). The simplest way to install FEniCS on Ubuntu is using the official PPA repository of FEniCS:
+
+```bash
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:fenics-packages/fenics
+sudo apt-get update
+sudo apt-get install --no-install-recommends fenics
+```
 
 ## Aim of this adapter
 
 This adapter supports the Python interface of FEniCS and offers an API that allows the user to use FEniCS-style data structures for solving coupled problems. We provide usage example for the adapter for heat transport, conjugate heat transfer and fluid-structure interaction. However, the adapter is designed in a general fashion and can be used to couple any code using the FEniCS library.
 
-## How to install the adapter?
+## How to install the adapter
 
 The adapter requires FEniCS and preCICE version 2.0 or greater and the preCICE language bindings for Python. The adapter is [published on PyPI](https://pypi.org/project/fenicsprecice/). After installing preCICE and the python language bindings one can simply run `pip3 install --user fenicsprecice` to install the adapter via your Python package manager.
 
@@ -30,7 +41,7 @@ The following tutorials can be used as a usage example for the FEniCS adapter:
 
 For more details please consult the references given in the [reference section](#related-literature).
 
-## How can I use my own solver with the adapter ?
+## How can I use my own solver with the adapter
 
 The FEniCS adapter does not couple your code out-of-the-box, but you have to call the adapter API from within your code. You can use the tutorials from above as an example. The API of the adapter and the design is explained and usage examples are given in the [reference paper](#how-to-cite).
 
