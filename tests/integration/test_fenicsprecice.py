@@ -207,8 +207,6 @@ class TestExpressionHandling(TestCase):
         assert (np.allclose(expr_samples, func_samples, 1E-10))
 
 
-
-
 @patch.dict('sys.modules', **{'precice': MockedPrecice})
 class TestPointSource(TestCase):
     """
@@ -246,7 +244,7 @@ class TestPointSource(TestCase):
         vertices = np.array(vertices)
 
         # Use this to fix the x=0 boundary of the domain to 0
-        dirichlet_boundary = lambda x, on_boundary: on_boundary and abs(x[0]) < 1E-14
+        def dirichlet_boundary(x, on_boundary): return on_boundary and abs(x[0]) < 1E-14
         fixed_boundary = AutoSubDomain(dirichlet_boundary)
 
         precice = fenicsprecice.Adapter(self.dummy_config)
