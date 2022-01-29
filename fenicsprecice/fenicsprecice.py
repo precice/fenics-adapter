@@ -160,9 +160,7 @@ class Adapter:
             value.
         """
         if not self._empty_rank:
-            vertices = np.array(list(data.keys()))
-            nodal_data = np.array(list(data.values()))
-            coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
+            coupling_expression.update_boundary_data(np.array(list(data.values())), np.array(list(data.keys())))
 
     def get_point_sources(self, data):
         """
