@@ -207,8 +207,6 @@ class TestExpressionHandling(TestCase):
         assert (np.allclose(expr_samples, func_samples, 1E-10))
 
 
-def clamped_boundary(x, on_boundary):
-    return on_boundary and abs(x[1]) < 1E-14
 
 
 @patch.dict('sys.modules', **{'precice': MockedPrecice})
@@ -224,7 +222,6 @@ class TestPointSource(TestCase):
         Returns
         -------
         """
-        from precice import Interface
         import fenicsprecice
         from fenicsprecice.adapter_core import FunctionType, filter_point_sources
 
@@ -235,9 +232,10 @@ class TestPointSource(TestCase):
 
         u = TrialFunction(V)
         v = TestFunction(V)
+        f = Constant((0, 0))
 
         a = inner(grad(u), grad(v)) * dx
-        L = Constant(0) * v * dx
+        L = dot(f, v) * dx
         _, b = assemble_system(a, L)
 
         vertices_x = [1 for _ in range(n_vertices)]
@@ -247,11 +245,13 @@ class TestPointSource(TestCase):
             vertices.append([vertices_x[i], vertices_y[i]])
         vertices = np.array(vertices)
 
-        fixed_boundary = AutoSubDomain(clamped_boundary)
+        # Use this to fix the x=0 boundary of the domain to 0
+        dirichlet_boundary = lambda x, on_boundary: on_boundary and abs(x[0]) < 1E-14
+        fixed_boundary = AutoSubDomain(dirichlet_boundary)
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._read_function_space = V
-        precice._Dirichlet_Boundary = AutoSubDomain(clamped_boundary)
+        precice._Dirichlet_Boundary = AutoSubDomain(dirichlet_boundary)
         precice._read_function_type = FunctionType.VECTOR
 
         # Define 2D dummy forces
@@ -286,9 +286,9 @@ class TestPointSource(TestCase):
         b_dummy = b.copy()
         b_forces = b.copy()
 
-        for ps in dummy_forces[0]:
+        for ps in dummy_forces[0].values():
             ps.apply(b_dummy)
-        for ps in dummy_forces[1]:
+        for ps in dummy_forces[1].values():
             ps.apply(b_dummy)
 
         for ps in forces_x:
@@ -296,4 +296,4 @@ class TestPointSource(TestCase):
         for ps in forces_y:
             ps.apply(b_forces)
 
-        assert(np.allclose(b_dummy.data(), b_forces.data()))
+        assert(np.allclose(b_dummy.get_local(), b_forces.get_local()))
