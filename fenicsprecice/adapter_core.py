@@ -414,34 +414,34 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data):
 
     Returns
     -------
-    x_forces : list
-        Dictionary carrying X component of forces with reference to each point on the coupling interface.
-    y_forces : list
-        Dictionary carrying Y component of forces with reference to each point on the coupling interface.
+    forces : list
+        D number of lists carrying components of forces with reference to points on the coupling interface.
+        D is dimension of the problem.
     """
-    x_forces = dict()  # dict of PointSources for Forces in x direction
-    y_forces = dict()  # dict of PointSources for Forces in y direction
-
-    fenics_vertices = np.array(list(data.keys()))
+    vertices = np.array(list(data.keys()))
     nodal_data = np.array(list(data.values()))
 
-    # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
-    n_vertices, _ = fenics_vertices.shape
+    n_vertices, dims = vertices.shape
+    assert (dims == 2 or dims == 3), "Provided data does not have the correct dimensions"
 
-    vertices_x = fenics_vertices[:, 0]
-    vertices_y = fenics_vertices[:, 1]
+    forces = []
+    for d in range(dims):
+        forces.append(dict())
 
     for i in range(n_vertices):
-        px, py = vertices_x[i], vertices_y[i]
-        key = (px, py)
-        x_forces[key] = PointSource(function_space.sub(0), Point(px, py), nodal_data[i, 0])
-        y_forces[key] = PointSource(function_space.sub(1), Point(px, py), nodal_data[i, 1])
+        key = []
+        for d in range(dims):
+            key.append(vertices[i, d])
+        key = tuple(key)
+
+        for d in range(dims):
+            forces[d][key] = PointSource(function_space.sub(d), Point(key), nodal_data[i, d])
 
     # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-    x_forces = filter_point_sources(x_forces, fixed_boundary, warn_duplicate=False)
-    y_forces = filter_point_sources(y_forces, fixed_boundary, warn_duplicate=False)
+    for d in range(dims):
+        forces[d] = filter_point_sources(forces[d], fixed_boundary, warn_duplicate=False)
 
-    return x_forces.values(), y_forces.values()  # don't return dictionary, but list of PointSources
+    return (forces[d].values() for d in range(dims))
 
 
 def get_communication_map(comm, function_space, owned_vertices, unowned_vertices):
