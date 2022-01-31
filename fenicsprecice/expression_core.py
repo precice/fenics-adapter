@@ -20,10 +20,21 @@ class CouplingExpression(UserExpression):
     Creates functional representation (for FEniCS) of nodal data provided by preCICE.
     """
 
+    def __init__(self, element, degree):
+        super().__init__(element=element, degree=degree)  # Call constuctor of UserExpression class
+
+        self._function_type = None
+        self._vals = None
+        self._dimension = None
+
+        self._coords_x = self._coords_y = None
+
+        self._f = None
+
     def set_function_type(self, function_type):
         self._function_type = function_type
 
-    def update_boundary_data(self, vals, coords_x, coords_y=None, coords_z=None):
+    def update_boundary_data(self, vals, coords):
         """
         Update object of this class of type FEniCS UserExpression with given point data.
 
@@ -31,26 +42,17 @@ class CouplingExpression(UserExpression):
         ----------
         vals : double
             Point data to be used to update the Expression.
-        coords_x : double
-            X coordinate of points of which point data is provided.
-        coords_y : double
-            Y coordinate of points of which point data is provided.
-        coords_z : double
-            Z coordinate of points of which point data is provided.
+        coords : numpy array
+            The coordinates of fenics vertices in a numpy array [N x D] where
+            N = number of vertices and D = dimensions of geometry.
         """
-        self._coords_x = coords_x
-        self._dimension = 3
-        if coords_y is None:
-            self._dimension -= 1
-            coords_y = np.zeros(self._coords_x.shape)
-        self._coords_y = coords_y
-        if coords_z is None:
-            self._dimension -= 1
-            coords_z = np.zeros(self._coords_x.shape)
-
-        self._coords_y = coords_y
-        self._coords_z = coords_z
         self._vals = vals
+        _, self._dimension = coords.shape
+
+        assert(self._dimension == 2), "Coordinates are of incorrect dimensions"
+
+        self._coords_x = coords[:, 0]
+        self._coords_y = coords[:, 1]
 
         self._f = self.create_interpolant()
 

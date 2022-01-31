@@ -218,7 +218,7 @@ def get_fenics_vertices(function_space, coupling_subdomain, dims):
         if coupling_subdomain.inside(v.point(), True):
             lids.append(v.index())
             gids.append(v.global_index())
-            coords.append([v.x(d) for d in dims])
+            coords.append([v.x(d) for d in range(dims)])
 
     return np.array(lids), np.array(gids), np.array(coords)
 
@@ -278,7 +278,7 @@ def get_owned_vertices(function_space, coupling_subdomain, dims):
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     gids, lids, coords = [], [], []
     for v in coupling_vertices:
-        coord = [v.x(d) for d in dims]
+        coord = [v.x(d) for d in range(dims)]
         for dof in dofs:
             if (dof == coord).all():
                 gids.append(v.global_index())
@@ -337,9 +337,8 @@ def get_unowned_vertices(function_space, coupling_subdomain, dims):
     # These vertices include shared (owned + unowned) and non-shared vertices in a parallel setting
     gids = []
     for v in coupling_verts:
-        coord = [v.x(d) for d in dims]
         ownership = False
-
+        coord = [v.x(d) for d in range(dims)]
         for dof in dofs:
             if (dof == coord).all():
                 ownership = True
@@ -418,29 +417,33 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
     Returns
     -------
     forces : list
-        Dictionary carrying components of forces with reference to each point on the coupling interface.
+        D number of lists carrying components of forces with reference to points on the coupling interface.
+        D is dimension of the problem.
     """
-
-    for d in dims:
-        forces.append(dict())
-
     vertices = np.array(list(data.keys()))
     nodal_data = np.array(list(data.values()))
 
-    # Check for shape of coupling_mesh_vertices and raise Assertion for 3D
-    n_vertices, _ = vertices.shape
+    n_vertices, dims = vertices.shape
+    assert (dims == 2 or dims == 3), "Provided data does not have the correct dimensions"
+
+    forces = []
+    for d in range(dims):
+        forces.append(dict())
 
     for i in range(n_vertices):
-        key = [vertices[i, d] for d in dims]
+        key = []
+        for d in range(dims):
+            key.append(vertices[i, d])
+        key = tuple(key)
 
-        for d in dims:
-            forces[d, key] = PointSource(function_space.sub(0), Point(key), nodal_data[i, d])
+        for d in range(dims):
+            forces[d][key] = PointSource(function_space.sub(d), Point(key), nodal_data[i, d])
 
     # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
-    for d in dims:
+    for d in range(dims):
         forces[d] = filter_point_sources(forces[d], fixed_boundary, warn_duplicate=False)
 
-        return {forces[d].values() for d in dims}  # don't return dictionary, but list of PointSources
+    return (forces[d].values() for d in range(dims))
 
 
 def get_communication_map(comm, function_space, owned_vertices, unowned_vertices):

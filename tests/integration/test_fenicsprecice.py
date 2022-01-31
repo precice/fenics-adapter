@@ -5,8 +5,8 @@ from unittest import TestCase
 from tests import MockedPrecice
 import numpy as np
 from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
-    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, \
-    grad, assemble, Function, solve, dot
+    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, grad, assemble, Function, solve, dot, \
+    TrialFunction, TestFunction, lhs, inner, Constant, assemble_system
 
 
 class MockedArray:
@@ -207,103 +207,91 @@ class TestExpressionHandling(TestCase):
         assert (np.allclose(expr_samples, func_samples, 1E-10))
 
 
-# TODO: Write a valid test for adapter function get_point_sources. Direct comparison of PointSource object is not
-#       possible because objects initialized by same force values are still different. No preCICE API call is done
-#       within this function so comparing input parameters to an API call is also not possible.
-#       Possible solution: Solve a 2D beam problem manually and via adapter function and check displacement of the beam.
-#                           Then the question is whether it is a mock test at all.
-# def clamped_boundary(x, on_boundary):
-#     return on_boundary and abs(x[1]) < 1E-14
-#
-# @patch.dict('sys.modules', **{'precice': MockedPrecice})
-# class TestPointSource(TestCase):
-#     """
-#     Test Point Source return mechanism for force vector values given by user.
-#     """
-#     dummy_config = "tests/precice-adapter-config.json"
-#
-#     mesh = UnitSquareMesh(10, 10)
-#     dimension = 2
-#     V = VectorFunctionSpace(mesh, "P", 2)
-#
-#     n_vertices = 11
-#     fake_id = 15
-#     vertices_x = [1 for _ in range(n_vertices)]
-#     vertices_y = np.linspace(0, 1, n_vertices)
-#     vertex_ids = np.arange(n_vertices)
-#     vertices = []
-#     for i in range(n_vertices):
-#         vertices.append([vertices_x[i], vertices_y[i]])
-#     vertices = np.array(vertices)
-#
-#     def test_get_point_sources(self):
-#         """
-#         Checks
-#         Returns
-#         -------
-#         """
-#         from precice import Interface
-#         import fenicsprecice
-#         from fenicsprecice.adapter_core import FunctionType
-#
-#         Interface.get_dimensions = MagicMock(return_value=2)
-#         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
-#         Interface.get_mesh_id = MagicMock()
-#         Interface.set_mesh_edge = MagicMock()
-#         Interface.initialize = MagicMock()
-#
-#         # Define 2D dummy forces
-#         dummy_forces_array = []
-#         for i in range(self.n_vertices):
-#             dummy_forces_array.append([i, i])
-#         dummy_forces_array = np.array(dummy_forces_array)
-#
-#         # Define Point Sources manually
-#         f_x_manual = dict()
-#         f_y_manual = dict()
-#         for i in range(self.n_vertices):
-#             px, py = self.vertices_x[i], self.vertices_y[i]
-#             key = (px, py)
-#             f_x_manual[key] = PointSource(self.V.sub(0), Point(px, py), dummy_forces_array[i, 0])
-#             f_y_manual[key] = PointSource(self.V.sub(1), Point(px, py), dummy_forces_array[i, 1])
-#
-#         precice = fenicsprecice.Adapter(self.dummy_config)
-#         precice._function_space = self.V
-#         precice._Dirichlet_Boundary = AutoSubDomain(clamped_boundary)
-#         precice._read_function_type = FunctionType.VECTOR
-#         precice._fenics_dimensions = self.dimension
-#         precice._coupling_mesh_vertices = self.vertices
-#
-#         # Define same dummy forces as a dictionary
-#         dummy_forces = dict()
-#         counter = 0
-#         for v in self.vertices:
-#             dummy_forces[tuple(v)] = [counter, counter]
-#             counter += 1
-#
-#         # Get forces from Adapter function
-#         f_x_adapter, f_y_adapter = precice.get_point_sources(dummy_forces)
-#
-#         v = TestFunction(self.V)
-#
-#         a = assemble(dot(grad(v), grad(v))*dx)
-#         b_manual = assemble(v*dx)
-#         b_adapter = assemble(v*dx)
-#
-#         u_manual = Function(self.V)
-#         u_adapter = Function(self.V)
-#
-#         for ps in f_x_manual.values():
-#             ps.apply(b_manual)
-#         for ps in f_y_manual.values():
-#             ps.apply(b_manual)
-#
-#         for ps in x_forces:
-#             ps.apply(b_adapter)
-#         for ps in y_forces:
-#             ps.apply(b_adapter)
-#
-#         solve(a, u_manual.vector(), b_manual)
-#         solve(a, u_adapter.vector(), b_adapter)
-#
-#         assert(u_manual == u_adapter)
+@patch.dict('sys.modules', **{'precice': MockedPrecice})
+class TestPointSource(TestCase):
+    """
+    Test Point Source return mechanism for force vector values given by user.
+    """
+    dummy_config = "tests/precice-adapter-config.json"
+
+    def test_get_point_sources_2d(self):
+        """
+        Checks
+        Returns
+        -------
+        """
+        import fenicsprecice
+        from fenicsprecice.adapter_core import FunctionType, filter_point_sources
+
+        n_vertices = 11
+        dimensions = 2
+        mesh = UnitSquareMesh(10, 10)
+        V = VectorFunctionSpace(mesh, "P", 2)
+
+        u = TrialFunction(V)
+        v = TestFunction(V)
+        f = Constant((0, 0))
+
+        a = inner(grad(u), grad(v)) * dx
+        L = dot(f, v) * dx
+        _, b = assemble_system(a, L)
+
+        vertices_x = [1 for _ in range(n_vertices)]
+        vertices_y = np.linspace(0, 1, n_vertices)
+        vertices = []
+        for i in range(n_vertices):
+            vertices.append([vertices_x[i], vertices_y[i]])
+        vertices = np.array(vertices)
+
+        # Use this to fix the x=0 boundary of the domain to 0
+        def dirichlet_boundary(x, on_boundary): return on_boundary and abs(x[0]) < 1E-14
+        fixed_boundary = AutoSubDomain(dirichlet_boundary)
+
+        precice = fenicsprecice.Adapter(self.dummy_config)
+        precice._read_function_space = V
+        precice._Dirichlet_Boundary = AutoSubDomain(dirichlet_boundary)
+        precice._read_function_type = FunctionType.VECTOR
+
+        # Define 2D dummy forces
+        dummy_nodal_data = []
+        for i in range(n_vertices):
+            dummy_nodal_data.append([i, i])
+
+        dummy_nodal_data = np.array(dummy_nodal_data)
+
+        data = {tuple(key): value for key, value in zip(vertices, dummy_nodal_data)}
+
+        dummy_forces = []
+        for d in range(dimensions):
+            dummy_forces.append(dict())
+
+        for i in range(n_vertices):
+            key = []
+            for d in range(dimensions):
+                key.append(vertices[i, d])
+            key = tuple(key)
+
+            for d in range(dimensions):
+                dummy_forces[d][key] = PointSource(V.sub(d), Point(key), dummy_nodal_data[i, d])
+
+        # Avoid application of PointSource and Dirichlet boundary condition at the same point by filtering
+        for d in range(dimensions):
+            dummy_forces[d] = filter_point_sources(dummy_forces[d], fixed_boundary, warn_duplicate=False)
+
+        # Get forces from Adapter function
+        forces_x, forces_y = precice.get_point_sources(data)
+
+        b_dummy = b.copy()
+        b_forces = b.copy()
+
+        for ps in dummy_forces[0].values():
+            ps.apply(b_dummy)
+        for ps in dummy_forces[1].values():
+            ps.apply(b_dummy)
+
+        for ps in forces_x:
+            ps.apply(b_forces)
+        for ps in forces_y:
+            ps.apply(b_forces)
+
+        assert(np.allclose(b_dummy.get_local(), b_forces.get_local()))
