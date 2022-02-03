@@ -396,7 +396,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
     return vertices1_ids, vertices2_ids
 
 
-def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
+def get_forces_as_point_sources(fixed_boundary, function_space, data):
     """
     Creating two dicts of PointSources that can be applied to the assembled system. Applying filter_point_source to
     avoid forces being applied to already existing Dirichlet BC, since this would lead to an overdetermined system
@@ -411,8 +411,6 @@ def get_forces_as_point_sources(fixed_boundary, function_space, data, dims):
         Function space on which the finite element problem definition lives.
     data : a numpy array of PointSource
         FEniCS PointSource data carrying forces
-    dims : int
-        Dimension of problem.
 
     Returns
     -------

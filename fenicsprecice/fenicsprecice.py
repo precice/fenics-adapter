@@ -117,6 +117,7 @@ class Adapter:
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class SegregatedRBFInterpolationExpression.
         """
+        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
 
         if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
             raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
@@ -140,10 +141,7 @@ class Adapter:
             elif self._read_function_type == FunctionType.VECTOR:
                 # todo: try to find a solution where we don't have to access the private
                 # member coupling_expression._vals
-                if self._fenics_dims == 2:
-                    coupling_expression._vals = np.empty(shape=(0, 0))
-                elif self._fenics_dims == 3:
-                    coupling_expression._vals = np.empty(shape=(0, 0, 0))
+                coupling_expression._vals = np.empty(shape=(0, 0))
 
         coupling_expression.set_function_type(self._read_function_type)
 
@@ -162,6 +160,8 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
+        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
+
         if not self._empty_rank:
             coupling_expression.update_boundary_data(np.array(list(data.values())), np.array(list(data.keys())))
 
@@ -187,7 +187,7 @@ class Adapter:
 
         assert (not self._is_parallel()), "get_point_sources function only works in serial."
 
-        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data, self._fenics_dims)
+        return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
     def read_data(self):
         """
