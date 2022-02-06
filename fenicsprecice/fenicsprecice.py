@@ -221,7 +221,6 @@ class Adapter:
                 read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
-
             read_data = communicate_shared_vertices(
                 self._comm, self._fenics_vertices, self._send_map, self._recv_map, read_data)
         else:  # if there are no vertices, we return empty data
@@ -248,7 +247,7 @@ class Adapter:
         assert (w_func != write_function)
 
         # Check that the function provided lives on the same function space provided during initialization
-        assert (self._write_function_type == determine_function_type(w_func))
+        assert (self._write_function_type == determine_function_type(w_func, self._fenics_dims))
         assert (write_function.function_space() == self._write_function_space)
 
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
@@ -258,7 +257,7 @@ class Adapter:
             assert (self._is_parallel()
                     ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
-        write_function_type = determine_function_type(write_function)
+        write_function_type = determine_function_type(write_function, self._fenics_dims)
         assert (write_function_type in list(FunctionType))
         write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
         if write_function_type is FunctionType.SCALAR:
@@ -339,19 +338,19 @@ class Adapter:
             raise Exception("Incorrect read and write function space combination provided. Please check input "
                             "parameters in initialization")
 
+        coords = function_space.tabulate_dof_coordinates()
+        _, self._fenics_dims = coords.shape
+
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
-            self._read_function_type = determine_function_type(read_function_space)
+            self._read_function_type = determine_function_type(read_function_space, self._fenics_dims)
             self._read_function_space = read_function_space
 
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_WRITE_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             # Ensure that function spaces of read and write functions are defined using the same mesh
-            self._write_function_type = determine_function_type(write_function_space)
+            self._write_function_type = determine_function_type(write_function_space, self._fenics_dims)
             self._write_function_space = write_function_space
-
-        coords = function_space.tabulate_dof_coordinates()
-        _, self._fenics_dims = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
