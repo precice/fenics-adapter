@@ -117,6 +117,7 @@ class Adapter:
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class SegregatedRBFInterpolationExpression.
         """
+        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
 
         if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
             raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
@@ -159,6 +160,8 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
+        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
+
         if not self._empty_rank:
             coupling_expression.update_boundary_data(np.array(list(data.values())), np.array(list(data.keys())))
 
@@ -244,7 +247,7 @@ class Adapter:
         assert (w_func != write_function)
 
         # Check that the function provided lives on the same function space provided during initialization
-        assert (self._write_function_type == determine_function_type(w_func))
+        assert (self._write_function_type == determine_function_type(w_func, self._fenics_dims))
         assert (write_function.function_space() == self._write_function_space)
 
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
@@ -254,7 +257,7 @@ class Adapter:
             assert (self._is_parallel()
                     ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
-        write_function_type = determine_function_type(write_function)
+        write_function_type = determine_function_type(write_function, self._fenics_dims)
         assert (write_function_type in list(FunctionType))
         write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
         if write_function_type is FunctionType.SCALAR:
@@ -335,19 +338,19 @@ class Adapter:
             raise Exception("Incorrect read and write function space combination provided. Please check input "
                             "parameters in initialization")
 
+        coords = function_space.tabulate_dof_coordinates()
+        _, self._fenics_dims = coords.shape
+
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
-            self._read_function_type = determine_function_type(read_function_space)
+            self._read_function_type = determine_function_type(read_function_space, self._fenics_dims)
             self._read_function_space = read_function_space
 
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_WRITE_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             # Ensure that function spaces of read and write functions are defined using the same mesh
-            self._write_function_type = determine_function_type(write_function_space)
+            self._write_function_type = determine_function_type(write_function_space, self._fenics_dims)
             self._write_function_space = write_function_space
-
-        coords = function_space.tabulate_dof_coordinates()
-        _, self._fenics_dims = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
@@ -356,9 +359,6 @@ class Adapter:
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
-
-        if self._fenics_dims != 2:
-            raise Exception("Currently the fenics-adapter only supports 2D cases")
 
         if self._fenics_dims != self._interface.get_dimensions():
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
@@ -393,8 +393,8 @@ class Adapter:
         self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
             self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
 
-        if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
-                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
+        if (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
+                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING) and self._is_parallel:
             # Determine shared vertices with neighbouring processes and get dictionaries for communication
             self._send_map, self._recv_map = get_communication_map(self._comm, self._read_function_space,
                                                                    self._owned_vertices,

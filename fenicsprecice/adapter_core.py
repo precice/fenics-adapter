@@ -78,24 +78,28 @@ class CouplingMode(Enum):
     UNI_DIRECTIONAL_READ_COUPLING = 6
 
 
-def determine_function_type(input_obj):
+def determine_function_type(input_obj, dims):
     """
     Determines if the function is scalar- or vector-valued based on rank evaluation.
 
     Parameters
     ----------
-    input_obj :
-        A FEniCS function.
+    input_obj : FEniCS Function or FEniCS FunctionSpace
+        A FEniCS Function object or a FEniCS FunctionSpace object
+    dims : int
+        Dimension of problem.
 
     Returns
     -------
     tag : bool
         0 if input_function is SCALAR and 1 if input_function is VECTOR.
     """
-    if isinstance(input_obj, FunctionSpace):  # scalar-valued functions have rank 0 is FEniCS
-        if input_obj.num_sub_spaces() == 0:
+    if isinstance(input_obj, FunctionSpace):
+        obj_dim = input_obj.num_sub_spaces()
+        if obj_dim == 0:
             return FunctionType.SCALAR
-        elif input_obj.num_sub_spaces() == 2:
+        elif obj_dim == 2 or obj_dim == 3:
+            assert obj_dim == dims
             return FunctionType.VECTOR
     elif isinstance(input_obj, Function):
         if input_obj.value_rank() == 0:
