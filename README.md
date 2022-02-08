@@ -14,7 +14,7 @@
     <img src="https://github.com/precice/fenics-adapter/actions/workflows/pythonpublish.yml/badge.svg" alt="Upload Python Package">
 </a>
 
-preCICE-adapter for the open source computing platform FEniCS. Note: The adapter **currently only supports 2D simulations in FEniCS.**
+preCICE-adapter for the open source computing platform FEniCS.
 
 ## Installing the package
 
