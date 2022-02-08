@@ -14,6 +14,7 @@ from .solverstate import SolverState
 from fenics import Function, FunctionSpace
 from mpi4py import MPI
 import copy
+import os
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
@@ -29,11 +30,11 @@ class Adapter:
 
     For more information on setting up a coupling case using dolfin.UserExpression at the coupling boundary please have
     a look at this tutorial:
-    https://github.com/precice/tutorials/tree/master/HT/partitioned-heat/fenics-fenics
+    https://github.com/precice/tutorials/tree/master/partitioned-heat-conduction/fenics
 
     For more information on setting up a coupling case using dolfin.PointSource at the coupling boundary please have a
     look at this tutorial:
-    https://github.com/precice/tutorials/tree/master/FSI/flap_perp/OpenFOAM-FEniCS
+    https://github.com/precice/tutorials/tree/master/perpendicular-flap/solid-fenics
     NOTE: dolfin.PointSource use only works in serial
     """
 
@@ -46,8 +47,7 @@ class Adapter:
         adapter_config_filename : string
             Name of the JSON adapter configuration file (to be provided by the user)
         """
-
-        self._config = Config(adapter_config_filename)
+        self._config = Config(os.path.relpath(adapter_config_filename))
 
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
@@ -109,14 +109,15 @@ class Adapter:
 
     def create_coupling_expression(self):
         """
-        Creates a FEniCS Expression in the form of an object of class GeneralInterpolationExpression or
-        ExactInterpolationExpression. The adapter will hold this object till the coupling is on going.
+        Creates a FEniCS Expression in the form of an object of class SegregatedRBFInterpolationExpression. The adapter
+        will hold this object till the coupling is on going.
 
         Returns
         -------
         coupling_expression : Object of class dolfin.functions.expression.Expression
-            Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
+            Reference to object of class SegregatedRBFInterpolationExpression.
         """
+        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
 
         if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
             raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
@@ -154,19 +155,19 @@ class Adapter:
         Parameters
         ----------
         coupling_expression : Object of class dolfin.functions.expression.Expression
-            Reference to object of class GeneralInterpolationExpression or ExactInterpolationExpression.
+            Reference to object of class SegregatedRBFInterpolationExpression.
         data : dict_like
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
+        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
+
         if not self._empty_rank:
-            vertices = np.array(list(data.keys()))
-            nodal_data = np.array(list(data.values()))
-            coupling_expression.update_boundary_data(nodal_data, vertices[:, 0], vertices[:, 1])
+            coupling_expression.update_boundary_data(np.array(list(data.values())), np.array(list(data.keys())))
 
     def get_point_sources(self, data):
         """
-        Update values of at points by defining a point source load using data.
+        Update values at points by defining a point source load using data.
 
         Parameters
         ----------
@@ -195,9 +196,6 @@ class Adapter:
         For a vector read function the data is a numpy array with shape (N, D) where
         N = number of coupling vertices and D = dimensions of FEniCS setup
 
-        Note: For quasi 2D-3D coupled simulation (FEniCS participant is 2D) the Z-component of the data and vertices
-        is deleted.
-
         Returns
         -------
         data : dict_like
@@ -213,7 +211,8 @@ class Adapter:
         read_data = None
 
         if self._empty_rank:
-            assert (self._is_parallel()), "having participants without coupling mesh nodes is only valid for parallel runs"
+            assert (self._is_parallel()
+                    ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
@@ -232,7 +231,7 @@ class Adapter:
     def write_data(self, write_function):
         """
         Writes data to preCICE. Depending on the dimensions of the simulation (2D-3D Coupling, 2D-2D coupling or
-        Scalar/Vector write function) write_data is first converted into a format needed for preCICE.
+        Scalar/Vector write function) write_function is first converted into a format needed for preCICE.
 
         Parameters
         ----------
@@ -248,16 +247,17 @@ class Adapter:
         assert (w_func != write_function)
 
         # Check that the function provided lives on the same function space provided during initialization
-        assert (self._write_function_type == determine_function_type(w_func))
+        assert (self._write_function_type == determine_function_type(w_func, self._fenics_dims))
         assert (write_function.function_space() == self._write_function_space)
 
         write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
                                                     self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
 
         if self._empty_rank:
-            assert (self._is_parallel()), "having participants without coupling mesh nodes is only valid for parallel runs"
+            assert (self._is_parallel()
+                    ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
-        write_function_type = determine_function_type(write_function)
+        write_function_type = determine_function_type(write_function, self._fenics_dims)
         assert (write_function_type in list(FunctionType))
         write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
         if write_function_type is FunctionType.SCALAR:
@@ -338,19 +338,19 @@ class Adapter:
             raise Exception("Incorrect read and write function space combination provided. Please check input "
                             "parameters in initialization")
 
+        coords = function_space.tabulate_dof_coordinates()
+        _, self._fenics_dims = coords.shape
+
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
-            self._read_function_type = determine_function_type(read_function_space)
+            self._read_function_type = determine_function_type(read_function_space, self._fenics_dims)
             self._read_function_space = read_function_space
 
         if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_WRITE_COUPLING or \
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
             # Ensure that function spaces of read and write functions are defined using the same mesh
-            self._write_function_type = determine_function_type(write_function_space)
+            self._write_function_type = determine_function_type(write_function_space, self._fenics_dims)
             self._write_function_space = write_function_space
-
-        coords = function_space.tabulate_dof_coordinates()
-        _, self._fenics_dims = coords.shape
 
         # Ensure that function spaces of read and write functions use the same mesh
         if self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
@@ -359,9 +359,6 @@ class Adapter:
 
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
-
-        if self._fenics_dims != 2:
-            raise Exception("Currently the fenics-adapter only supports 2D cases")
 
         if self._fenics_dims != self._interface.get_dimensions():
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
@@ -396,8 +393,8 @@ class Adapter:
         self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
             self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
 
-        if self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or \
-                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING:
+        if (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
+                self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING) and self._is_parallel:
             # Determine shared vertices with neighbouring processes and get dictionaries for communication
             self._send_map, self._recv_map = get_communication_map(self._comm, self._read_function_space,
                                                                    self._owned_vertices,
@@ -486,7 +483,7 @@ class Adapter:
 
         Notes
         -----
-        Refer advance() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer advance() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -503,7 +500,7 @@ class Adapter:
 
         Notes
         -----
-        Refer finalize() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer finalize() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
         """
         self._interface.finalize()
 
@@ -522,7 +519,7 @@ class Adapter:
 
         Notes
         -----
-        Refer is_coupling_ongoing() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer is_coupling_ongoing() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -537,7 +534,8 @@ class Adapter:
 
         Notes
         -----
-        Refer is_time_window_complete() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer is_time_window_complete() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -557,7 +555,8 @@ class Adapter:
 
         Notes
         -----
-        Refer is_action_required(action) in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer is_action_required(action) in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -572,7 +571,8 @@ class Adapter:
 
         Notes
         -----
-        Refer action_write_iteration_checkpoint() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer action_write_iteration_checkpoint() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
@@ -588,7 +588,8 @@ class Adapter:
 
         Notes
         -----
-        Refer action_read_iteration_checkpoint() in https://github.com/precice/python-bindings/blob/develop/precice.pyx
+        Refer action_read_iteration_checkpoint() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------

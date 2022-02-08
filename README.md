@@ -14,7 +14,7 @@
     <img src="https://github.com/precice/fenics-adapter/actions/workflows/pythonpublish.yml/badge.svg" alt="Upload Python Package">
 </a>
 
-preCICE-adapter for the open source computing platform FEniCS. Note: The adapter **currently only supports 2D simulations in FEniCS.**
+preCICE-adapter for the open source computing platform FEniCS.
 
 ## Installing the package
 
@@ -75,13 +75,9 @@ To create and install the `fenicsprecice` python package the following instructi
 
 ## Citing
 
-If you are using this adapter, please refer to the [citing information on the FEniCS adapter](https://www.precice.org/adapter-fenics.html#how-to-cite).
-
-preCICE is an academic project, developed at the [Technical University of Munich](https://www5.in.tum.de/) and at the [University of Stuttgart](https://www.ipvs.uni-stuttgart.de/). If you use preCICE, please [cite us](https://www.precice.org/publications/):
-
-*H.-J. Bungartz, F. Lindner, B. Gatzhammer, M. Mehl, K. Scheufele, A. Shukaev, and B. Uekermann: preCICE - A Fully Parallel Library for Multi-Physics Surface Coupling. Computers and Fluids, 141, 250–258, 2016.*
-
-If you are using FEniCS, please also consider the information on [the official FEniCS website on citing](https://fenicsproject.org/citing/).
+* FEniCS-preCICE: If you are using this adapter (`fenics-adapter`), please refer to the [citing information on the FEniCS adapter](https://www.precice.org/adapter-fenics.html#how-to-cite).
+* preCICE: preCICE is an academic project, developed at the [Technical University of Munich](https://www5.in.tum.de/) and at the [University of Stuttgart](https://www.ipvs.uni-stuttgart.de/). If you use preCICE, please [cite preCICE](https://precice.org/publications.html#how-to-cite-precice).
+* FEniCS: If you are using FEniCS, please also consider the information on [the official FEniCS website on citing](https://fenicsproject.org/citing/).
 
 ## Development history
 
@@ -89,4 +85,4 @@ The initial version of this adapter was developed by [Benjamin Rodenberg](https:
 
 [Richard Hertrich](https://github.com/richahert) contributed the possibility to perform FSI simulations using the adapter in his [Bachelor thesis](https://mediatum.ub.tum.de/node?id=1520579).
 
-[Ishaan Desai](https://www.ipvs.uni-stuttgart.de/institute/team/Desai/) improved the user interface and extended the adapter to also allow for parallel FEniCS computations.
+[Ishaan Desai](https://www.ipvs.uni-stuttgart.de/institute/team/Desai/) improved the user interface and extended the adapter to allow for parallel FEniCS computations and 3D cases in certain scenarios.
