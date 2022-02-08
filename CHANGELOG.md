@@ -2,7 +2,8 @@
 
 ## 1.3.0
 
-* Adding functionality for 3D cases with PointSource objects at coupling boundaries. See PRs [#133](https://github.com/precice/fenics-adapter/pull/133), [#146](https://github.com/precice/fenics-adapter/pull/146) and [#147](https://github.com/precice/fenics-adapter/pull/147)
+* Adding functionality for 3D cases with PointSource objects at coupling boundaries. See PRs [#133](https://github.com/precice/fenics-adapter/pull/133), [#146](https://github.com/precice/fenics-adapter/pull/146) and [#147](https://github.com/precice/fenics-adapter/pull/147).
+* Fixing an issue of the `config` object not being able to find the adapter configuration file in a Jupyter notebook. [See PR #144](https://github.com/precice/fenics-adapter/pull/144)
 
 ## 1.2.0
 
