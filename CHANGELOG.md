@@ -1,5 +1,9 @@
 # FEniCS-preCICE adapter changelog
 
+## 1.3.0
+
+* Adding functionality for 3D cases with PointSource objects at coupling boundaries. See PRs [#133](https://github.com/precice/fenics-adapter/pull/133), [#146](https://github.com/precice/fenics-adapter/pull/146) and [#147](https://github.com/precice/fenics-adapter/pull/147)
+
 ## 1.2.0
 
 * Reduce complexity of initialization to reduce runtime for large cases. [See PR #135](https://github.com/precice/fenics-adapter/pull/135)
