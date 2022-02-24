@@ -26,7 +26,17 @@ This adapter supports the Python interface of FEniCS and offers an API that allo
 
 ## How to install the adapter
 
-The adapter requires FEniCS and preCICE version 2.0 or greater and the preCICE language bindings for Python. The adapter is [published on PyPI](https://pypi.org/project/fenicsprecice/). After installing preCICE and the python language bindings one can simply run `pip3 install --user fenicsprecice` to install the adapter via your Python package manager.
+The adapter requires FEniCS and preCICE version 2.0 or greater and the preCICE language bindings for Python.
+
+### Use `pip`
+
+The adapter is [published on PyPI](https://pypi.org/project/fenicsprecice/). After installing preCICE and the python language bindings one can simply run `pip3 install --user fenicsprecice` to install the adapter via your Python package manager.
+
+### Use `conda`
+
+You can alternatively use `conda` to install the adapter. Please refer to [`conda-forge/fenicsprecice`](https://anaconda.org/conda-forge/fenicsprecice) for installation instructions. Bonus, if you use `conda`: You don't have to worry about the dependencies, because `conda` takes care of this for you.
+
+### Something special?
 
 Please refer to the installation instructions provided [here](https://github.com/precice/fenics-adapter#installing-the-package) for alternative installation procedures.
 
