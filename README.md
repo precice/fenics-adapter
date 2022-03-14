@@ -4,6 +4,10 @@
     <img src="https://img.shields.io/github/license/precice/fenics-adapter.svg" alt="GNU LGPL license">
 </a>
 
+<a style="text-decoration: none" href="https://doi.org/10.1016/j.softx.2021.100807" target="_blank">
+    <img src="https://zenodo.org/badge/DOI/10.1016/j.softx.2021.100807.svg" alt="DOI">
+</a>
+
 <a style="text-decoration: none" href="https://github.com/precice/fenics-adapter/actions/workflows/build-and-test.yml" target="_blank">
     <img src="https://github.com/precice/fenics-adapter/actions/workflows/build-and-test.yml/badge.svg" alt="Build and Test">
 </a>
