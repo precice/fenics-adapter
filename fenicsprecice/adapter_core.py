@@ -2,7 +2,7 @@
 This module consists of helper functions used in the Adapter class. Names of the functions are self explanatory
 """
 
-from fenics import SubDomain, Point, PointSource, vertices, FunctionSpace, Function, edges
+from fenics import SubDomain, Point, PointSource, vertices, FunctionSpace, Function, edges, cells
 import numpy as np
 from enum import Enum
 import logging
@@ -375,6 +375,8 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
         Array of first vertex of each edge.
     vertices2_ids : numpy array
         Array of second vertex of each edge.
+    edges_ids : numpy array
+        Array of FEniCS edge global IDs.
     """
 
     def edge_is_on(subdomain, this_edge):
@@ -386,6 +388,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
 
     vertices1_ids = []
     vertices2_ids = []
+    edges_ids = []
 
     for edge in edges(function_space.mesh()):
         if edge_is_on(coupling_subdomain, edge):
@@ -393,12 +396,59 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
             if v1.global_index() in global_ids and v2.global_index() in global_ids:
                 vertices1_ids.append(id_mapping[v1.global_index()])
                 vertices2_ids.append(id_mapping[v2.global_index()])
+                edges_ids.append(edge.index())
 
     vertices1_ids = np.array(vertices1_ids)
     vertices2_ids = np.array(vertices2_ids)
+    edges_ids = np.array(edges_ids)
 
-    return vertices1_ids, vertices2_ids
+    print("EDGES ID: ", edges_ids)
+    return vertices1_ids, vertices2_ids, edges_ids
 
+def get_coupling_triangles(function_space, coupling_subdomain):
+    """
+    Extracts triangles of mesh which lie on the coupling region.
+
+    Parameters
+    ----------
+    function_space : FEniCS function space
+        Function space on which the finite element problem definition lives.
+    coupling_subdomain : FEniCS Domain
+        FEniCS domain of the coupling interface region.
+
+
+    Returns
+    -------
+    edges : numpy array
+        Array of edges indices (3 per triangle)
+
+    """
+
+    def cell_is_in(subdomain, this_cell):
+        """
+        Check whether edge lies within subdomain
+        """
+        assert(len(list(vertices(this_cell))) == 3), "Only triangular meshes are supported"
+        return all([subdomain.inside(v.point(), True) for v in vertices(this_cell)])
+
+    edges_ids = []
+
+    for cell in cells(function_space.mesh()):
+        if cell_is_in(coupling_subdomain, cell):
+            e1, e2, e3 = list(edges(cell))
+            #if e1.global_index() in global_ids and v2.global_index() in global_ids:
+                #vertices1_ids.append(id_mapping[v1.global_index()])
+                #vertices2_ids.append(id_mapping[v2.global_index()])
+            print("global:", e1.global_index(), e2.global_index(), e3.global_index())
+            print("local:", e1.index(), e2.index(), e3.index())
+
+            # PreCICE ID != global ID != local ID
+            #if e1.thisown and e2.thisown and e3.thisown:
+            edges_ids += [e1.index(), e2.index(), e3.index()]
+
+
+
+    return np.array(edges_ids)
 
 def get_forces_as_point_sources(fixed_boundary, function_space, data):
     """
