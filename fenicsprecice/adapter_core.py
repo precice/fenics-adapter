@@ -57,11 +57,6 @@ class Vertices:
     def get_coordinates(self):
         return copy.deepcopy(self._coordinates)
 
-class Edges:
-    """
-    Set of edges. An edge has a local ID, global ID and a preCICE ID. 
-    Each
-    """
 
 
 class FunctionType(Enum):
@@ -408,7 +403,6 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
     vertices2_ids = np.array(vertices2_ids)
     edges_ids = np.array(edges_ids)
 
-    print("EDGES ID: ", edges_ids)
     return vertices1_ids, vertices2_ids, edges_ids
 
 def get_coupling_triangles(function_space, coupling_subdomain, global_ids, precice_edge_dict):
@@ -444,16 +438,6 @@ def get_coupling_triangles(function_space, coupling_subdomain, global_ids, preci
     for cell in cells(function_space.mesh()):
         if cell_is_in(coupling_subdomain, cell):
             e1, e2, e3 = list(edges(cell))
-            #if e1.global_index() in global_ids and v2.global_index() in global_ids:
-                #vertices1_ids.append(id_mapping[v1.global_index()])
-                #vertices2_ids.append(id_mapping[v2.global_index()])
-            #if not all([v in global_ids for v in np.concatenate((e1.entities(0), e2.entities(0)))]):
-             #   print("global:", e1.global_index(), e2.global_index(), e3.global_index())
-            #    print("local:", e1.index(), e2.index(), e3.index())
-
-            # PreCICE ID != global ID != local ID
-            #if e1.thisown and e2.thisown and e3.thisown:
-            print("Dict: ", precice_edge_dict, "edges GI: ", e1.index(), e2.index(), e3.index())
             if e1.index() in precice_edge_dict.keys() and e2.index() in precice_edge_dict.keys() and e3.index() in precice_edge_dict.keys():
                 edges_ids += [e1.index(), e2.index(), e3.index()]
 
