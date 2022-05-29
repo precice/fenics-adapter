@@ -444,15 +444,8 @@ class Adapter:
         edges = get_coupling_triangles(function_space, coupling_domain, global_ids, self._precice_edge_dict)
 
         for i in range(int(len(edges)/3)):
-            #assert (edges[i] != edge_vertex_ids2[i])
-            print(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                                          edges[3*i], edges[3*i+1], edges[3*i+2])
-            #self._interface.set_mesh_triangle(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                                          #self._precice_edge_dict[edges[3*i]], self._precice_edge_dict[edges[3*i+1]], self._precice_edge_dict[edges[3*i+2]])
-            e1, e2, e3 = edges[3*i], edges[3*i+1], edges[3*i+2]
-            print("triangle made of (in fenics)", e1, e2, e3)
+            # Make this cleaner?
             e1, e2, e3 = self._precice_edge_dict[edges[3*i]], self._precice_edge_dict[edges[3*i+1]], self._precice_edge_dict[edges[3*i+2]]
-            print("triangle made of (in preCICE)", e1, e2, e3)
             self._interface.set_mesh_triangle(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           e1, e2, e3)
 
