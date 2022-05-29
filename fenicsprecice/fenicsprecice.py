@@ -422,8 +422,6 @@ class Adapter:
             self._precice_edge_dict[edges_ids[i]] = self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-        print(self._precice_edge_dict)
-
         self.configure_volume_connectivity(function_space, coupling_subdomain, self._owned_vertices.get_global_ids())
 
         precice_dt = self._interface.initialize()
@@ -439,8 +437,6 @@ class Adapter:
         return precice_dt
 
     def configure_volume_connectivity(self, function_space, coupling_domain, global_ids):
-        id_mapping = {key: value for key, value in zip(
-            self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
         edges = get_coupling_triangles(function_space, coupling_domain, global_ids, self._precice_edge_dict)
 
         for i in range(int(len(edges)/3)):
