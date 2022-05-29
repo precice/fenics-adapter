@@ -441,8 +441,6 @@ def get_coupling_triangles(function_space, coupling_subdomain, global_ids, preci
             if e1.index() in precice_edge_dict.keys() and e2.index() in precice_edge_dict.keys() and e3.index() in precice_edge_dict.keys():
                 edges_ids += [e1.index(), e2.index(), e3.index()]
 
-
-
     return np.array(edges_ids)
 
 def get_forces_as_point_sources(fixed_boundary, function_space, data):
