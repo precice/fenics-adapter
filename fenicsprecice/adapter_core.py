@@ -382,7 +382,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
     vertices2_ids : numpy array
         Array of second vertex of each edge.
     edges_ids : numpy array
-        Array of FEniCS edge global IDs.
+        Array of FEniCS edge local IDs.
     """
 
     def edge_is_on(subdomain, this_edge):
@@ -402,7 +402,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
             if v1.global_index() in global_ids and v2.global_index() in global_ids:
                 vertices1_ids.append(id_mapping[v1.global_index()])
                 vertices2_ids.append(id_mapping[v2.global_index()])
-                edges_ids.append(edge.global_index())
+                edges_ids.append(edge.index())
 
     vertices1_ids = np.array(vertices1_ids)
     vertices2_ids = np.array(vertices2_ids)
@@ -453,9 +453,9 @@ def get_coupling_triangles(function_space, coupling_subdomain, global_ids, preci
 
             # PreCICE ID != global ID != local ID
             #if e1.thisown and e2.thisown and e3.thisown:
-            print("Dict: ", precice_edge_dict, "edges GI: ", e1.global_index(), e2.global_index(), e3.global_index())
-            if e1.global_index() in precice_edge_dict.keys() and e2.global_index() in precice_edge_dict.keys() and e3.global_index() in precice_edge_dict.keys():
-                edges_ids += [e1.global_index(), e2.global_index(), e3.global_index()]
+            print("Dict: ", precice_edge_dict, "edges GI: ", e1.index(), e2.index(), e3.index())
+            if e1.index() in precice_edge_dict.keys() and e2.index() in precice_edge_dict.keys() and e3.index() in precice_edge_dict.keys():
+                edges_ids += [e1.index(), e2.index(), e3.index()]
 
 
 
