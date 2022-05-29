@@ -57,6 +57,12 @@ class Vertices:
     def get_coordinates(self):
         return copy.deepcopy(self._coordinates)
 
+class Edges:
+    """
+    Set of edges. An edge has a local ID, global ID and a preCICE ID. 
+    Each
+    """
+
 
 class FunctionType(Enum):
     """
@@ -396,7 +402,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
             if v1.global_index() in global_ids and v2.global_index() in global_ids:
                 vertices1_ids.append(id_mapping[v1.global_index()])
                 vertices2_ids.append(id_mapping[v2.global_index()])
-                edges_ids.append(edge.index())
+                edges_ids.append(edge.global_index())
 
     vertices1_ids = np.array(vertices1_ids)
     vertices2_ids = np.array(vertices2_ids)
@@ -405,7 +411,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
     print("EDGES ID: ", edges_ids)
     return vertices1_ids, vertices2_ids, edges_ids
 
-def get_coupling_triangles(function_space, coupling_subdomain):
+def get_coupling_triangles(function_space, coupling_subdomain, global_ids, precice_edge_dict):
     """
     Extracts triangles of mesh which lie on the coupling region.
 
@@ -415,6 +421,8 @@ def get_coupling_triangles(function_space, coupling_subdomain):
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         FEniCS domain of the coupling interface region.
+    global_ids: numpy_array
+        Array of global IDs of vertices owned by this rank.
 
 
     Returns
@@ -439,12 +447,15 @@ def get_coupling_triangles(function_space, coupling_subdomain):
             #if e1.global_index() in global_ids and v2.global_index() in global_ids:
                 #vertices1_ids.append(id_mapping[v1.global_index()])
                 #vertices2_ids.append(id_mapping[v2.global_index()])
-            print("global:", e1.global_index(), e2.global_index(), e3.global_index())
-            print("local:", e1.index(), e2.index(), e3.index())
+            #if not all([v in global_ids for v in np.concatenate((e1.entities(0), e2.entities(0)))]):
+             #   print("global:", e1.global_index(), e2.global_index(), e3.global_index())
+            #    print("local:", e1.index(), e2.index(), e3.index())
 
             # PreCICE ID != global ID != local ID
             #if e1.thisown and e2.thisown and e3.thisown:
-            edges_ids += [e1.index(), e2.index(), e3.index()]
+            print("Dict: ", precice_edge_dict, "edges GI: ", e1.global_index(), e2.global_index(), e3.global_index())
+            if e1.global_index() in precice_edge_dict.keys() and e2.global_index() in precice_edge_dict.keys() and e3.global_index() in precice_edge_dict.keys():
+                edges_ids += [e1.global_index(), e2.global_index(), e3.global_index()]
 
 
 
