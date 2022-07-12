@@ -189,7 +189,7 @@ class Adapter:
 
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
-    def read_data(self):
+    def read_data(self, dt=None):
         """
         Read data from preCICE. Data is generated depending on the type of the read function (Scalar or Vector).
         For a scalar read function the data is a numpy array with shape (N) where N = number of coupling vertices
@@ -216,9 +216,9 @@ class Adapter:
 
         if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
-                read_data = self._interface.read_block_scalar_data(read_data_id, self._precice_vertex_ids)
+                read_data = self._interface.read_block_scalar_data(read_data_id, self._precice_vertex_ids, dt)
             elif self._read_function_type is FunctionType.VECTOR:
-                read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
+                read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids, dt)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
             read_data = communicate_shared_vertices(
