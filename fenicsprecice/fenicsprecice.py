@@ -295,10 +295,10 @@ class Adapter:
         """
 
         write_function_space, write_function = None, None
-        if isinstance(write_object, Function):  # precice.initialize_data() will be called using this Function
+        if isinstance(write_object, Function):
             write_function_space = write_object.function_space()
             write_function = write_object
-        elif isinstance(write_object, FunctionSpace):  # preCICE will use default zero values for initialization.
+        elif isinstance(write_object, FunctionSpace):
             write_function_space = write_object
             write_function = None
         elif write_object is None:
@@ -419,15 +419,13 @@ class Adapter:
             self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-        precice_dt = self._interface.initialize()
-
         if self._interface.is_action_required(precice.action_write_initial_data()):
             if not write_function:
-                raise Exception("Non-standard initialization requires a write_function")
+                raise Exception("preCICE requires you to write initial data. Please provide a write_function to initialize(...)")
             self.write_data(write_function)
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
-        self._interface.initialize_data()
+        precice_dt = self._interface.initialize()
 
         return precice_dt
 

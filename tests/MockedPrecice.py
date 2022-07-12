@@ -32,9 +32,6 @@ class Interface:
     def get_mesh_id(self, foo):
         raise Exception("not implemented")
 
-    def initialize_data(self):
-        raise Exception("not implemented")
-
     def advance(self, foo):
         raise Exception("not implemented")
 

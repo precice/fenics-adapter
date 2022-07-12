@@ -56,7 +56,6 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
-        Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
@@ -92,7 +91,6 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
-        Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
@@ -136,7 +134,6 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
-        Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
@@ -177,7 +174,6 @@ class TestWriteandReadData(TestCase):
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
         Interface.is_action_required = MagicMock(return_value=False)
-        Interface.initialize_data = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
