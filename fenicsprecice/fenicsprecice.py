@@ -421,7 +421,8 @@ class Adapter:
 
         if self._interface.is_action_required(precice.action_write_initial_data()):
             if not write_function:
-                raise Exception("preCICE requires you to write initial data. Please provide a write_function to initialize(...)")
+                raise Exception(
+                    "preCICE requires you to write initial data. Please provide a write_function to initialize(...)")
             self.write_data(write_function)
             self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
