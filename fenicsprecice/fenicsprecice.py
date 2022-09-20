@@ -422,7 +422,7 @@ class Adapter:
 
         # Configure mesh connectivity (triangles from edges) for 2D simulations
         if self._fenics_dims == 2:
-            edges = get_coupling_triangles(function_space, coupling_domain, self._precice_edge_dict)
+            edges = get_coupling_triangles(function_space, coupling_subdomain, self._precice_edge_dict)
             for edges_ids in edges:
                 self._interface.set_mesh_triangle(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                                   self._precice_edge_dict[edges_ids[0]],
