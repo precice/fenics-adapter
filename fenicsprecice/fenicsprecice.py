@@ -420,7 +420,16 @@ class Adapter:
             self._precice_edge_dict[edges_ids[i]] = self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
                                           edge_vertex_ids1[i], edge_vertex_ids2[i])
 
-        self.configure_volume_connectivity(function_space, coupling_subdomain, self._owned_vertices.get_global_ids())
+        # Configure mesh connectivity (triangles from edges) for 2D simulations
+        if self._fenics_dims == 2:
+            edges = get_coupling_triangles(function_space, coupling_domain, self._precice_edge_dict)
+            for edges_ids in edges:
+                self._interface.set_mesh_triangle(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
+                                                  self._precice_edge_dict[edges_ids[0]],
+                                                  self._precice_edge_dict[edges_ids[1]],
+                                                  self._precice_edge_dict[edges_ids[2]])
+        else:
+            print("Mesh connectivity information is not written for 3D cases.")
 
         precice_dt = self._interface.initialize()
 
@@ -433,15 +442,6 @@ class Adapter:
         self._interface.initialize_data()
 
         return precice_dt
-
-    def configure_volume_connectivity(self, function_space, coupling_domain, global_ids):
-        edges = get_coupling_triangles(function_space, coupling_domain, global_ids, self._precice_edge_dict)
-
-        for i in range(int(len(edges)/3)):
-            # Make this cleaner?
-            e1, e2, e3 = self._precice_edge_dict[edges[3*i]], self._precice_edge_dict[edges[3*i+1]], self._precice_edge_dict[edges[3*i+2]]
-            self._interface.set_mesh_triangle(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                                          e1, e2, e3)
 
     def store_checkpoint(self, user_u, t, n):
         """

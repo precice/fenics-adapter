@@ -405,7 +405,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
 
     return vertices1_ids, vertices2_ids, edges_ids
 
-def get_coupling_triangles(function_space, coupling_subdomain, global_ids, precice_edge_dict):
+def get_coupling_triangles(function_space, coupling_subdomain, precice_edge_dict):
     """
     Extracts triangles of mesh which lie on the coupling region.
 
@@ -415,15 +415,13 @@ def get_coupling_triangles(function_space, coupling_subdomain, global_ids, preci
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         FEniCS domain of the coupling interface region.
-    global_ids: numpy_array
-        Array of global IDs of vertices owned by this rank.
+    precice_edge_dict: dict
 
 
     Returns
     -------
     edges : numpy array
         Array of edges indices (3 per triangle)
-
     """
 
     def cell_is_in(subdomain, this_cell):
@@ -439,7 +437,7 @@ def get_coupling_triangles(function_space, coupling_subdomain, global_ids, preci
         if cell_is_in(coupling_subdomain, cell):
             e1, e2, e3 = list(edges(cell))
             if all(edge in precice_edge_dict.keys() for edge in [e1.index(), e2.index(), e3.index()]):
-                edges_ids += [e1.index(), e2.index(), e3.index()]
+                edges_ids.append([e1.index(), e2.index(), e3.index()])
 
     return np.array(edges_ids)
 
