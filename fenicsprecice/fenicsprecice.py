@@ -65,6 +65,7 @@ class Adapter:
         self._unowned_vertices = Vertices(VertexType.UNOWNED)
         self._fenics_vertices = Vertices(VertexType.FENICS)
         self._precice_vertex_ids = None  # initialized later
+        self._precice_edge_dict = dict()
 
         # read data related quantities (read data is read from preCICE and applied in FEniCS)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
@@ -413,9 +414,6 @@ class Adapter:
         edge_vertex_ids1, edge_vertex_ids2, edges_ids = get_coupling_boundary_edges(function_space, coupling_subdomain,
                                                                          self._owned_vertices.get_global_ids(),
                                                                          id_mapping)
-
-        # Initialize preCICE edges dict
-        self._precice_edge_dict = {}
 
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
