@@ -58,7 +58,6 @@ class Vertices:
         return copy.deepcopy(self._coordinates)
 
 
-
 class FunctionType(Enum):
     """
     Defines scalar- and vector-valued function.
@@ -405,6 +404,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
 
     return vertices1_ids, vertices2_ids, edges_ids
 
+
 def get_coupling_triangles(function_space, coupling_subdomain, precice_edge_dict):
     """
     Extracts triangles of mesh which lie on the coupling region.
@@ -416,7 +416,7 @@ def get_coupling_triangles(function_space, coupling_subdomain, precice_edge_dict
     coupling_subdomain : FEniCS Domain
         FEniCS domain of the coupling interface region.
     precice_edge_dict: dict
-
+        Dictionary with FEniCS IDs of coupling mesh edges as keys and preCICE IDs of the edges as values
 
     Returns
     -------
@@ -440,6 +440,7 @@ def get_coupling_triangles(function_space, coupling_subdomain, precice_edge_dict
                 edges_ids.append([e1.index(), e2.index(), e3.index()])
 
     return np.array(edges_ids)
+
 
 def get_forces_as_point_sources(fixed_boundary, function_space, data):
     """

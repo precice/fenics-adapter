@@ -411,14 +411,14 @@ class Adapter:
         # Define a mapping between coupling vertices and their IDs in preCICE
         id_mapping = {key: value for key, value in zip(self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
 
-        edge_vertex_ids1, edge_vertex_ids2, edges_ids = get_coupling_boundary_edges(function_space, coupling_subdomain,
-                                                                         self._owned_vertices.get_global_ids(),
-                                                                         id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2, edges_ids = get_coupling_boundary_edges(
+            function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
 
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-            self._precice_edge_dict[edges_ids[i]] = self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                                          edge_vertex_ids1[i], edge_vertex_ids2[i])
+            self._precice_edge_dict[edges_ids[i]] = self._interface.set_mesh_edge(
+                self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
+                edge_vertex_ids1[i], edge_vertex_ids2[i])
 
         # Configure mesh connectivity (triangles from edges) for 2D simulations
         if self._fenics_dims == 2:
