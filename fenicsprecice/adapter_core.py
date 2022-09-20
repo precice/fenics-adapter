@@ -438,7 +438,7 @@ def get_coupling_triangles(function_space, coupling_subdomain, global_ids, preci
     for cell in cells(function_space.mesh()):
         if cell_is_in(coupling_subdomain, cell):
             e1, e2, e3 = list(edges(cell))
-            if e1.index() in precice_edge_dict.keys() and e2.index() in precice_edge_dict.keys() and e3.index() in precice_edge_dict.keys():
+            if all(edge in precice_edge_dict.keys() for edge in [e1.index(), e2.index(), e3.index()]):
                 edges_ids += [e1.index(), e2.index(), e3.index()]
 
     return np.array(edges_ids)
