@@ -1,5 +1,10 @@
 # FEniCS-preCICE adapter changelog
 
+## 1.4.0
+
+* Adding CITATION.cff to link the adapter repository to the relevant publication in the journal SoftwareX.
+* Add functionality to define mesh connectivity in 2D cases in the form of triangles.
+
 ## 1.3.0
 
 * Adding functionality for 3D cases with PointSource objects at coupling boundaries. See PRs [#133](https://github.com/precice/fenics-adapter/pull/133), [#146](https://github.com/precice/fenics-adapter/pull/146) and [#147](https://github.com/precice/fenics-adapter/pull/147).
