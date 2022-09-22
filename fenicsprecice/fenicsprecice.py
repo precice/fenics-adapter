@@ -8,7 +8,7 @@ import logging
 import precice
 from .adapter_core import FunctionType, determine_function_type, convert_fenics_to_precice, get_fenics_vertices, \
     get_owned_vertices, get_unowned_vertices, get_coupling_boundary_edges, get_forces_as_point_sources, \
-    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType, filter_point_sources
+    get_communication_map, communicate_shared_vertices, CouplingMode, Vertices, VertexType, filter_point_sources, get_coupling_triangles
 from .expression_core import SegregatedRBFInterpolationExpression, EmptyExpression
 from .solverstate import SolverState
 from fenics import Function, FunctionSpace
@@ -65,6 +65,7 @@ class Adapter:
         self._unowned_vertices = Vertices(VertexType.UNOWNED)
         self._fenics_vertices = Vertices(VertexType.FENICS)
         self._precice_vertex_ids = None  # initialized later
+        self._precice_edge_dict = dict()
 
         # read data related quantities (read data is read from preCICE and applied in FEniCS)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
@@ -410,14 +411,25 @@ class Adapter:
         # Define a mapping between coupling vertices and their IDs in preCICE
         id_mapping = {key: value for key, value in zip(self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
 
-        edge_vertex_ids1, edge_vertex_ids2 = get_coupling_boundary_edges(function_space, coupling_subdomain,
-                                                                         self._owned_vertices.get_global_ids(),
-                                                                         id_mapping)
+        edge_vertex_ids1, edge_vertex_ids2, edges_ids = get_coupling_boundary_edges(
+            function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
 
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-            self._interface.set_mesh_edge(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                                          edge_vertex_ids1[i], edge_vertex_ids2[i])
+            self._precice_edge_dict[edges_ids[i]] = self._interface.set_mesh_edge(
+                self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
+                edge_vertex_ids1[i], edge_vertex_ids2[i])
+
+        # Configure mesh connectivity (triangles from edges) for 2D simulations
+        if self._fenics_dims == 2:
+            edges = get_coupling_triangles(function_space, coupling_subdomain, self._precice_edge_dict)
+            for edges_ids in edges:
+                self._interface.set_mesh_triangle(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
+                                                  self._precice_edge_dict[edges_ids[0]],
+                                                  self._precice_edge_dict[edges_ids[1]],
+                                                  self._precice_edge_dict[edges_ids[2]])
+        else:
+            print("Mesh connectivity information is not written for 3D cases.")
 
         precice_dt = self._interface.initialize()
 
