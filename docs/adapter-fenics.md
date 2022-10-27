@@ -30,7 +30,7 @@ The adapter requires FEniCS and preCICE version 2.0 or greater and the preCICE l
 
 ### Use `pip`
 
-The adapter is [published on PyPI](https://pypi.org/project/fenicsprecice/). After installing preCICE and the python language bindings one can simply run `pip3 install --user fenicsprecice` to install the adapter via your Python package manager.
+The adapter is [published on PyPI](https://pypi.org/project/fenicsprecice/). After installing preCICE and the python language bindings, run `pip3 install --user fenicsprecice` to install the adapter via your Python package manager.
 
 ### Use `conda`
 
