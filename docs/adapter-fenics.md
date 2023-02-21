@@ -58,7 +58,7 @@ The FEniCS adapter does not couple your code out-of-the-box, but you have to cal
 
 ## You need more information?
 
-Please don't hesitate to ask questions about the FEniCS adapter on [discourse](https://precice.discourse.group/) or in [Matrix](https://matrix.to/#/#precice_Lobby:gitter.im).
+Please don't hesitate to ask questions about the FEniCS adapter on [discourse](https://precice.discourse.group/) or in [Matrix]({{ site.matrix_url }}).
 
 ## How to cite
 
