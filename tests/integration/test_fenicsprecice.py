@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 from unittest import TestCase
 from tests import MockedPrecice
 import numpy as np
-from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
-    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, grad, assemble, Function, solve, dot, \
-    TrialFunction, TestFunction, lhs, inner, Constant, assemble_system
+from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, \
+    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, grad, dot, TrialFunction, \
+    TestFunction, inner, Constant, assemble_system
 
 
 class MockedArray:
@@ -74,20 +74,10 @@ class TestCheckpointing(TestCase):
         Test correct checkpoint storing
         """
         import fenicsprecice
-        from precice import Interface, action_write_iteration_checkpoint
-
-        def is_action_required_behavior(py_action):
-            if py_action == action_write_iteration_checkpoint():
-                return True
-            else:
-                return False
+        from precice import Interface
 
         Interface.initialize = MagicMock(return_value=self.dt)
-        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
         Interface.get_dimensions = MagicMock()
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
         Interface.is_time_window_complete = MagicMock(return_value=True)
         Interface.advance = MagicMock()
 
@@ -123,7 +113,6 @@ class TestExpressionHandling(TestCase):
     vector_function = interpolate(vector_expr, vector_V)
 
     n_vertices = 11
-    fake_id = 15
     vertices_x = [1 for _ in range(n_vertices)]
     vertices_y = np.linspace(0, 1, n_vertices)
     vertex_ids = np.arange(n_vertices)
@@ -146,12 +135,8 @@ class TestExpressionHandling(TestCase):
 
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
 
         right_boundary = self.Right()
@@ -180,12 +165,8 @@ class TestExpressionHandling(TestCase):
 
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
         Interface.write_block_vector_data = MagicMock()
 
         right_boundary = self.Right()

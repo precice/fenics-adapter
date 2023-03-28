@@ -14,16 +14,16 @@ class Interface:
     def __init__(self, name, config_file, rank, procs):
         pass
 
-    def read_block_scalar_data(self, read_data_id, vertex_ids):
+    def read_block_scalar_data(self, read_mesh_name, read_data_name, vertex_ids):
         raise Exception("not implemented")
 
-    def read_block_vector_data(self, read_data_id, vertex_ids):
+    def read_block_vector_data(self, read_mesh_name, read_data_name, vertex_ids):
         raise Exception("not implemented")
 
-    def write_block_scalar_data(self, write_data_id, vertex_ids, write_data):
+    def write_block_scalar_data(self, write_mesh_name, write_data_name, vertex_ids, write_data):
         raise Exception("not implemented")
 
-    def write_block_vector_data(self, write_data_id, vertex_ids, write_data):
+    def write_block_vector_data(self, write_mesh_name, write_data_name, vertex_ids, write_data):
         raise Exception("not implemented")
 
     def get_data_id(self, foo, bar):

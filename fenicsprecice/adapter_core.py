@@ -388,7 +388,7 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
 
     vertices1_ids = []
     vertices2_ids = []
-    edges_ids = []
+    fenics_edges_ids = []
 
     for edge in edges(function_space.mesh()):
         if edge_is_on(coupling_subdomain, edge):
@@ -396,16 +396,16 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
             if v1.global_index() in global_ids and v2.global_index() in global_ids:
                 vertices1_ids.append(id_mapping[v1.global_index()])
                 vertices2_ids.append(id_mapping[v2.global_index()])
-                edges_ids.append(edge.index())
+                fenics_edges_ids.append(edge.index())
 
     vertices1_ids = np.array(vertices1_ids)
     vertices2_ids = np.array(vertices2_ids)
-    edges_ids = np.array(edges_ids)
+    fenics_edges_ids = np.array(fenics_edges_ids)
 
-    return vertices1_ids, vertices2_ids, edges_ids
+    return vertices1_ids, vertices2_ids, fenics_edges_ids
 
 
-def get_coupling_triangles(function_space, coupling_subdomain, precice_edge_dict):
+def get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping):
     """
     Extracts triangles of mesh which lie on the coupling region.
 
@@ -415,13 +415,13 @@ def get_coupling_triangles(function_space, coupling_subdomain, precice_edge_dict
         Function space on which the finite element problem definition lives.
     coupling_subdomain : FEniCS Domain
         FEniCS domain of the coupling interface region.
-    precice_edge_dict: dict
-        Dictionary with FEniCS IDs of coupling mesh edges as keys and preCICE IDs of the edges as values
+    fenics_edge_ids: numpy array
+        Array with FEniCS IDs of coupling mesh edges
 
     Returns
     -------
-    edges : numpy array
-        Array of edges indices (3 per triangle)
+    vertex_ids : numpy array
+        Array of indices of vertices which make up triangles (3 per triangle)
     """
 
     def cell_is_in(subdomain, this_cell):
@@ -431,15 +431,18 @@ def get_coupling_triangles(function_space, coupling_subdomain, precice_edge_dict
         assert(len(list(vertices(this_cell))) == 3), "Only triangular meshes are supported"
         return all([subdomain.inside(v.point(), True) for v in vertices(this_cell)])
 
-    edges_ids = []
-
+    vertex_ids = []
     for cell in cells(function_space.mesh()):
         if cell_is_in(coupling_subdomain, cell):
             e1, e2, e3 = list(edges(cell))
-            if all(edge in precice_edge_dict.keys() for edge in [e1.index(), e2.index(), e3.index()]):
-                edges_ids.append([e1.index(), e2.index(), e3.index()])
+            if all(edge_ids in fenics_edge_ids for edge_ids in [e1.index(), e2.index(), e3.index()]):
+                v1, v2 = vertices(e1)
+                _, v3 = vertices(e2)
+                assert (v3 != v1)
+                assert (v2 != v2)
+                vertex_ids.append([id_mapping[v1.global_index()], id_mapping[v2.global_index()], id_mapping[v3.global_index()]])
 
-    return np.array(edges_ids)
+    return np.array(vertex_ids)
 
 
 def get_forces_as_point_sources(fixed_boundary, function_space, data):

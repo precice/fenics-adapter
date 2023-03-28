@@ -37,7 +37,6 @@ class TestWriteandReadData(TestCase):
     vector_function = interpolate(vector_expr, vector_V)
 
     n_vertices = 11
-    fake_id = 15
     vertices_x = [x_right for _ in range(n_vertices)]
     vertices_y = np.linspace(y_bottom, y_top, n_vertices)
 
@@ -50,24 +49,19 @@ class TestWriteandReadData(TestCase):
 
         Interface.write_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock(return_value=self.fake_id)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock(return_value=False)
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice._write_data_id = self.fake_id
         precice.initialize(RightBoundary(), self.scalar_V, self.scalar_function)
 
         precice.write_data(self.scalar_function)
 
-        expected_data_id = self.fake_id
         expected_values = np.array([self.scalar_expr(x_right, y) for y in self.vertices_y])
         expected_ids = np.arange(self.n_vertices)
-        expected_args = [expected_data_id, expected_ids, expected_values]
+        expected_args = [expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.write_block_scalar_data.call_args[0], expected_args):
             if isinstance(arg, int):
@@ -81,30 +75,24 @@ class TestWriteandReadData(TestCase):
         """
         from precice import Interface
         import fenicsprecice
-        from fenicsprecice.adapter_core import VertexType, Vertices, convert_fenics_to_precice
 
         Interface.write_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock(return_value=self.fake_id)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock(return_value=False)
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice._write_data_id = self.fake_id
         precice.initialize(RightBoundary(), self.vector_V, self.vector_function)
 
         precice.write_data(self.vector_function)
 
-        expected_data_id = self.fake_id
         expected_values_x = np.array([self.vector_expr(x_right, y)[0] for y in np.linspace(y_bottom, y_top, 11)])
         expected_values_y = np.array([self.vector_expr(x_right, y)[1] for y in np.linspace(y_bottom, y_top, 11)])
         expected_values = np.stack([expected_values_x, expected_values_y], axis=1)
         expected_ids = np.arange(self.n_vertices)
-        expected_args = [expected_data_id, expected_ids, expected_values]
+        expected_args = [expected_ids, expected_values]
 
         for arg, expected_arg in zip(Interface.write_block_vector_data.call_args[0], expected_args):
             if isinstance(arg, int):
@@ -128,23 +116,18 @@ class TestWriteandReadData(TestCase):
 
         Interface.read_block_scalar_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock(return_value=self.fake_id)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock(return_value=False)
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice._read_data_id = self.fake_id
         precice.initialize(RightBoundary(), self.scalar_V)
 
         read_data = precice.read_data()
 
-        expected_data_id = self.fake_id
         expected_ids = np.arange(self.n_vertices)
-        expected_args = [expected_data_id, expected_ids]
+        expected_args = [expected_ids]
 
         for arg, expected_arg in zip(Interface.read_block_scalar_data.call_args[0], expected_args):
             if isinstance(arg, int):
@@ -168,23 +151,18 @@ class TestWriteandReadData(TestCase):
 
         Interface.read_block_vector_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock(return_value=self.fake_id)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.set_mesh_edge = MagicMock()
         Interface.initialize = MagicMock()
-        Interface.is_action_required = MagicMock(return_value=False)
 
         precice = fenicsprecice.Adapter(self.dummy_config)
         precice._interface = Interface(None, None, None, None)
-        precice._read_data_id = self.fake_id
         precice.initialize(RightBoundary(), self.vector_V)
 
         read_data = precice.read_data()
 
-        expected_data_id = self.fake_id
         expected_ids = np.arange(self.n_vertices)
-        expected_args = [expected_data_id, expected_ids]
+        expected_args = [expected_ids]
 
         for arg, expected_arg in zip(Interface.read_block_vector_data.call_args[0], expected_args):
             if isinstance(arg, int):
