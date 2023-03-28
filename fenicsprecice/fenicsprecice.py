@@ -117,7 +117,7 @@ class Adapter:
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class SegregatedRBFInterpolationExpression.
         """
-        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
+        assert (self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
 
         if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
             raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
@@ -160,7 +160,7 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
-        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
+        assert (self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
 
         if not self._empty_rank:
             coupling_expression.update_boundary_data(np.array(list(data.values())), np.array(list(data.keys())))
@@ -213,9 +213,11 @@ class Adapter:
 
         if not self._empty_rank:
             if self._read_function_type is FunctionType.SCALAR:
-                read_data = self._interface.read_block_scalar_data(self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
+                read_data = self._interface.read_block_scalar_data(
+                    self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
             elif self._read_function_type is FunctionType.VECTOR:
-                read_data = self._interface.read_block_vector_data(self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
+                read_data = self._interface.read_block_vector_data(
+                    self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
             read_data = communicate_shared_vertices(
@@ -256,10 +258,18 @@ class Adapter:
         write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
         if write_function_type is FunctionType.SCALAR:
             assert (write_function.function_space().num_sub_spaces() == 0)
-            self._interface.write_block_scalar_data(self._config.get_coupling_mesh_name(), self._config.get_write_data_name(), self._precice_vertex_ids, write_data)
+            self._interface.write_block_scalar_data(
+                self._config.get_coupling_mesh_name(),
+                self._config.get_write_data_name(),
+                self._precice_vertex_ids,
+                write_data)
         elif write_function_type is FunctionType.VECTOR:
             assert (write_function.function_space().num_sub_spaces() > 0)
-            self._interface.write_block_vector_data(self._config.get_coupling_mesh_name(), self._config.get_write_data_name(), self._precice_vertex_ids, write_data)
+            self._interface.write_block_vector_data(
+                self._config.get_coupling_mesh_name(),
+                self._config.get_write_data_name(),
+                self._precice_vertex_ids,
+                write_data)
         else:
             raise Exception("write_function provided is neither VECTOR nor SCALAR type")
 
@@ -384,7 +394,8 @@ class Adapter:
             print("Rank {} has no part of coupling boundary.".format(self._comm.Get_rank()))
 
         # Define mesh in preCICE
-        self._precice_vertex_ids = self._interface.set_mesh_vertices(self._config.get_coupling_mesh_name(), self._owned_vertices.get_coordinates())
+        self._precice_vertex_ids = self._interface.set_mesh_vertices(
+            self._config.get_coupling_mesh_name(), self._owned_vertices.get_coordinates())
 
         if (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING) and self._is_parallel:
@@ -408,7 +419,10 @@ class Adapter:
 
         for i in range(len(edge_vertex_ids1)):
             assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-            self._interface.set_mesh_edge(self._config.get_coupling_mesh_name(), edge_vertex_ids1[i], edge_vertex_ids2[i])
+            self._interface.set_mesh_edge(
+                self._config.get_coupling_mesh_name(),
+                edge_vertex_ids1[i],
+                edge_vertex_ids2[i])
 
         # Configure mesh connectivity (triangles from edges) for 2D simulations
         if self._fenics_dims == 2:

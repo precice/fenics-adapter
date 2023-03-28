@@ -273,4 +273,4 @@ class TestPointSource(TestCase):
         for ps in forces_y:
             ps.apply(b_forces)
 
-        assert(np.allclose(b_dummy.get_local(), b_forces.get_local()))
+        assert (np.allclose(b_dummy.get_local(), b_forces.get_local()))
