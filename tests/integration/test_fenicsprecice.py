@@ -136,6 +136,7 @@ class TestExpressionHandling(TestCase):
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Interface.requires_initial_data = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
         Interface.write_block_scalar_data = MagicMock()
 
@@ -166,6 +167,7 @@ class TestExpressionHandling(TestCase):
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Interface.requires_initial_data = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
         Interface.write_block_vector_data = MagicMock()
 
