@@ -573,7 +573,7 @@ class Adapter:
         tag : bool
             True if checkpoint needs to be written, False otherwise.
         """
-        return precice.requires_writing_checkpoint()
+        return self._interface.requires_writing_checkpoint()
 
     def requires_reading_checkpoint(self):
         """
@@ -589,4 +589,4 @@ class Adapter:
         tag : bool
             True if checkpoint needs to be written, False otherwise.
         """
-        return precice.requires_reading_checkpoint()
+        return self._interface.requires_reading_checkpoint()
