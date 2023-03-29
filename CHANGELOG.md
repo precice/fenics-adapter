@@ -1,5 +1,9 @@
 # FEniCS-preCICE adapter changelog
 
+## latest
+
+* Update adapter to use preCICE v3 API [#153](https://github.com/precice/fenics-adapter/pull/153).
+
 ## 1.4.0
 
 * Adding CITATION.cff to link the adapter repository to the relevant publication in the journal SoftwareX.
