@@ -50,7 +50,7 @@ class TestWriteandReadData(TestCase):
         Interface.write_block_scalar_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
-        Interface.set_mesh_edge = MagicMock()
+        Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
@@ -79,7 +79,7 @@ class TestWriteandReadData(TestCase):
         Interface.write_block_vector_data = MagicMock()
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
-        Interface.set_mesh_edge = MagicMock()
+        Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
@@ -117,7 +117,7 @@ class TestWriteandReadData(TestCase):
         Interface.read_block_scalar_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
-        Interface.set_mesh_edge = MagicMock()
+        Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
@@ -152,7 +152,7 @@ class TestWriteandReadData(TestCase):
         Interface.read_block_vector_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
         Interface.get_dimensions = MagicMock(return_value=self.dimension)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
-        Interface.set_mesh_edge = MagicMock()
+        Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
