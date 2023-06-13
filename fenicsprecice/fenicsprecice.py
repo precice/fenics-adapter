@@ -212,12 +212,7 @@ class Adapter:
                     ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
-            if self._read_function_type is FunctionType.SCALAR:
-                read_data = self._interface.read_block_scalar_data(
-                    self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
-            elif self._read_function_type is FunctionType.VECTOR:
-                read_data = self._interface.read_block_vector_data(
-                    self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
+            read_data = self._interface.read_data(self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
             read_data = communicate_shared_vertices(
@@ -256,22 +251,11 @@ class Adapter:
         write_function_type = determine_function_type(write_function, self._fenics_dims)
         assert (write_function_type in list(FunctionType))
         write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
-        if write_function_type is FunctionType.SCALAR:
-            assert (write_function.function_space().num_sub_spaces() == 0)
-            self._interface.write_block_scalar_data(
-                self._config.get_coupling_mesh_name(),
-                self._config.get_write_data_name(),
-                self._precice_vertex_ids,
-                write_data)
-        elif write_function_type is FunctionType.VECTOR:
-            assert (write_function.function_space().num_sub_spaces() > 0)
-            self._interface.write_block_vector_data(
-                self._config.get_coupling_mesh_name(),
-                self._config.get_write_data_name(),
-                self._precice_vertex_ids,
-                write_data)
-        else:
-            raise Exception("write_function provided is neither VECTOR nor SCALAR type")
+        self._interface.write_data(
+            self._config.get_coupling_mesh_name(),
+            self._config.get_write_data_name(),
+            self._precice_vertex_ids,
+            write_data)
 
     def initialize(self, coupling_subdomain, read_function_space=None, write_object=None, fixed_boundary=None):
         """
@@ -364,7 +348,7 @@ class Adapter:
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
-        if self._fenics_dims != self._interface.get_dimensions():
+        if self._fenics_dims != self._interface.get_mesh_dimensions():
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Set vertices on the coupling subdomain for this rank
@@ -419,22 +403,13 @@ class Adapter:
                     self._owned_vertices.get_global_ids(),
                     self._precice_vertex_ids)}
 
-            edge_vertex_ids1, edge_vertex_ids2, fenics_edge_ids = get_coupling_boundary_edges(
-                function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
-
-            for i in range(len(edge_vertex_ids1)):
-                assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-                self._interface.set_mesh_edge(
-                    self._config.get_coupling_mesh_name(),
-                    edge_vertex_ids1[i],
-                    edge_vertex_ids2[i])
+            edge_vertex_ids, fenics_edge_ids = get_coupling_boundary_edges(function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
+            self._interface.set_mesh_edges(self._config.get_coupling_mesh_name(), edge_vertex_ids)
 
             # Configure mesh connectivity (triangles from edges) for 2D simulations
             if self._fenics_dims == 2:
                 vertices = get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping)
-                for vertex_ids in vertices:
-                    self._interface.set_mesh_triangle(self._config.get_coupling_mesh_name(),
-                                                      vertex_ids[0], vertex_ids[1], vertex_ids[2])
+                self._interface.set_mesh_triangles(self._config.get_coupling_mesh_name(), vertices)
             else:
                 print("Mesh connectivity information is not written for 3D cases.")
 
@@ -444,9 +419,7 @@ class Adapter:
                     "preCICE requires you to write initial data. Please provide a write_function to initialize(...)")
             self.write_data(write_function)
 
-        precice_dt = self._interface.initialize()
-
-        return precice_dt
+        self._interface.initialize()
 
     def store_checkpoint(self, user_u, t, n):
         """
@@ -499,15 +472,9 @@ class Adapter:
         Notes
         -----
         Refer advance() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
-
-        Returns
-        -------
-        max_dt : double
-            Maximum length of timestep to be computed by solver.
         """
         self._first_advance_done = True
-        max_dt = self._interface.advance(dt)
-        return max_dt
+        self._interface.advance(dt)
 
     def finalize(self):
         """
@@ -558,6 +525,22 @@ class Adapter:
             True if implicit coupling in the time window has converged and False if not converged yet.
         """
         return self._interface.is_time_window_complete()
+
+    def get_max_time_step_size(self):
+        """
+        Get the maximum time step from preCICE.
+
+        Notes
+        -----
+        Refer get_max_time_step_size() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
+
+        Returns
+        -------
+        max_dt : double
+            Maximum length of timestep to be computed by solver.
+        """
+        return self._interface.get_max_time_step_size()
 
     def requires_writing_checkpoint(self):
         """

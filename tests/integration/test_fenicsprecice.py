@@ -77,7 +77,7 @@ class TestCheckpointing(TestCase):
         from precice import Interface
 
         Interface.initialize = MagicMock(return_value=self.dt)
-        Interface.get_dimensions = MagicMock()
+        Interface.get_mesh_dimensions = MagicMock()
         Interface.is_time_window_complete = MagicMock(return_value=True)
         Interface.advance = MagicMock()
 
@@ -133,12 +133,12 @@ class TestExpressionHandling(TestCase):
         from precice import Interface
         import fenicsprecice
 
-        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.get_mesh_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.requires_initial_data = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
-        Interface.write_block_scalar_data = MagicMock()
+        Interface.write_data = MagicMock()
 
         right_boundary = self.Right()
 
@@ -164,12 +164,12 @@ class TestExpressionHandling(TestCase):
         from precice import Interface
         import fenicsprecice
 
-        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.get_mesh_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.requires_initial_data = MagicMock(return_value=False)
         Interface.initialize = MagicMock()
-        Interface.write_block_vector_data = MagicMock()
+        Interface.write_data = MagicMock()
 
         right_boundary = self.Right()
 

@@ -386,23 +386,20 @@ def get_coupling_boundary_edges(function_space, coupling_subdomain, global_ids, 
         assert (len(list(vertices(this_edge))) == 2)
         return all([subdomain.inside(v.point(), True) for v in vertices(this_edge)])
 
-    vertices1_ids = []
-    vertices2_ids = []
+    edge_vertices_ids = []
     fenics_edges_ids = []
 
     for edge in edges(function_space.mesh()):
         if edge_is_on(coupling_subdomain, edge):
             v1, v2 = list(vertices(edge))
             if v1.global_index() in global_ids and v2.global_index() in global_ids:
-                vertices1_ids.append(id_mapping[v1.global_index()])
-                vertices2_ids.append(id_mapping[v2.global_index()])
+                edge_vertices_ids.append([id_mapping[v1.global_index()], id_mapping[v2.global_index()]])
                 fenics_edges_ids.append(edge.index())
 
-    vertices1_ids = np.array(vertices1_ids)
-    vertices2_ids = np.array(vertices2_ids)
+    edge_vertices_ids = np.array(edge_vertices_ids)
     fenics_edges_ids = np.array(fenics_edges_ids)
 
-    return vertices1_ids, vertices2_ids, fenics_edges_ids
+    return edge_vertices_ids, fenics_edges_ids
 
 
 def get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping):

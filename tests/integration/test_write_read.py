@@ -47,8 +47,8 @@ class TestWriteandReadData(TestCase):
         from precice import Interface
         import fenicsprecice
 
-        Interface.write_block_scalar_data = MagicMock()
-        Interface.get_dimensions = MagicMock(return_value=2)
+        Interface.write_data = MagicMock()
+        Interface.get_mesh_dimensions = MagicMock(return_value=2)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.requires_initial_data = MagicMock(return_value=False)
@@ -64,7 +64,7 @@ class TestWriteandReadData(TestCase):
         expected_ids = np.arange(self.n_vertices)
         expected_args = [expected_ids, expected_values]
 
-        for arg, expected_arg in zip(Interface.write_block_scalar_data.call_args[0], expected_args):
+        for arg, expected_arg in zip(Interface.write_data.call_args[0], expected_args):
             if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
             elif isinstance(arg, np.ndarray):
@@ -77,8 +77,8 @@ class TestWriteandReadData(TestCase):
         from precice import Interface
         import fenicsprecice
 
-        Interface.write_block_vector_data = MagicMock()
-        Interface.get_dimensions = MagicMock(return_value=self.dimension)
+        Interface.write_data = MagicMock()
+        Interface.get_mesh_dimensions = MagicMock(return_value=self.dimension)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.requires_initial_data = MagicMock(return_value=False)
@@ -96,7 +96,7 @@ class TestWriteandReadData(TestCase):
         expected_ids = np.arange(self.n_vertices)
         expected_args = [expected_ids, expected_values]
 
-        for arg, expected_arg in zip(Interface.write_block_vector_data.call_args[0], expected_args):
+        for arg, expected_arg in zip(Interface.write_data.call_args[0], expected_args):
             if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
             elif isinstance(arg, np.ndarray):
@@ -116,8 +116,8 @@ class TestWriteandReadData(TestCase):
             data = np.arange(n_points)
             return data
 
-        Interface.read_block_scalar_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
-        Interface.get_dimensions = MagicMock(return_value=self.dimension)
+        Interface.read_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
+        Interface.get_mesh_dimensions = MagicMock(return_value=self.dimension)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.requires_initial_data = MagicMock(return_value=False)
@@ -132,7 +132,7 @@ class TestWriteandReadData(TestCase):
         expected_ids = np.arange(self.n_vertices)
         expected_args = [expected_ids]
 
-        for arg, expected_arg in zip(Interface.read_block_scalar_data.call_args[0], expected_args):
+        for arg, expected_arg in zip(Interface.read_data.call_args[0], expected_args):
             if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
             elif isinstance(arg, np.ndarray):
@@ -152,8 +152,8 @@ class TestWriteandReadData(TestCase):
             data = np.arange(n_points * self.dimension).reshape(n_points, self.dimension)
             return data
 
-        Interface.read_block_vector_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
-        Interface.get_dimensions = MagicMock(return_value=self.dimension)
+        Interface.read_data = MagicMock(return_value=return_dummy_data(self.n_vertices))
+        Interface.get_mesh_dimensions = MagicMock(return_value=self.dimension)
         Interface.set_mesh_vertices = MagicMock(return_value=np.arange(self.n_vertices))
         Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
         Interface.requires_initial_data = MagicMock(return_value=False)
@@ -168,7 +168,7 @@ class TestWriteandReadData(TestCase):
         expected_ids = np.arange(self.n_vertices)
         expected_args = [expected_ids]
 
-        for arg, expected_arg in zip(Interface.read_block_vector_data.call_args[0], expected_args):
+        for arg, expected_arg in zip(Interface.read_data.call_args[0], expected_args):
             if isinstance(arg, int):
                 self.assertTrue(arg == expected_arg)
             elif isinstance(arg, np.ndarray):
