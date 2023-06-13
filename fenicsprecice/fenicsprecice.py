@@ -212,7 +212,11 @@ class Adapter:
                     ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
-            read_data = self._interface.read_data(self._config.get_coupling_mesh_name(), self._config.get_read_data_name(), self._precice_vertex_ids, dt)
+            read_data = self._interface.read_data(
+                self._config.get_coupling_mesh_name(),
+                self._config.get_read_data_name(),
+                self._precice_vertex_ids,
+                dt)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
             read_data = communicate_shared_vertices(
@@ -403,7 +407,8 @@ class Adapter:
                     self._owned_vertices.get_global_ids(),
                     self._precice_vertex_ids)}
 
-            edge_vertex_ids, fenics_edge_ids = get_coupling_boundary_edges(function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
+            edge_vertex_ids, fenics_edge_ids = get_coupling_boundary_edges(
+                function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
             self._interface.set_mesh_edges(self._config.get_coupling_mesh_name(), edge_vertex_ids)
 
             # Configure mesh connectivity (triangles from edges) for 2D simulations
