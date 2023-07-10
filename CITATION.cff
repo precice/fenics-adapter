@@ -4,8 +4,8 @@
 cff-version: 1.2.0
 title: FEniCS-preCICE
 message: >-
-  If you use this software, please cite it using the
-  metadata from this file.
+  If you use this software, please cite it using the metadata from this file. When using or referring to preCICE in
+  academic publications, please follow the [citation guidelines](https://precice.org/fundamentals-literature-guide.html). 
 type: software
 authors:
   - given-names: Benjamin
