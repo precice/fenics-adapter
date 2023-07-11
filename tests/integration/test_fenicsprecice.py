@@ -74,12 +74,12 @@ class TestCheckpointing(TestCase):
         Test correct checkpoint storing
         """
         import fenicsprecice
-        from precice import Interface
+        from precice import Participant
 
-        Interface.initialize = MagicMock(return_value=self.dt)
-        Interface.get_mesh_dimensions = MagicMock()
-        Interface.is_time_window_complete = MagicMock(return_value=True)
-        Interface.advance = MagicMock()
+        Participant.initialize = MagicMock(return_value=self.dt)
+        Participant.get_mesh_dimensions = MagicMock()
+        Participant.is_time_window_complete = MagicMock(return_value=True)
+        Participant.advance = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
 
@@ -88,7 +88,7 @@ class TestCheckpointing(TestCase):
         # Replicating control flow where implicit iteration has not converged and solver state needs to be restored
         # to a checkpoint
         precice.advance(self.dt)
-        Interface.is_time_window_complete = MagicMock(return_value=False)
+        Participant.is_time_window_complete = MagicMock(return_value=False)
 
         # Check if the checkpoint is stored correctly in the adapter
         self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
@@ -130,27 +130,26 @@ class TestExpressionHandling(TestCase):
         Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
         same points on a FEniCS Expression created by the Adapter
         """
-        from precice import Interface
+        from precice import Participant
         import fenicsprecice
 
-        Interface.get_mesh_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
-        Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
-        Interface.requires_initial_data = MagicMock(return_value=False)
-        Interface.initialize = MagicMock()
-        Interface.write_data = MagicMock()
+        Participant.get_mesh_dimensions = MagicMock(return_value=2)
+        Participant.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Participant.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Participant.requires_initial_data = MagicMock(return_value=False)
+        Participant.initialize = MagicMock()
+        Participant.write_data = MagicMock()
 
         right_boundary = self.Right()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
-        precice._interface = Interface(None, None, None, None)
+        precice._participant = Participant(None, None, None, None)
         precice.initialize(right_boundary, self.scalar_V, self.scalar_function)
         values = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
-
         scalar_coupling_expr = precice.create_coupling_expression()
-        precice.update_coupling_expression(scalar_coupling_expr, data)
 
+        precice.update_coupling_expression(scalar_coupling_expr, data)
         expr_samples = np.array([scalar_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
         func_samples = np.array([self.scalar_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
 
@@ -161,20 +160,20 @@ class TestExpressionHandling(TestCase):
         Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
         same points on a FEniCS Expression created by the Adapter
         """
-        from precice import Interface
+        from precice import Participant
         import fenicsprecice
 
-        Interface.get_mesh_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
-        Interface.requires_mesh_connectivity_for = MagicMock(return_value=False)
-        Interface.requires_initial_data = MagicMock(return_value=False)
-        Interface.initialize = MagicMock()
-        Interface.write_data = MagicMock()
+        Participant.get_mesh_dimensions = MagicMock(return_value=2)
+        Participant.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Participant.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Participant.requires_initial_data = MagicMock(return_value=False)
+        Participant.initialize = MagicMock()
+        Participant.write_data = MagicMock()
 
         right_boundary = self.Right()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
-        precice._interface = Interface(None, None, None, None)
+        precice._participant = Participant(None, None, None, None)
         precice.initialize(right_boundary, self.vector_V, self.vector_function)
         values = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}

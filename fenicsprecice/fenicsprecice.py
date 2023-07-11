@@ -52,7 +52,7 @@ class Adapter:
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
 
-        self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(),
+        self._participant = precice.Participant(self._config.get_participant_name(), self._config.get_config_file_name(),
                                             self._comm.Get_rank(), self._comm.Get_size())
 
         # FEniCS related quantities
@@ -189,7 +189,7 @@ class Adapter:
 
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
-    def read_data(self, dt=None):
+    def read_data(self, dt):
         """
         Read data from preCICE. Data is generated depending on the type of the read function (Scalar or Vector).
         For a scalar read function the data is a numpy array with shape (N) where N = number of coupling vertices
@@ -212,7 +212,7 @@ class Adapter:
                     ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
-            read_data = self._interface.read_data(
+            read_data = self._participant.read_data(
                 self._config.get_coupling_mesh_name(),
                 self._config.get_read_data_name(),
                 self._precice_vertex_ids,
@@ -255,7 +255,7 @@ class Adapter:
         write_function_type = determine_function_type(write_function, self._fenics_dims)
         assert (write_function_type in list(FunctionType))
         write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
-        self._interface.write_data(
+        self._participant.write_data(
             self._config.get_coupling_mesh_name(),
             self._config.get_write_data_name(),
             self._precice_vertex_ids,
@@ -352,7 +352,7 @@ class Adapter:
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
-        if self._fenics_dims != self._interface.get_mesh_dimensions():
+        if self._fenics_dims != self._participant.get_mesh_dimensions(self._config.get_coupling_mesh_name()):
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Set vertices on the coupling subdomain for this rank
@@ -382,7 +382,7 @@ class Adapter:
             print("Rank {} has no part of coupling boundary.".format(self._comm.Get_rank()))
 
         # Define mesh in preCICE
-        self._precice_vertex_ids = self._interface.set_mesh_vertices(
+        self._precice_vertex_ids = self._participant.set_mesh_vertices(
             self._config.get_coupling_mesh_name(), self._owned_vertices.get_coordinates())
 
         if (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
@@ -399,7 +399,7 @@ class Adapter:
             _ = filter_point_sources(point_data, fixed_boundary, warn_duplicate=True)
 
         # Set mesh connectivity information in preCICE to allow nearest-projection mapping
-        if self._interface.requires_mesh_connectivity_for(self._config.get_coupling_mesh_name()):
+        if self._participant.requires_mesh_connectivity_for(self._config.get_coupling_mesh_name()):
             # Define a mapping between coupling vertices and their IDs in preCICE
             id_mapping = {
                 key: value for key,
@@ -409,22 +409,22 @@ class Adapter:
 
             edge_vertex_ids, fenics_edge_ids = get_coupling_boundary_edges(
                 function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
-            self._interface.set_mesh_edges(self._config.get_coupling_mesh_name(), edge_vertex_ids)
+            self._participant.set_mesh_edges(self._config.get_coupling_mesh_name(), edge_vertex_ids)
 
             # Configure mesh connectivity (triangles from edges) for 2D simulations
             if self._fenics_dims == 2:
                 vertices = get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping)
-                self._interface.set_mesh_triangles(self._config.get_coupling_mesh_name(), vertices)
+                self._participant.set_mesh_triangles(self._config.get_coupling_mesh_name(), vertices)
             else:
                 print("Mesh connectivity information is not written for 3D cases.")
 
-        if self._interface.requires_initial_data():
+        if self._participant.requires_initial_data():
             if not write_function:
                 raise Exception(
                     "preCICE requires you to write initial data. Please provide a write_function to initialize(...)")
             self.write_data(write_function)
 
-        self._interface.initialize()
+        self._participant.initialize()
 
     def store_checkpoint(self, user_u, t, n):
         """
@@ -479,7 +479,7 @@ class Adapter:
         Refer advance() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
         """
         self._first_advance_done = True
-        self._interface.advance(dt)
+        self._participant.advance(dt)
 
     def finalize(self):
         """
@@ -489,7 +489,7 @@ class Adapter:
         -----
         Refer finalize() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
         """
-        self._interface.finalize()
+        self._participant.finalize()
 
     def get_participant_name(self):
         """
@@ -513,7 +513,7 @@ class Adapter:
         tag : bool
             True if coupling is still going on and False if coupling has finished.
         """
-        return self._interface.is_coupling_ongoing()
+        return self._participant.is_coupling_ongoing()
 
     def is_time_window_complete(self):
         """
@@ -529,7 +529,7 @@ class Adapter:
         tag : bool
             True if implicit coupling in the time window has converged and False if not converged yet.
         """
-        return self._interface.is_time_window_complete()
+        return self._participant.is_time_window_complete()
 
     def get_max_time_step_size(self):
         """
@@ -545,7 +545,7 @@ class Adapter:
         max_dt : double
             Maximum length of timestep to be computed by solver.
         """
-        return self._interface.get_max_time_step_size()
+        return self._participant.get_max_time_step_size()
 
     def requires_writing_checkpoint(self):
         """
@@ -561,7 +561,7 @@ class Adapter:
         tag : bool
             True if checkpoint needs to be written, False otherwise.
         """
-        return self._interface.requires_writing_checkpoint()
+        return self._participant.requires_writing_checkpoint()
 
     def requires_reading_checkpoint(self):
         """
@@ -577,4 +577,4 @@ class Adapter:
         tag : bool
             True if checkpoint needs to be written, False otherwise.
         """
-        return self._interface.requires_reading_checkpoint()
+        return self._participant.requires_reading_checkpoint()
