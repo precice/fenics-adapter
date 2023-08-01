@@ -52,8 +52,11 @@ class Adapter:
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
 
-        self._participant = precice.Participant(self._config.get_participant_name(), self._config.get_config_file_name(),
-                                            self._comm.Get_rank(), self._comm.Get_size())
+        self._participant = precice.Participant(
+            self._config.get_participant_name(),
+            self._config.get_config_file_name(),
+            self._comm.Get_rank(),
+            self._comm.Get_size())
 
         # FEniCS related quantities
         self._read_function_space = None  # initialized later

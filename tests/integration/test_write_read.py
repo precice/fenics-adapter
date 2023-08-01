@@ -9,6 +9,7 @@ y_bottom, y_top = 0, 1
 
 dummy_dt = 1
 
+
 class RightBoundary(SubDomain):
     def inside(self, x, on_boundary):
         tol = 1E-14
