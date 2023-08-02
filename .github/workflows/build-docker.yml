@@ -22,11 +22,11 @@ jobs:
         docker_username: precice
     steps:
       - name: Set branch name for manual triggering
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: echo "branch=${{ inputs.branch }}" >> $GITHUB_ENV    
-      - name: Set branch name for manual triggering
-        if: github.event_name != 'pull_request'
+      - name: Set branch name for on pull triggering
+        if: github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch'
         shell: bash
         run: echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV    
       - name: Checkout Repository
