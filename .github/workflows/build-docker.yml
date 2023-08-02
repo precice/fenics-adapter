@@ -24,11 +24,15 @@ jobs:
       - name: Set branch name for manual triggering
         if: github.event_name == 'workflow_dispatch'
         shell: bash
-        run: echo "branch=${{ inputs.branch }}" >> $GITHUB_ENV    
+        run: | 
+          echo "ADAPTER_REF=${{ inputs.branch }}" >> $GITHUB_ENV
+          echo "PYTHON_REF=latest" >> $GITHUB_ENV       
       - name: Set branch name for on pull triggering
         if: github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch'
         shell: bash
-        run: echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV    
+        run: |
+          echo "ADAPTER_REF=${{ github.ref_name }}" >> $GITHUB_ENV
+          echo "PYTHON_REF=develop" >> $GITHUB_ENV          
       - name: Checkout Repository
         uses: actions/checkout@v2
       - name: Set up Docker Buildx
@@ -40,19 +44,21 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and push latest Dockerfile
         uses: docker/build-push-action@v2
-        if: ${{ env.branch }} == 'master'
+        if: ${{ env.ADAPTER_REF }} == 'master'
         with:
           push: true
           file: "./tools/releasing/packaging/docker/Dockerfile"
           tags: ${{ env.docker_username }}/fenics-adapter:latest
           build-args: |
-            branch=${{ env.branch }}
+            FENICS_ADAPTER_REF=${{ env.ADAPTER_REF }}
+            PYTHON_BINDINGS_REF=${{ env.PYTHON_REF }}
       - name: Build and push develop Dockerfile
         uses: docker/build-push-action@v2
-        if: ${{ env.branch }} != 'master'
+        if: ${{ env.ADAPTER_REF }} != 'master'
         with:
           push: true
           file: "./tools/releasing/packaging/docker/Dockerfile"
           tags: ${{ env.docker_username }}/fenics-adapter:${{ env.branch }}
           build-args: |
-            branch=${{ env.branch }}
+            FENICS_ADAPTER_REF=${{ env.ADAPTER_REF }}
+            PYTHON_BINDINGS_REF=${{ env.PYTHON_REF }}
