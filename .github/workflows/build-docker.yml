@@ -1,7 +1,14 @@
 name: Update docker image
 
 on:
-  workflow_dispatch:      # Trigger by hand from the UI
+  workflow_dispatch: # Trigger by hand from the UI
+    inputs:
+      branch:
+        type: choice
+        description: branch to build the container from
+        options:
+          - develop
+          - master     
   push:
     branches:
       - develop
@@ -14,10 +21,14 @@ jobs:
     env:
         docker_username: precice
     steps:
-      - name: Get branch name
+      - name: Set branch name for manual triggering
         if: github.event_name != 'pull_request'
         shell: bash
-        run: echo "branch=$(echo ${GITHUB_REF#refs/heads/} | tr / -)" >> $GITHUB_ENV    
+        run: echo "branch=${{ inputs.branch }}" >> $GITHUB_ENV    
+      - name: Set branch name for manual triggering
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV    
       - name: Checkout Repository
         uses: actions/checkout@v2
       - name: Set up Docker Buildx
