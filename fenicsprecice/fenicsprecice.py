@@ -414,11 +414,11 @@ class Adapter:
                 function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
 
             # Surface coupling over 1D edges
-            #TODO call set_mesh_edges, if using surface coupling. Otherwise does not make sense.
+            # TODO call set_mesh_edges, if using surface coupling. Otherwise does not make sense.
             self._participant.set_mesh_edges(self._config.get_coupling_mesh_name(), edge_vertex_ids)
 
             # Configure mesh connectivity (triangles from edges) for 2D simulations
-            #TODO only enter code below, if using volume coupling. Otherwise does not make sense.
+            # TODO only enter code below, if using volume coupling. Otherwise does not make sense.
             if self._fenics_dims == 2:
                 # Volume coupling over 2D triangles
                 vertices = get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping)
