@@ -32,7 +32,7 @@ jobs:
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction/fenics
-          python3 heat.py -d & python3 heat.py -n
+          ./run.sh -d & ./run.sh -n
 
   run_ht_complex:
     name: Run HT, complex
@@ -57,4 +57,4 @@ jobs:
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction-complex/fenics
-          python3 heat.py -d -i complex & python3 heat.py -n -i complex
+          ./run.sh -d & ./run.sh -n
