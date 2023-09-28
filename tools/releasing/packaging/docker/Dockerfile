@@ -1,6 +1,6 @@
 # Dockerfile to build a ubuntu image containing the installed Debian package of a release 
-ARG branch=develop
-ARG from=precice/python-bindings:${branch}
+ARG PYTHON_BINDINGS_REF=develop
+ARG from=precice/python-bindings:${PYTHON_BINDINGS_REF}
 FROM $from
 
 USER root
@@ -17,7 +17,7 @@ RUN python3 -m pip install --user --upgrade pip
 
 # Rebuild image if force_rebuild after that command
 ARG CACHEBUST
-ARG branch=develop
+ARG FENICS_ADAPTER_REF=develop
 
 # Building fenics-adapter
-RUN python3 -m pip install --user git+https://github.com/precice/fenics-adapter.git@$branch
+RUN python3 -m pip install --user git+https://github.com/precice/fenics-adapter.git@$FENICS_ADAPTER_REF

@@ -1,10 +1,18 @@
 name: Update docker image
 
 on:
-  workflow_dispatch:      # Trigger by hand from the UI
+  workflow_dispatch: # Trigger by hand from the UI
+    inputs:
+      branch:
+        type: choice
+        description: branch to build the container from
+        options:
+          - develop
+          - master     
   push:
     branches:
       - develop
+      - master
 
 jobs:
   build-and-release-docker-image:
@@ -13,10 +21,28 @@ jobs:
     env:
         docker_username: precice
     steps:
-      - name: Get branch name
-        if: github.event_name != 'pull_request'
+      - name: Set branch name for manual triggering
+        if: github.event_name == 'workflow_dispatch'
         shell: bash
-        run: echo "branch=$(echo ${GITHUB_REF#refs/heads/} | tr / -)" >> $GITHUB_ENV    
+        run: | 
+          echo "ADAPTER_REF=${{ inputs.branch }}" >> $GITHUB_ENV 
+      - name: Set branch name for on pull triggering
+        if: github.event_name != 'pull_request' && github.event_name != 'workflow_dispatch'
+        shell: bash
+        run: |
+          echo "ADAPTER_REF=${{ github.ref_name }}" >> $GITHUB_ENV
+      - name: Set PYTHON_BINDINGS_REF and the TAG depending on branch
+        shell: bash
+        run: |
+          if [[ '${{ env.ADAPTER_REF }}' == 'master' ]]; then
+              echo "PYTHON_BINDINGS_REF=latest" >> "$GITHUB_ENV"
+              echo "TAG=latest" >> "$GITHUB_ENV"
+              echo "Building TAG: latest"
+          else
+              echo "PYTHON_BINDINGS_REF=${{ env.ADAPTER_REF }}" >> "$GITHUB_ENV"
+              echo "TAG=${{ env.ADAPTER_REF }}" >> "$GITHUB_ENV"
+              echo "Building TAG: ${{ env.ADAPTER_REF }}"
+          fi   
       - name: Checkout Repository
         uses: actions/checkout@v2
       - name: Set up Docker Buildx
@@ -31,6 +57,7 @@ jobs:
         with:
           push: true
           file: "./tools/releasing/packaging/docker/Dockerfile"
-          tags: ${{ env.docker_username }}/fenics-adapter:${{ env.branch }},${{ env.docker_username }}/fenics-adapter:latest
+          tags: ${{ env.docker_username }}/fenics-adapter:${{ env.TAG }}
           build-args: |
-            branch=${{ env.branch }}
+            FENICS_ADAPTER_REF=${{ env.ADAPTER_REF }}
+            PYTHON_BINDINGS_REF=${{ env.PYTHON_BINDINGS_REF }}
