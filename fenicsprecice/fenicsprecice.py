@@ -412,14 +412,17 @@ class Adapter:
 
             edge_vertex_ids, fenics_edge_ids = get_coupling_boundary_edges(
                 function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
+
+            # Surface coupling over 1D edges
             self._participant.set_mesh_edges(self._config.get_coupling_mesh_name(), edge_vertex_ids)
 
-            # Configure mesh connectivity (triangles from edges) for 2D simulations
-            if self._fenics_dims == 2:
-                vertices = get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping)
-                self._participant.set_mesh_triangles(self._config.get_coupling_mesh_name(), vertices)
-            else:
-                print("Mesh connectivity information is not written for 3D cases.")
+            # Code below does not work properly. Volume coupling does not integrate well with surface coupling in this state. See https://github.com/precice/fenics-adapter/issues/162.
+            # # Configure mesh connectivity (triangles from edges) for 2D simulations
+            # if self._fenics_dims == 2:
+            #     vertices = get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping)
+            #     self._participant.set_mesh_triangles(self._config.get_coupling_mesh_name(), vertices)
+            # else:
+            #     print("Mesh connectivity information is not written for 3D cases.")
 
         if self._participant.requires_initial_data():
             if not write_function:
