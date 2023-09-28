@@ -52,8 +52,11 @@ class Adapter:
         # Setup up MPI communicator on mpi4py
         self._comm = MPI.COMM_WORLD
 
-        self._interface = precice.Interface(self._config.get_participant_name(), self._config.get_config_file_name(),
-                                            self._comm.Get_rank(), self._comm.Get_size())
+        self._participant = precice.Participant(
+            self._config.get_participant_name(),
+            self._config.get_config_file_name(),
+            self._comm.Get_rank(),
+            self._comm.Get_size())
 
         # FEniCS related quantities
         self._read_function_space = None  # initialized later
@@ -65,7 +68,6 @@ class Adapter:
         self._unowned_vertices = Vertices(VertexType.UNOWNED)
         self._fenics_vertices = Vertices(VertexType.FENICS)
         self._precice_vertex_ids = None  # initialized later
-        self._precice_edge_dict = dict()
 
         # read data related quantities (read data is read from preCICE and applied in FEniCS)
         self._read_function_type = None  # stores whether read function is scalar or vector valued
@@ -118,7 +120,7 @@ class Adapter:
         coupling_expression : Object of class dolfin.functions.expression.Expression
             Reference to object of class SegregatedRBFInterpolationExpression.
         """
-        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
+        assert (self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
 
         if not (self._read_function_type is FunctionType.SCALAR or self._read_function_type is FunctionType.VECTOR):
             raise Exception("No valid read_function is provided in initialization. Cannot create coupling expression")
@@ -161,7 +163,7 @@ class Adapter:
             The coupling data. A dictionary containing nodal data with vertex coordinates as key and associated data as
             value.
         """
-        assert(self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
+        assert (self._fenics_dims == 2), "Boundary conditions of Expression objects are only allowed for 2D cases"
 
         if not self._empty_rank:
             coupling_expression.update_boundary_data(np.array(list(data.values())), np.array(list(data.keys())))
@@ -190,7 +192,7 @@ class Adapter:
 
         return get_forces_as_point_sources(self._Dirichlet_Boundary, self._read_function_space, data)
 
-    def read_data(self):
+    def read_data(self, dt):
         """
         Read data from preCICE. Data is generated depending on the type of the read function (Scalar or Vector).
         For a scalar read function the data is a numpy array with shape (N) where N = number of coupling vertices
@@ -206,9 +208,6 @@ class Adapter:
         assert (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
                 CouplingMode.BI_DIRECTIONAL_COUPLING)
 
-        read_data_id = self._interface.get_data_id(self._config.get_read_data_name(),
-                                                   self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
-
         read_data = None
 
         if self._empty_rank:
@@ -216,10 +215,11 @@ class Adapter:
                     ), "having participants without coupling mesh nodes is only valid for parallel runs"
 
         if not self._empty_rank:
-            if self._read_function_type is FunctionType.SCALAR:
-                read_data = self._interface.read_block_scalar_data(read_data_id, self._precice_vertex_ids)
-            elif self._read_function_type is FunctionType.VECTOR:
-                read_data = self._interface.read_block_vector_data(read_data_id, self._precice_vertex_ids)
+            read_data = self._participant.read_data(
+                self._config.get_coupling_mesh_name(),
+                self._config.get_read_data_name(),
+                self._precice_vertex_ids,
+                dt)
 
             read_data = {tuple(key): value for key, value in zip(self._owned_vertices.get_coordinates(), read_data)}
             read_data = communicate_shared_vertices(
@@ -251,9 +251,6 @@ class Adapter:
         assert (self._write_function_type == determine_function_type(w_func, self._fenics_dims))
         assert (write_function.function_space() == self._write_function_space)
 
-        write_data_id = self._interface.get_data_id(self._config.get_write_data_name(),
-                                                    self._interface.get_mesh_id(self._config.get_coupling_mesh_name()))
-
         if self._empty_rank:
             assert (self._is_parallel()
                     ), "having participants without coupling mesh nodes is only valid for parallel runs"
@@ -261,14 +258,11 @@ class Adapter:
         write_function_type = determine_function_type(write_function, self._fenics_dims)
         assert (write_function_type in list(FunctionType))
         write_data = convert_fenics_to_precice(write_function, self._owned_vertices.get_local_ids())
-        if write_function_type is FunctionType.SCALAR:
-            assert (write_function.function_space().num_sub_spaces() == 0)
-            self._interface.write_block_scalar_data(write_data_id, self._precice_vertex_ids, write_data)
-        elif write_function_type is FunctionType.VECTOR:
-            assert (write_function.function_space().num_sub_spaces() > 0)
-            self._interface.write_block_vector_data(write_data_id, self._precice_vertex_ids, write_data)
-        else:
-            raise Exception("write_function provided is neither VECTOR nor SCALAR type")
+        self._participant.write_data(
+            self._config.get_coupling_mesh_name(),
+            self._config.get_write_data_name(),
+            self._precice_vertex_ids,
+            write_data)
 
     def initialize(self, coupling_subdomain, read_function_space=None, write_object=None, fixed_boundary=None):
         """
@@ -296,10 +290,10 @@ class Adapter:
         """
 
         write_function_space, write_function = None, None
-        if isinstance(write_object, Function):  # precice.initialize_data() will be called using this Function
+        if isinstance(write_object, Function):
             write_function_space = write_object.function_space()
             write_function = write_object
-        elif isinstance(write_object, FunctionSpace):  # preCICE will use default zero values for initialization.
+        elif isinstance(write_object, FunctionSpace):
             write_function_space = write_object
             write_function = None
         elif write_object is None:
@@ -361,7 +355,7 @@ class Adapter:
         if fixed_boundary:
             self._Dirichlet_Boundary = fixed_boundary
 
-        if self._fenics_dims != self._interface.get_dimensions():
+        if self._fenics_dims != self._participant.get_mesh_dimensions(self._config.get_coupling_mesh_name()):
             raise Exception("Dimension of preCICE setup and FEniCS do not match")
 
         # Set vertices on the coupling subdomain for this rank
@@ -391,8 +385,8 @@ class Adapter:
             print("Rank {} has no part of coupling boundary.".format(self._comm.Get_rank()))
 
         # Define mesh in preCICE
-        self._precice_vertex_ids = self._interface.set_mesh_vertices(self._interface.get_mesh_id(
-            self._config.get_coupling_mesh_name()), self._owned_vertices.get_coordinates())
+        self._precice_vertex_ids = self._participant.set_mesh_vertices(
+            self._config.get_coupling_mesh_name(), self._owned_vertices.get_coordinates())
 
         if (self._coupling_type is CouplingMode.UNI_DIRECTIONAL_READ_COUPLING or
                 self._coupling_type is CouplingMode.BI_DIRECTIONAL_COUPLING) and self._is_parallel:
@@ -407,41 +401,36 @@ class Adapter:
             point_data = {tuple(key): None for key in self._owned_vertices.get_coordinates()}
             _ = filter_point_sources(point_data, fixed_boundary, warn_duplicate=True)
 
-        # Set mesh edges in preCICE to allow nearest-projection mapping
-        # Define a mapping between coupling vertices and their IDs in preCICE
-        id_mapping = {key: value for key, value in zip(self._owned_vertices.get_global_ids(), self._precice_vertex_ids)}
+        # Set mesh connectivity information in preCICE to allow nearest-projection mapping
+        if self._participant.requires_mesh_connectivity_for(self._config.get_coupling_mesh_name()):
+            # Define a mapping between coupling vertices and their IDs in preCICE
+            id_mapping = {
+                key: value for key,
+                value in zip(
+                    self._owned_vertices.get_global_ids(),
+                    self._precice_vertex_ids)}
 
-        edge_vertex_ids1, edge_vertex_ids2, edges_ids = get_coupling_boundary_edges(
-            function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
+            edge_vertex_ids, fenics_edge_ids = get_coupling_boundary_edges(
+                function_space, coupling_subdomain, self._owned_vertices.get_global_ids(), id_mapping)
 
-        for i in range(len(edge_vertex_ids1)):
-            assert (edge_vertex_ids1[i] != edge_vertex_ids2[i])
-            self._precice_edge_dict[edges_ids[i]] = self._interface.set_mesh_edge(
-                self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                edge_vertex_ids1[i], edge_vertex_ids2[i])
+            # Surface coupling over 1D edges
+            self._participant.set_mesh_edges(self._config.get_coupling_mesh_name(), edge_vertex_ids)
 
-        # Configure mesh connectivity (triangles from edges) for 2D simulations
-        if self._fenics_dims == 2:
-            edges = get_coupling_triangles(function_space, coupling_subdomain, self._precice_edge_dict)
-            for edges_ids in edges:
-                self._interface.set_mesh_triangle(self._interface.get_mesh_id(self._config.get_coupling_mesh_name()),
-                                                  self._precice_edge_dict[edges_ids[0]],
-                                                  self._precice_edge_dict[edges_ids[1]],
-                                                  self._precice_edge_dict[edges_ids[2]])
-        else:
-            print("Mesh connectivity information is not written for 3D cases.")
+            # Code below does not work properly. Volume coupling does not integrate well with surface coupling in this state. See https://github.com/precice/fenics-adapter/issues/162.
+            # # Configure mesh connectivity (triangles from edges) for 2D simulations
+            # if self._fenics_dims == 2:
+            #     vertices = get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, id_mapping)
+            #     self._participant.set_mesh_triangles(self._config.get_coupling_mesh_name(), vertices)
+            # else:
+            #     print("Mesh connectivity information is not written for 3D cases.")
 
-        precice_dt = self._interface.initialize()
-
-        if self._interface.is_action_required(precice.action_write_initial_data()):
+        if self._participant.requires_initial_data():
             if not write_function:
-                raise Exception("Non-standard initialization requires a write_function")
+                raise Exception(
+                    "preCICE requires you to write initial data. Please provide a write_function to initialize(...)")
             self.write_data(write_function)
-            self._interface.mark_action_fulfilled(precice.action_write_initial_data())
 
-        self._interface.initialize_data()
-
-        return precice_dt
+        self._participant.initialize()
 
     def store_checkpoint(self, user_u, t, n):
         """
@@ -464,7 +453,6 @@ class Adapter:
         # making sure that the FEniCS function provided by user is not directly accessed by the Adapter
         assert (my_u != user_u)
         self._checkpoint = SolverState(my_u, t, n)
-        self._interface.mark_action_fulfilled(self.action_write_iteration_checkpoint())
 
     def retrieve_checkpoint(self):
         """
@@ -481,7 +469,6 @@ class Adapter:
         """
         assert (not self.is_time_window_complete())
         logger.debug("Restore solver state")
-        self._interface.mark_action_fulfilled(self.action_read_iteration_checkpoint())
         return self._checkpoint.get_state()
 
     def advance(self, dt):
@@ -496,15 +483,9 @@ class Adapter:
         Notes
         -----
         Refer advance() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
-
-        Returns
-        -------
-        max_dt : double
-            Maximum length of timestep to be computed by solver.
         """
         self._first_advance_done = True
-        max_dt = self._interface.advance(dt)
-        return max_dt
+        self._participant.advance(dt)
 
     def finalize(self):
         """
@@ -514,7 +495,7 @@ class Adapter:
         -----
         Refer finalize() in https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
         """
-        self._interface.finalize()
+        self._participant.finalize()
 
     def get_participant_name(self):
         """
@@ -538,7 +519,7 @@ class Adapter:
         tag : bool
             True if coupling is still going on and False if coupling has finished.
         """
-        return self._interface.is_coupling_ongoing()
+        return self._participant.is_coupling_ongoing()
 
     def is_time_window_complete(self):
         """
@@ -554,58 +535,52 @@ class Adapter:
         tag : bool
             True if implicit coupling in the time window has converged and False if not converged yet.
         """
-        return self._interface.is_time_window_complete()
+        return self._participant.is_time_window_complete()
 
-    def is_action_required(self, action):
+    def get_max_time_step_size(self):
         """
-        Tag to check if a particular preCICE action is required.
-
-        Parameters
-        ----------
-        action : string
-            Name of the preCICE action.
+        Get the maximum time step from preCICE.
 
         Notes
         -----
-        Refer is_action_required(action) in
+        Refer get_max_time_step_size() in
+        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
+
+        Returns
+        -------
+        max_dt : double
+            Maximum length of timestep to be computed by solver.
+        """
+        return self._participant.get_max_time_step_size()
+
+    def requires_writing_checkpoint(self):
+        """
+        Tag to check if checkpoint needs to be written.
+
+        Notes
+        -----
+        Refer requires_writing_checkpoint() in
         https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
         tag : bool
-            True if action is required and False if action is not required.
+            True if checkpoint needs to be written, False otherwise.
         """
-        return self._interface.is_action_required(action)
+        return self._participant.requires_writing_checkpoint()
 
-    def action_write_iteration_checkpoint(self):
+    def requires_reading_checkpoint(self):
         """
-        Get name of action to convey to preCICE that a checkpoint has been written.
+        Tag to check if checkpoint needs to be read.
 
         Notes
         -----
-        Refer action_write_iteration_checkpoint() in
+        Refer requires_reading_checkpoint() in
         https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
 
         Returns
         -------
-        action : string
-            Name of action related to writing a checkpoint.
+        tag : bool
+            True if checkpoint needs to be written, False otherwise.
         """
-        return precice.action_write_iteration_checkpoint()
-
-    def action_read_iteration_checkpoint(self):
-        """
-        Get name of action to convey to preCICE that a checkpoint has been read and the state of the system has been
-        restored to that checkpoint.
-
-        Notes
-        -----
-        Refer action_read_iteration_checkpoint() in
-        https://github.com/precice/python-bindings/blob/develop/cyprecice/cyprecice.pyx
-
-        Returns
-        -------
-        action : string
-            Name of action related to reading a checkpoint.
-        """
-        return precice.action_read_iteration_checkpoint()
+        return self._participant.requires_reading_checkpoint()

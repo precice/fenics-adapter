@@ -49,7 +49,7 @@ class CouplingExpression(UserExpression):
         self._vals = vals
         _, self._dimension = coords.shape
 
-        assert(self._dimension == 2), "Coordinates are of incorrect dimensions"
+        assert (self._dimension == 2), "Coordinates are of incorrect dimensions"
 
         self._coords_x = coords[:, 0]
         self._coords_y = coords[:, 1]
@@ -128,10 +128,10 @@ class CouplingExpression(UserExpression):
         """
         try:
             if self._vals.ndim == 1:
-                assert(self._function_type is FunctionType.SCALAR)
+                assert (self._function_type is FunctionType.SCALAR)
                 return True
             elif self._vals.ndim > 1:
-                assert(self._function_type is FunctionType.VECTOR)
+                assert (self._function_type is FunctionType.VECTOR)
                 return False
             else:
                 raise Exception("Dimension of the function is 0 or negative!")
@@ -149,10 +149,10 @@ class CouplingExpression(UserExpression):
         """
         try:
             if self._vals.ndim > 1:
-                assert(self._function_type is FunctionType.VECTOR)
+                assert (self._function_type is FunctionType.VECTOR)
                 return True
             elif self._vals.ndim == 1:
-                assert(self._function_type is FunctionType.SCALAR)
+                assert (self._function_type is FunctionType.SCALAR)
                 return False
             else:
                 raise Exception("Dimension of the function is 0 or negative!")
@@ -170,7 +170,7 @@ class SegregatedRBFInterpolationExpression(CouplingExpression):
     """
 
     def segregated_interpolant_2d(self, coords_x, coords_y, data):
-        assert(coords_x.shape == coords_y.shape)
+        assert (coords_x.shape == coords_y.shape)
         # create least squares system to approximate a * x ** 2 + b * x + c ~= y
 
         def lstsq_interp(x, y, w): return w[0] * x ** 2 + w[1] * y ** 2 + w[2] * x * y + w[3] * x + w[4] * y + w[5]
@@ -242,7 +242,7 @@ class EmptyExpression(CouplingExpression):
         :param x: coordinate where expression has to be evaluated
         :param value: buffer where result has to be returned to
         """
-        assert(MPI.COMM_WORLD.Get_size() > 1)
+        assert (MPI.COMM_WORLD.Get_size() > 1)
         for i in range(self._vals.ndim):
             value[i] = 0
 

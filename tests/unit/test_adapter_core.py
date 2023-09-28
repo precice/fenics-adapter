@@ -29,10 +29,9 @@ class TestAdapterCore(TestCase):
             if right_edge.inside(v.point(), True):
                 global_ids.append(v.global_index())
 
-        edge_vertex_ids1, edge_vertex_ids2, _ = get_coupling_boundary_edges(V, right_edge, global_ids, id_mapping)
+        edge_vertex_ids, _ = get_coupling_boundary_edges(V, right_edge, global_ids, id_mapping)
 
-        self.assertEqual(len(edge_vertex_ids1), 10)
-        self.assertEqual(len(edge_vertex_ids2), 10)
+        self.assertEqual(len(edge_vertex_ids), 10)
 
     def test_convert_fenics_to_precice(self):
         """

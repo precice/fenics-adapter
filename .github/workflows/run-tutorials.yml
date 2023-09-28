@@ -7,15 +7,15 @@ on:
   pull_request:
     paths:
       - '**'
-      
-jobs:  
+
+jobs:
   run_ht_simple:
     name: Run HT, simple
     runs-on: ubuntu-latest
-    container: precice/precice
+    container: precice/precice:develop
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2      
+        uses: actions/checkout@v2
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
@@ -30,17 +30,17 @@ jobs:
       - name: Get tutorials
         run: git clone -b develop https://github.com/precice/tutorials.git
       - name: Run tutorial
-        run: | 
+        run: |
           cd tutorials/partitioned-heat-conduction/fenics
-          python3 heat.py -d & python3 heat.py -n
-        
+          ./run.sh -d & ./run.sh -n
+
   run_ht_complex:
     name: Run HT, complex
     runs-on: ubuntu-latest
-    container: precice/precice
+    container: precice/precice:develop
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2      
+        uses: actions/checkout@v2
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
@@ -57,4 +57,4 @@ jobs:
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction-complex/fenics
-          python3 heat.py -d -i complex & python3 heat.py -n -i complex
+          ./run.sh -d & ./run.sh -n

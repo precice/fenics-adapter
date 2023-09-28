@@ -1,11 +1,4 @@
-from unittest.mock import MagicMock
-
-action_read_iteration_checkpoint = MagicMock(return_value=1)
-action_write_iteration_checkpoint = MagicMock(return_value=2)
-action_write_initial_data = MagicMock()
-
-
-class Interface:
+class Participant:
     """
     Mock representation of preCICE to be used in all mock tests. Dummy implementation of all functions below are
     to be used where the preCICE API calls via the python bindings are done in the FEniCS Adapter
@@ -14,31 +7,28 @@ class Interface:
     def __init__(self, name, config_file, rank, procs):
         pass
 
-    def read_block_scalar_data(self, read_data_id, vertex_ids):
+    def read_data(self, read_mesh_name, read_data_name, vertex_ids, dt):
         raise Exception("not implemented")
 
-    def read_block_vector_data(self, read_data_id, vertex_ids):
+    def write_data(self, write_mesh_name, write_data_name, vertex_ids, write_data):
         raise Exception("not implemented")
 
-    def write_block_scalar_data(self, write_data_id, vertex_ids, write_data):
-        raise Exception("not implemented")
-
-    def write_block_vector_data(self, write_data_id, vertex_ids, write_data):
-        raise Exception("not implemented")
-
-    def get_data_id(self, foo, bar):
-        raise Exception("not implemented")
-
-    def get_mesh_id(self, foo):
-        raise Exception("not implemented")
-
-    def initialize_data(self):
+    def initialize():
         raise Exception("not implemented")
 
     def advance(self, foo):
         raise Exception("not implemented")
 
-    def is_action_required(self, action):
+    def finalize():
+        raise Exception("not implemented")
+
+    def requires_initial_data(self):
+        raise Exception("not implemented")
+
+    def requires_reading_checkpoint(self):
+        raise Exception("not implemented")
+
+    def requires_writing_checkpoint(self):
         raise Exception("not implemented")
 
     def is_coupling_ongoing(self):
@@ -48,6 +38,9 @@ class Interface:
         raise Exception("not implemented")
 
     def get_dimensions(self):
+        raise Exception("not implemented")
+
+    def get_max_time_step_size(self):
         raise Exception("not implemented")
 
     def is_time_window_complete(self):
