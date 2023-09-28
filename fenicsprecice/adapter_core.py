@@ -436,7 +436,7 @@ def get_coupling_triangles(function_space, coupling_subdomain, fenics_edge_ids, 
                 v1, v2 = vertices(e1)
                 _, v3 = vertices(e2)
                 assert (v3 != v1)
-                assert (v2 != v2)
+                assert (v3 != v2)
                 vertex_ids.append([id_mapping[v1.global_index()],
                                    id_mapping[v2.global_index()],
                                    id_mapping[v3.global_index()]])
