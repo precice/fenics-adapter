@@ -125,6 +125,29 @@ class TestExpressionHandling(TestCase):
         def inside(self, x, on_boundary):
             return near(x[0], 1.0)
 
+    def test_create_expression_scalar(self):
+        """
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
+        """
+        from precice import Participant
+        import fenicsprecice
+
+        Participant.get_mesh_dimensions = MagicMock(return_value=2)
+        Participant.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Participant.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Participant.requires_initial_data = MagicMock(return_value=False)
+        Participant.initialize = MagicMock()
+        Participant.write_data = MagicMock()
+
+        right_boundary = self.Right()
+
+        precice = fenicsprecice.Adapter(self.dummy_config)
+        precice._participant = Participant(None, None, None, None)
+        precice.initialize(right_boundary, self.scalar_V, self.scalar_function)
+        precice.create_coupling_expression()
+        # currently only a smoke tests. Is there a good way to test this?
+
     def test_update_expression_scalar(self):
         """
         Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
