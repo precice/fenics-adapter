@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 from unittest import TestCase
 from tests import MockedPrecice
 import numpy as np
-from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, ds, \
-    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, grad, assemble, Function, solve, dot, \
-    TrialFunction, TestFunction, lhs, inner, Constant, assemble_system
+from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, dx, \
+    SubDomain, near, PointSource, Point, AutoSubDomain, TestFunction, grad, dot, TrialFunction, \
+    TestFunction, inner, Constant, assemble_system
 
 
 class MockedArray:
@@ -74,22 +74,12 @@ class TestCheckpointing(TestCase):
         Test correct checkpoint storing
         """
         import fenicsprecice
-        from precice import Interface, action_write_iteration_checkpoint
+        from precice import Participant
 
-        def is_action_required_behavior(py_action):
-            if py_action == action_write_iteration_checkpoint():
-                return True
-            else:
-                return False
-
-        Interface.initialize = MagicMock(return_value=self.dt)
-        Interface.is_action_required = MagicMock(side_effect=is_action_required_behavior)
-        Interface.get_dimensions = MagicMock()
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
-        Interface.is_time_window_complete = MagicMock(return_value=True)
-        Interface.advance = MagicMock()
+        Participant.initialize = MagicMock(return_value=self.dt)
+        Participant.get_mesh_dimensions = MagicMock()
+        Participant.is_time_window_complete = MagicMock(return_value=True)
+        Participant.advance = MagicMock()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
 
@@ -98,7 +88,7 @@ class TestCheckpointing(TestCase):
         # Replicating control flow where implicit iteration has not converged and solver state needs to be restored
         # to a checkpoint
         precice.advance(self.dt)
-        Interface.is_time_window_complete = MagicMock(return_value=False)
+        Participant.is_time_window_complete = MagicMock(return_value=False)
 
         # Check if the checkpoint is stored correctly in the adapter
         self.assertEqual(precice.retrieve_checkpoint() == self.u_n_mocked, self.t, self.n)
@@ -123,7 +113,6 @@ class TestExpressionHandling(TestCase):
     vector_function = interpolate(vector_expr, vector_V)
 
     n_vertices = 11
-    fake_id = 15
     vertices_x = [1 for _ in range(n_vertices)]
     vertices_y = np.linspace(0, 1, n_vertices)
     vertex_ids = np.arange(n_vertices)
@@ -136,36 +125,54 @@ class TestExpressionHandling(TestCase):
         def inside(self, x, on_boundary):
             return near(x[0], 1.0)
 
+    def test_create_expression_scalar(self):
+        """
+        Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
+        same points on a FEniCS Expression created by the Adapter
+        """
+        from precice import Participant
+        import fenicsprecice
+
+        Participant.get_mesh_dimensions = MagicMock(return_value=2)
+        Participant.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Participant.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Participant.requires_initial_data = MagicMock(return_value=False)
+        Participant.initialize = MagicMock()
+        Participant.write_data = MagicMock()
+
+        right_boundary = self.Right()
+
+        precice = fenicsprecice.Adapter(self.dummy_config)
+        precice._participant = Participant(None, None, None, None)
+        precice.initialize(right_boundary, self.scalar_V, self.scalar_function)
+        precice.create_coupling_expression()
+        # currently only a smoke tests. Is there a good way to test this?
+
     def test_update_expression_scalar(self):
         """
         Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
         same points on a FEniCS Expression created by the Adapter
         """
-        from precice import Interface
+        from precice import Participant
         import fenicsprecice
 
-        Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
-        Interface.set_mesh_edge = MagicMock()
-        Interface.initialize = MagicMock()
-        Interface.initialize_data = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
-        Interface.write_block_scalar_data = MagicMock()
+        Participant.get_mesh_dimensions = MagicMock(return_value=2)
+        Participant.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Participant.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Participant.requires_initial_data = MagicMock(return_value=False)
+        Participant.initialize = MagicMock()
+        Participant.write_data = MagicMock()
 
         right_boundary = self.Right()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
-        precice._interface = Interface(None, None, None, None)
+        precice._participant = Participant(None, None, None, None)
         precice.initialize(right_boundary, self.scalar_V, self.scalar_function)
         values = np.array([self.scalar_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
-
         scalar_coupling_expr = precice.create_coupling_expression()
-        precice.update_coupling_expression(scalar_coupling_expr, data)
 
+        precice.update_coupling_expression(scalar_coupling_expr, data)
         expr_samples = np.array([scalar_coupling_expr(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
         func_samples = np.array([self.scalar_function(x, y) for x, y in zip(self.samplepts_x, self.samplepts_y)])
 
@@ -176,24 +183,20 @@ class TestExpressionHandling(TestCase):
         Check if a sampling of points on a dolfin Function interpolated via FEniCS is matching with the sampling of the
         same points on a FEniCS Expression created by the Adapter
         """
-        from precice import Interface
+        from precice import Participant
         import fenicsprecice
 
-        Interface.get_dimensions = MagicMock(return_value=2)
-        Interface.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
-        Interface.get_mesh_id = MagicMock()
-        Interface.get_data_id = MagicMock()
-        Interface.set_mesh_edge = MagicMock()
-        Interface.initialize = MagicMock()
-        Interface.initialize_data = MagicMock()
-        Interface.is_action_required = MagicMock()
-        Interface.mark_action_fulfilled = MagicMock()
-        Interface.write_block_vector_data = MagicMock()
+        Participant.get_mesh_dimensions = MagicMock(return_value=2)
+        Participant.set_mesh_vertices = MagicMock(return_value=self.vertex_ids)
+        Participant.requires_mesh_connectivity_for = MagicMock(return_value=False)
+        Participant.requires_initial_data = MagicMock(return_value=False)
+        Participant.initialize = MagicMock()
+        Participant.write_data = MagicMock()
 
         right_boundary = self.Right()
 
         precice = fenicsprecice.Adapter(self.dummy_config)
-        precice._interface = Interface(None, None, None, None)
+        precice._participant = Participant(None, None, None, None)
         precice.initialize(right_boundary, self.vector_V, self.vector_function)
         values = np.array([self.vector_function(x, y) for x, y in zip(self.vertices_x, self.vertices_y)])
         data = {(x, y): v for x, y, v in zip(self.vertices_x, self.vertices_y, values)}
@@ -294,4 +297,4 @@ class TestPointSource(TestCase):
         for ps in forces_y:
             ps.apply(b_forces)
 
-        assert(np.allclose(b_dummy.get_local(), b_forces.get_local()))
+        assert (np.allclose(b_dummy.get_local(), b_forces.get_local()))

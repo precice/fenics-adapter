@@ -12,7 +12,7 @@ jobs:
   run_ht_simple:
     name: Run HT, simple (surface coupling with matching meshes)
     runs-on: ubuntu-latest
-    container: precice/precice
+    container: precice/precice:develop
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -32,12 +32,12 @@ jobs:
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction/fenics
-          python3 heat.py -d & python3 heat.py -n
+          ./run.sh -d & ./run.sh -n
 
   run_ht_complex:
     name: Run HT, complex (surface coupling with nearest projection)
     runs-on: ubuntu-latest
-    container: precice/precice
+    container: precice/precice:develop
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -57,12 +57,12 @@ jobs:
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction-complex/fenics
-          python3 heat.py -d -i complex & python3 heat.py -n -i complex
+          ./run.sh -d & ./run.sh -n
 
   run_channel_transport_reaction:
     name: Run channel-transport-reaction (volume coupling with linear cell interpolation)
     runs-on: ubuntu-latest
-    container: precice/precice
+    container: precice/precice:develop
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
