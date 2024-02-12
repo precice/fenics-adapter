@@ -32,9 +32,7 @@ abstract: >-
   preCICE-adapter for the open source computing platform
   FEniCS.
 license: LGPL-3.0
-commit: ' 9aa3e22'
 version: 1.4.0
-date-released: '2022-09-22'
 preferred-citation:
   title: "FEniCS-preCICE: Coupling FEniCS to other Simulation Software"
   type: "article"
