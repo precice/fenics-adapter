@@ -7,6 +7,5 @@ except ModuleNotFoundError:
                   "The FEniCS adapter might not work as expected.\n\n")
 
 from .fenicsprecice import Adapter
-from ._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+from . import _version
+__version__ = _version.get_versions()['version']

@@ -1,5 +1,11 @@
 # FEniCS-preCICE adapter changelog
 
+## 2.0.0
+
+* Drop support for preCICE 2.x version, as this is a breaking release.
+* Update adapter to use preCICE v3 API [#153](https://github.com/precice/fenics-adapter/pull/153).
+* Remove functionality to define mesh connectivity in 2D cases in the form of triangles due to lack of testing and compatibility problems (might be added again). See [#162](https://github.com/precice/fenics-adapter/issues/162).
+
 ## 1.4.0
 
 * Adding CITATION.cff to link the adapter repository to the relevant publication in the journal SoftwareX.

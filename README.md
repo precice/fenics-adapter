@@ -65,6 +65,7 @@ python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
 **FEniCS is suddenly broken:** There are two known issues with preCICE, fenicsprecice and FEniCS:
 
 * If you see `ImportError: cannot import name 'sub_forms_by_domain'` run `pip3 uninstall -y fenics-ufl`. For details, refer to [issue #103](https://github.com/precice/fenics-adapter/issues/103).
+* If you see `ImportError: cannot import name 'cellname2facetname' from 'ufl.cell'`, refer to [issue #154](https://github.com/precice/fenics-adapter/issues/154).
 * If you see `ModuleNotFoundError: No module named 'dolfin'` and have installed PETSc from source, refer to [this forum post](https://fenicsproject.discourse.group/t/modulenotfounderror-no-module-named-dolfin-if-petsc-dir-is-set/4407). Short version: Try to use the PETSc that comes with your system, if possible. Note that you can also [compile preCICE without PETSc](https://www.precice.org/installation-source-configuration.html), if necessary.
 
 If this does not help, you can contact us on [gitter](https://gitter.im/precice/lobby) or [open an issue](https://github.com/precice/fenics-adapter/issues/new).
@@ -85,7 +86,7 @@ To create and install the `fenicsprecice` python package the following instructi
 
 ## Development history
 
-The initial version of this adapter was developed by [Benjamin Rodenberg](https://www.in.tum.de/i05/personen/personen/benjamin-rodenberg/) during his research stay at Lund University in the group for [Numerical Analysis](http://www.maths.lu.se/english/research/research-divisions/numerical-analysis/) in close collaboration with [Peter Meisrimel](https://www.lunduniversity.lu.se/lucat/user/09d80f0367a060bcf2a22d7c22e5e504).
+The initial version of this adapter was developed by [Benjamin Rodenberg](https://www.cs.cit.tum.de/sccs/personen/benjamin-rodenberg/) during his research stay at Lund University in the group for [Numerical Analysis](http://www.maths.lu.se/english/research/research-divisions/numerical-analysis/) in close collaboration with Peter Meisrimel.
 
 [Richard Hertrich](https://github.com/richahert) contributed the possibility to perform FSI simulations using the adapter in his [Bachelor thesis](https://mediatum.ub.tum.de/node?id=1520579).
 
