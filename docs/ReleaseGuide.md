@@ -24,3 +24,5 @@ Before starting this process make sure to check that all relevant changes are in
 5. Merge `master` into `develop` for synchronization of `develop`.
 
 6. If everything is in order up to this point then the new version can be released by hitting the "Publish release" button in your Release Draft.
+
+7. Now there should be a tag for the release. Re-run the [docker release workflow `build-docker.yml` via dispatch](https://github.com/precice/fenics-adapter/actions/workflows/build-docker.yml) such that the correct version is picked up by `versioneer`. Check the version in the container via `docker pull precice/fenics-adapter`, then `docker run -ti precice/fenics-adapter`, and inside the container `$ python3 -c "import fenicsprecice; print(fenicsprecice.__version__)"`.
