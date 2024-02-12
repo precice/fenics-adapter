@@ -39,6 +39,6 @@ setup(name='fenicsprecice',
       author_email='info@precice.org',
       license='LGPL-3.0',
       packages=['fenicsprecice'],
-      install_requires=['pyprecice>=3.0.0.0.dev0', 'scipy', 'numpy>=1.13.3', 'mpi4py'],
+      install_requires=['pyprecice>=3.0.0.0', 'scipy', 'numpy>=1.13.3', 'mpi4py'],
       test_suite='tests',
       zip_safe=False)
