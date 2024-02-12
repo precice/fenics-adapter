@@ -31,8 +31,8 @@ jobs:
         run: git clone -b develop https://github.com/precice/tutorials.git
       - name: Run tutorial
         run: |
-          cd tutorials/partitioned-heat-conduction/fenics
-          ./run.sh -d & ./run.sh -n
+          cd tutorials/partitioned-heat-conduction
+          cd dirichlet-fenics && ./run.sh & cd neumann-fenics && ./run.sh
 
   run_ht_complex:
     name: Run HT, complex
@@ -56,5 +56,5 @@ jobs:
         run: git clone -b develop https://github.com/precice/tutorials.git
       - name: Run tutorial
         run: |
-          cd tutorials/partitioned-heat-conduction-complex/fenics
-          ./run.sh -d & ./run.sh -n
+          cd tutorials/partitioned-heat-conduction-complex
+          cd dirichlet-fenics && ./run.sh & cd neumann-fenics && ./run.sh
