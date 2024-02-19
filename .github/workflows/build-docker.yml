@@ -8,11 +8,9 @@ on:
         description: branch to build the container from
         options:
           - develop
-          - master     
   push:
     branches:
       - develop
-      - master
 
 jobs:
   build-and-release-docker-image:
@@ -34,15 +32,9 @@ jobs:
       - name: Set PYTHON_BINDINGS_REF and the TAG depending on branch
         shell: bash
         run: |
-          if [[ '${{ env.ADAPTER_REF }}' == 'master' ]]; then
-              echo "PYTHON_BINDINGS_REF=latest" >> "$GITHUB_ENV"
-              echo "TAG=latest" >> "$GITHUB_ENV"
-              echo "Building TAG: latest"
-          else
-              echo "PYTHON_BINDINGS_REF=${{ env.ADAPTER_REF }}" >> "$GITHUB_ENV"
-              echo "TAG=${{ env.ADAPTER_REF }}" >> "$GITHUB_ENV"
-              echo "Building TAG: ${{ env.ADAPTER_REF }}"
-          fi   
+          echo "PYTHON_BINDINGS_REF=${{ env.ADAPTER_REF }}" >> "$GITHUB_ENV"
+          echo "TAG=${{ env.ADAPTER_REF }}" >> "$GITHUB_ENV"
+          echo "Building TAG: ${{ env.ADAPTER_REF }}"
       - name: Checkout Repository
         uses: actions/checkout@v2
       - name: Set up Docker Buildx
