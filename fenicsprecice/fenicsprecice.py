@@ -449,7 +449,11 @@ class Adapter:
             assert (self.is_time_window_complete())
 
         logger.debug("Store checkpoint")
-        my_u = user_u.copy()
+        try:
+            my_u = user_u.copy()
+        except AttributeError:  # if .copy() does not exist, it probably is a list
+            my_u = [item.copy() for item in user_u]
+
         # making sure that the FEniCS function provided by user is not directly accessed by the Adapter
         assert (my_u != user_u)
         self._checkpoint = SolverState(my_u, t, n)

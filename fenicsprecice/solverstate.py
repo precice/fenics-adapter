@@ -5,6 +5,7 @@ class SolverState:
 
         Parameters
         ----------
+        #TODO rename u to payload or similar
         u : Object of class dolfin.functions.function.Function
             FEniCS function related to the field during each coupling iteration.
         t : double
@@ -29,7 +30,10 @@ class SolverState:
         n : int
             Iteration number.
         """
-        return self.u.copy(), self.t, self.n
+        try:
+            return self.u.copy(), self.t, self.n
+        except AttributeError:  # if .copy() does not exist, it probably is a list
+            return [item.copy() for item in self.u], self.t, self.n
 
     def print_state(self):
         u, t, n = self.get_state()
