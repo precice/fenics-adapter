@@ -1,5 +1,9 @@
 # FEniCS-preCICE adapter changelog
 
+## latest
+
+* Additionally support checkpoints being provided as a list or tuple (of FEniCS Functions). https://github.com/precice/fenics-adapter/pull/170
+
 ## 2.0.0
 
 * Drop support for preCICE 2.x version, as this is a breaking release.
