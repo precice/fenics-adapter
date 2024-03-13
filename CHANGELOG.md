@@ -2,7 +2,7 @@
 
 ## latest
 
-* Additionally support checkpoints being provided as a list or tuple (of FEniCS Functions). https://github.com/precice/fenics-adapter/pull/170
+* Additionally support checkpoints being provided as a list or tuple (of FEniCS Functions). [#170](https://github.com/precice/fenics-adapter/pull/170)
 
 ## 2.0.0
 
