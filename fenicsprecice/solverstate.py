@@ -1,36 +1,43 @@
 class SolverState:
-    def __init__(self, u, t, n):
+    def __init__(self, payload, t, n):
         """
-        Solver state consists of a value u, associated time t and the timestep n
+        Solver state consists of a payload (either a single fenics.Function or a list of several fenics.Functions), associated time t and the timestep n
 
         Parameters
         ----------
-        u : Object of class dolfin.functions.function.Function
-            FEniCS function related to the field during each coupling iteration.
+        payload : A fenics.Function or a list of fenics.Functions
+            Describes the state of the solver.
         t : double
             Time stamp.
         n : int
             Iteration number.
         """
-        self.u = u
+        try:
+            self.payload = payload.copy()
+        except AttributeError:  # if .copy() does not exist, it probably is a list
+            self.payload = [item.copy() for item in payload]
+
         self.t = t
         self.n = n
 
     def get_state(self):
         """
-        Returns the state variables value u, associated time t and timestep n
+        Returns the state variables payload, associated time t and timestep n
 
         Returns
         -------
-        u : Object of class dolfin.functions.function.Function
-            A copy of FEniCS function related to the field during each coupling iteration.
+        payload : A fenics.Function or a list of fenics.Functions
+            Describes the state of the solver.
         t : double
             Time stamp.
         n : int
             Iteration number.
         """
-        return self.u.copy(), self.t, self.n
+        try:
+            return self.payload.copy(), self.t, self.n
+        except AttributeError:  # if .copy() does not exist, it probably is a list
+            return [item.copy() for item in self.payload], self.t, self.n
 
     def print_state(self):
-        u, t, n = self.get_state()
-        return print("u={u}, t={t}, n={n}".format(u=u, t=t, n=n))
+        payload, t, n = self.get_state()
+        return print(f"payload={payload}, t={t}, n={n}")
