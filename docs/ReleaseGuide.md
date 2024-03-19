@@ -10,7 +10,7 @@ Before starting this process make sure to check that all relevant changes are in
 
     a) Before merging the PR, make sure to bump the version in `CHANGELOG.md` on `fenics-adapter-vX.X.X`.
 
-    b) Update the version in `CITATION.cff` and update the release date.
+    b) Update the version in `CITATION.cff`.
 
     c) There is no need to bump the version anywhere else, since we use the [python-versioneer](https://github.com/python-versioneer/python-versioneer/) for maintaining the version everywhere else.
 
