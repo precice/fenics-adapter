@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 from unittest import TestCase
 from fenics import FunctionSpace, UnitSquareMesh, Expression, interpolate
-import random as rnd
 from fenicsprecice.solverstate import SolverState
 
 
