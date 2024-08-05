@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pipx install setuptools wheel twine
+          pip3 install --break-system-packages setuptools wheel twine
       - name: Build distribution
         run:  python3 setup.py sdist
   test:
@@ -37,7 +37,7 @@ jobs:
           mkdir -p precice
           echo "from setuptools import setup" >> precice/setup.py
           echo "setup(name='pyprecice', version='3.0.0.0')" >> precice/setup.py
-          pipx install ./precice/
+          pip3 install --break-system-packages ./precice/
       - name: Run unit tests
         run:  python3 setup.py test -s tests.unit
       - name: Run integration tests
