@@ -28,7 +28,7 @@ jobs:
   test:
     name: Run mock unit tests
     runs-on: ubuntu-latest
-    container: quay.io/fenicsproject/stable:current
+    container: benjaminrodenberg/fenics
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2      
