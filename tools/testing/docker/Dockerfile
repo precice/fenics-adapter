@@ -10,5 +10,5 @@ RUN apt-get -qq update && \
     apt-get -qq install software-properties-common && \
     add-apt-repository -y ppa:fenics-packages/fenics && \
     apt-get -qq update && \
-    apt-get -qq install --no-install-recommends fenics && \
+    apt-get -qq install --no-install-recommends fenics python3-pip && \
     rm -rf /var/lib/apt/lists/*
