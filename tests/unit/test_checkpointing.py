@@ -9,22 +9,22 @@ class TestCheckpointing(TestCase):
         """
         Check if correct values are read from the checkpoint, while the state of the object that is copied is not changed
         """
-        time = 0.5
-        iteration = 1
+        n = 1
         size = 5
         mesh = UnitSquareMesh(size,size)
         V = FunctionSpace(mesh, 'P', 2)
-        E = Expression("t", t=time, degree=2)
+        dummy_value = 1
+        E = Expression("t", t=dummy_value, degree=2)
         u = interpolate(E, V)
 
         # "write checkpoint"
-        sstate = SolverState(u, time, iteration)
+        sstate = SolverState(u, dummy_value, n)
         # "read checkpoint"
         u_cp, t_cp, n_cp = sstate.get_state()
 
         #check values
-        self.assertEqual(t_cp, time)
-        self.assertEqual(iteration, n_cp)
+        self.assertEqual(t_cp, dummy_value)
+        self.assertEqual(n, n_cp)
         #function should be the same everywhere (-> check vector values of the function)
         vec_u = u.vector()
         vec_u_cp = u_cp.vector()
@@ -35,29 +35,29 @@ class TestCheckpointing(TestCase):
         """
         Check if correct values are read from the checkpoint, if the dof vector of the dolfin functions are changed directly 
         """
-        time = 0.5
-        iteration = 1
+        n = 1
         size = 5
         mesh = UnitSquareMesh(size,size)
         V = FunctionSpace(mesh, 'P', 2)
-        E = Expression("t", t=time, degree=2)
+        dummy_value = 1
+        E = Expression("t", t=dummy_value, degree=2)
         u = interpolate(E, V)
 
         # "write checkpoint"
-        sstate = SolverState(u, time, iteration)
+        sstate = SolverState(u, dummy_value, n)
 
         # modify state of u
-        u.vector()[:] = time + 2
+        u.vector()[:] = dummy_value + 2
 
         # "read checkpoint"
         u_cp, _, _ = sstate.get_state()
 
         #check values
         #function should be the same everywhere
-        #(so the vector values should all be time=0.5)
+        #(so the vector values should all be dummy_value=1)
         vec_u_cp = u_cp.vector()
         for i in range(size*size):
-            self.assertAlmostEqual(time, vec_u_cp[i])
+            self.assertAlmostEqual(dummy_value, vec_u_cp[i])
     
 
     def test_solverstate_modification_assign(self):
@@ -65,16 +65,16 @@ class TestCheckpointing(TestCase):
         Check if correct values are read from the checkpoint, if the dof of the dolfin functions are changed with the assign function
         and not directly via the dof vector
         """
-        time = 0.5
-        iteration = 1
+        n = 1
         size = 5
         mesh = UnitSquareMesh(size,size)
         V = FunctionSpace(mesh, 'P', 2)
-        E = Expression("t", t=time, degree=2)
+        dummy_value = 1
+        E = Expression("t", t=dummy_value, degree=2)
         u = interpolate(E, V)
 
         # "write checkpoint"
-        sstate = SolverState(u, time, iteration)
+        sstate = SolverState(u, dummy_value, n)
 
         # modify state of u
         # "compute" new solution
@@ -87,7 +87,7 @@ class TestCheckpointing(TestCase):
 
         #check values
         #function should be the same everywhere
-        #(so the vector values should all be time=0.5)
+        #(so the vector values should all be dummy_value=1)
         vec_u_cp = u_cp.vector()
         for i in range(size*size):
-            self.assertAlmostEqual(time, vec_u_cp[i])
+            self.assertAlmostEqual(dummy_value, vec_u_cp[i])
