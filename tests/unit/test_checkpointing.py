@@ -39,25 +39,26 @@ class TestCheckpointing(TestCase):
         size = 5
         mesh = UnitSquareMesh(size,size)
         V = FunctionSpace(mesh, 'P', 2)
-        dummy_value = 1
-        E = Expression("t", t=dummy_value, degree=2)
+        ref_value = 1
+        E = Expression("t", t=ref_value, degree=2)
         u = interpolate(E, V)
 
         # "write checkpoint"
-        sstate = SolverState(u, dummy_value, n)
+        sstate = SolverState(u, ref_value, n)
 
         # modify state of u
-        u.vector()[:] = dummy_value + 2
+        dummy_value = ref_value + 2
+        u.vector()[:] = dummy_value
 
         # "read checkpoint"
         u_cp, _, _ = sstate.get_state()
 
         #check values
         #function should be the same everywhere
-        #(so the vector values should all be dummy_value=1)
+        #(so the vector values should all be ref_value)
         vec_u_cp = u_cp.vector()
         for i in range(size*size):
-            self.assertAlmostEqual(dummy_value, vec_u_cp[i])
+            self.assertAlmostEqual(ref_value, vec_u_cp[i])
     
 
     def test_solverstate_modification_assign(self):
@@ -69,16 +70,17 @@ class TestCheckpointing(TestCase):
         size = 5
         mesh = UnitSquareMesh(size,size)
         V = FunctionSpace(mesh, 'P', 2)
-        dummy_value = 1
-        E = Expression("t", t=dummy_value, degree=2)
+        ref_value = 1
+        E = Expression("t", t=ref_value, degree=2)
         u = interpolate(E, V)
 
         # "write checkpoint"
-        sstate = SolverState(u, dummy_value, n)
+        sstate = SolverState(u, ref_value, n)
 
         # modify state of u
         # "compute" new solution
-        E.t += 2
+        dummy_value = ref_value + 2
+        E.t = dummy_value
         u2 = interpolate(E,V)
         u.assign(u2)
 
@@ -87,7 +89,7 @@ class TestCheckpointing(TestCase):
 
         #check values
         #function should be the same everywhere
-        #(so the vector values should all be dummy_value=1)
+        #(so the vector values should all be ref_value)
         vec_u_cp = u_cp.vector()
         for i in range(size*size):
-            self.assertAlmostEqual(dummy_value, vec_u_cp[i])
+            self.assertAlmostEqual(ref_value, vec_u_cp[i])
