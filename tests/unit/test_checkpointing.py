@@ -34,6 +34,8 @@ class TestCheckpointing(TestCase):
     def test_solverstate_modification_vector(self):
         """
         Check if correct values are read from the checkpoint, if the dof vector of the dolfin functions are changed directly 
+
+        Motivation for this test: Related to https://github.com/precice/fenics-adapter/pull/172 and https://github.com/precice/tutorials/pull/554
         """
         n = 1
         size = 5
