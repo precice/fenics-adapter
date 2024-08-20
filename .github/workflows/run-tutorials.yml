@@ -82,4 +82,4 @@ jobs:
       - name: Run tutorial
         run: |
           cd tutorials/channel-transport-reaction
-          cd fluid-fenics && ./run.py & cd chemical-fenics && ./run.py
+          cd fluid-fenics && ./run.sh & cd chemical-fenics && ./run.sh
