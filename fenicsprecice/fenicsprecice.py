@@ -434,14 +434,14 @@ class Adapter:
 
         self._participant.initialize()
 
-    def store_checkpoint(self, user_u, t, n):
+    def store_checkpoint(self, payload, t, n):
         """
         Defines an object of class SolverState which stores the current state of the variable and the time stamp.
 
         Parameters
         ----------
-        user_u : FEniCS Function
-            Current state of the physical variable of interest for this participant.
+        payload : fenics.function or a list of fenics.functions
+            Current state of the physical variable(s) of interest for this participant.
         t : double
             Current simulation time.
         n : int
@@ -451,10 +451,7 @@ class Adapter:
             assert (self.is_time_window_complete())
 
         logger.debug("Store checkpoint")
-        my_u = user_u.copy()
-        # making sure that the FEniCS function provided by user is not directly accessed by the Adapter
-        assert (my_u != user_u)
-        self._checkpoint = SolverState(my_u, t, n)
+        self._checkpoint = SolverState(payload, t, n)
 
     def retrieve_checkpoint(self):
         """

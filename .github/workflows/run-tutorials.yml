@@ -31,8 +31,8 @@ jobs:
         run: git clone -b develop https://github.com/precice/tutorials.git
       - name: Run tutorial
         run: |
-          cd tutorials/partitioned-heat-conduction/fenics
-          ./run.sh -d & ./run.sh -n
+          cd tutorials/partitioned-heat-conduction
+          cd dirichlet-fenics && ./run.sh & cd neumann-fenics && ./run.sh
 
   run_ht_complex:
     name: Run HT, complex (surface coupling with nearest projection)
@@ -56,8 +56,8 @@ jobs:
         run: git clone -b develop https://github.com/precice/tutorials.git
       - name: Run tutorial
         run: |
-          cd tutorials/partitioned-heat-conduction-complex/fenics
-          ./run.sh -d & ./run.sh -n
+          cd tutorials/partitioned-heat-conduction-complex
+          cd dirichlet-fenics && ./run.sh & cd neumann-fenics && ./run.sh
 
   run_channel_transport_reaction:
     name: Run channel-transport-reaction (volume coupling with linear cell interpolation)
@@ -82,4 +82,4 @@ jobs:
       - name: Run tutorial
         run: |
           cd tutorials/channel-transport-reaction
-          python3 fluid-fenics/fluid.py & python3 chemical-fenics/chemical-reaction-advection-diffusion.py
+          cd fluid-fenics && ./run.py & cd chemical-fenics && ./run.py

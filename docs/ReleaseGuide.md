@@ -10,7 +10,7 @@ Before starting this process make sure to check that all relevant changes are in
 
     a) Before merging the PR, make sure to bump the version in `CHANGELOG.md` on `fenics-adapter-vX.X.X`.
 
-    b) Update the version in `CITATION.cff` and update the release date.
+    b) Update the version in `CITATION.cff`.
 
     c) There is no need to bump the version anywhere else, since we use the [python-versioneer](https://github.com/python-versioneer/python-versioneer/) for maintaining the version everywhere else.
 
@@ -24,3 +24,5 @@ Before starting this process make sure to check that all relevant changes are in
 5. Merge `master` into `develop` for synchronization of `develop`.
 
 6. If everything is in order up to this point then the new version can be released by hitting the "Publish release" button in your Release Draft.
+
+7. Now there should be a tag for the release. Re-run the [docker release workflow `build-docker.yml` via dispatch](https://github.com/precice/fenics-adapter/actions/workflows/build-docker.yml) such that the correct version is picked up by `versioneer`. Check the version in the container via `docker pull precice/fenics-adapter`, then `docker run -ti precice/fenics-adapter`, and inside the container `$ python3 -c "import fenicsprecice; print(fenicsprecice.__version__)"`.
