@@ -1,5 +1,9 @@
 # FEniCS-preCICE adapter changelog
 
+## latest
+
+* Add unit tests for checkpointing. [#173](https://github.com/precice/fenics-adapter/pull/173)
+
 ## 2.1.0
 
 * Additionally support checkpoints being provided as a list or tuple (of FEniCS Functions). [#170](https://github.com/precice/fenics-adapter/pull/170)
