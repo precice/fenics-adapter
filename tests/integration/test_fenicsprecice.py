@@ -25,7 +25,11 @@ class MockedArray:
         """
         self.value = new_value.value
 
-    def copy(self):
+    def copy(self, deepcopy=False):
+        """
+        mock of dolfin.Function.copy
+        :param deepcopy: has no effect but we need to provide it to avoid throwing TypeError if copy(deepcopy=True) is called
+        """
         returned_array = MockedArray()
         returned_array.value = self.value
         return returned_array
