@@ -432,7 +432,7 @@ class Adapter:
 
         self._participant.initialize()
 
-    def store_checkpoint(self, payload, t, n):
+    def store_checkpoint(self, payload, t = None, n = None):
         """
         Defines an object of class SolverState which stores the current state of the variable and the time stamp.
 
@@ -440,9 +440,9 @@ class Adapter:
         ----------
         payload : fenics.function or a list of fenics.functions
             Current state of the physical variable(s) of interest for this participant.
-        t : double
+        t : double (optional)
             Current simulation time.
-        n : int
+        n : int (optional)
             Current time window (iteration) number.
         """
         if self._first_advance_done:
@@ -459,14 +459,25 @@ class Adapter:
         -------
         u : FEniCS Function
             Current state of the physical variable of interest for this participant.
-        t : double
+        t : double (optional)
             Current simulation time.
-        n : int
+        n : int (optional)
             Current time window (iteration) number.
         """
         assert (not self.is_time_window_complete())
         logger.debug("Restore solver state")
-        return self._checkpoint.get_state()
+
+        # since t and n are optional, they should not be returned, if not specified
+        payload, t, n = self._checkpoint.get_state()
+        match (t, n):
+            case (None, None):
+                return payload
+            case (_, None):
+                return payload, t
+            case (None, _):
+                return payload, n
+            case _:
+                return payload, t, n
 
     def advance(self, dt):
         """
