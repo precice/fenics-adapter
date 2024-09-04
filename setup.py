@@ -14,15 +14,6 @@ if sys.version_info[1] == 6 and sys.version_info[2] == 9:
                   "when running the tests (see https://github.com/precice/fenics-adapter/pull/61). If you want to "
                   "run the tests, please install a different Python version.")
 
-try:
-    from fenics import *
-except ModuleNotFoundError:
-    warnings.warn("No FEniCS installation found on system. Please install FEniCS and check the installation.\n\n"
-                  "You can check this by running the command\n\n"
-                  "python3 -c 'from fenics import *'\n\n"
-                  "Please check https://fenicsproject.org/download/ for installation guidance.\n"
-                  "The installation will continue, but please be aware that your installed version of the "
-                  "fenics-adapter might not work as expected.")
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
@@ -39,6 +30,17 @@ setup(name='fenicsprecice',
       author_email='info@precice.org',
       license='LGPL-3.0',
       packages=['fenicsprecice'],
-      install_requires=['pyprecice>=3.0.0.0', 'scipy', 'numpy>=1.13.3, <2', 'mpi4py'],
+      setup_requires=['mpi4py<4'],
+      install_requires=['pyprecice>=3.0.0.0', 'scipy', 'numpy>=1.13.3, <2', 'mpi4py<4'],
       test_suite='tests',
       zip_safe=False)
+
+try:
+    from fenics import *
+except ModuleNotFoundError:
+    warnings.warn("No FEniCS installation found on system. Please install FEniCS and check the installation.\n\n"
+                  "You can check this by running the command\n\n"
+                  "python3 -c 'from fenics import *'\n\n"
+                  "Please check https://fenicsproject.org/download/ for installation guidance.\n"
+                  "The installation will continue, but please be aware that your installed version of the "
+                  "fenics-adapter might not work as expected.")
