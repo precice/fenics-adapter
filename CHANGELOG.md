@@ -4,6 +4,7 @@
 
 * Use `copy(deepcopy=True)` when checkpointing to make checkpointing more user-friendly and secure. IMPORTANT: might increase runtime, please open an issue if you face serious problems. [#172](https://github.com/precice/fenics-adapter/pull/172)
 * Add unit tests for checkpointing. [#173](https://github.com/precice/fenics-adapter/pull/173)
+* Add required version of `mpi4py` to `<4` to avoid crash during installation. [#181](https://github.com/precice/fenics-adapter/pull/181)
 
 ## 2.1.0
 
