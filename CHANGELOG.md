@@ -4,6 +4,7 @@
 
 * Use `copy(deepcopy=True)` when checkpointing to make checkpointing more user-friendly and secure. IMPORTANT: might increase runtime, please open an issue if you face serious problems. [#172](https://github.com/precice/fenics-adapter/pull/172)
 * Add unit tests for checkpointing. [#173](https://github.com/precice/fenics-adapter/pull/173)
+* Remove checks for FEniCS installation and python3 from `setup.py` since the approach is deprecated. [#182](https://github.com/precice/fenics-adapter/pull/182)
 
 ## 2.1.0
 
