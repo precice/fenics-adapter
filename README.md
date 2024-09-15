@@ -22,6 +22,9 @@ preCICE-adapter for the open source computing platform FEniCS.
 
 ## Installing the package
 
+For more recent pip versions you may encounter the error `error: externally-managed-environment` during installation of the fenicsprecice. You can read why [here](https://packaging.python.org/en/latest/specifications/externally-managed-environments/).
+
+Therefore, it is recommended to follow the instructions below after creating and activating a Python virtual environment. For more information about virtual environments, refer to the [Python documentation](https://docs.python.org/3/library/venv.html).
 ### Using pip3 to install from PyPI
 
 It is recommended to install [fenicsprecice from PyPI](https://pypi.org/project/fenicsprecice/) via
