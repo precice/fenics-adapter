@@ -1,6 +1,6 @@
 # FEniCS-preCICE adapter changelog
 
-## latest
+## v2.2.0
 
 * Use `copy(deepcopy=True)` when checkpointing to make checkpointing more user-friendly and secure. IMPORTANT: might increase runtime, please open an issue if you face serious problems. [#172](https://github.com/precice/fenics-adapter/pull/172)
 * Add unit tests for checkpointing. [#173](https://github.com/precice/fenics-adapter/pull/173)
