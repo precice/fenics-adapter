@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          apt install python3-setuptools python3-setuptools-whl
+          sudo apt install python3-setuptools python3-setuptools-whl
       - name: Build distribution
         run:  python3 setup.py sdist
   test:
