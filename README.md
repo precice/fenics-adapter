@@ -22,17 +22,22 @@ preCICE-adapter for the open source computing platform FEniCS.
 
 ## Installing the package
 
-For more recent pip versions you may encounter the error `error: externally-managed-environment` during installation of the fenicsprecice. You can read why [here](https://packaging.python.org/en/latest/specifications/externally-managed-environments/).
-
-Therefore, it is recommended to follow the instructions below after creating and activating a Python virtual environment. For more information about virtual environments, refer to the [Python documentation](https://docs.python.org/3/library/venv.html).
-
 ### Using pip3 to install from PyPI
 
 It is recommended to install [fenicsprecice from PyPI](https://pypi.org/project/fenicsprecice/) via
 
 ```bash
-pip3 install --user fenicsprecice
+pip3 install fenicsprecice
 ```
+
+For more recent pip versions you may encounter the error `error: externally-managed-environment` during installation of the fenicsprecice. You can read why [here](https://packaging.python.org/en/latest/specifications/externally-managed-environments/). In this case, it is recommended to create a virtual environment and install the package in the virtual environment. The following commands will create the virtual environment `venv_name` at the location `path/of/your/venv/`:
+
+```
+python3 -m venv --system-site-packages path/of/your/venv/venv_name
+. path/of/your/venv/venv_name/bin/activate
+```
+
+You can replace `path/of/your/venv/venv_name` with the location and name you want to use for your virtual environment. The command `--system-size-packages` will allow the virtual environment to access the FEniCS installation on your system. Refer to the [Python documentation](https://docs.python.org/3/library/venv.html) for further details on virtual environments.
 
 This should work out of the box, if all dependencies are installed correctly. If you face problems during installation or you want to run the tests, see below for a list of dependencies and alternative installation procedures
 
