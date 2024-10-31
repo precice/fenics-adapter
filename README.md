@@ -32,7 +32,7 @@ pip3 install fenicsprecice
 
 For more recent pip versions you may encounter the error `error: externally-managed-environment` during installation of the fenicsprecice. You can read why [here](https://packaging.python.org/en/latest/specifications/externally-managed-environments/). In this case, it is recommended to create a virtual environment and install the package in the virtual environment. The following commands will create the virtual environment `venv_name` at the location `path/of/your/venv/`:
 
-```
+```bash
 python3 -m venv --system-site-packages path/of/your/venv/venv_name
 . path/of/your/venv/venv_name/bin/activate
 ```
