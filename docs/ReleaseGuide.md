@@ -26,3 +26,32 @@ Before starting this process make sure to check that all relevant changes are in
 6. If everything is in order up to this point then the new version can be released by hitting the "Publish release" button in your Release Draft.
 
 7. Now there should be a tag for the release. Re-run the [docker release workflow `build-docker.yml` via dispatch](https://github.com/precice/fenics-adapter/actions/workflows/build-docker.yml) such that the correct version is picked up by `versioneer`. Check the version in the container via `docker pull precice/fenics-adapter`, then `docker run -ti precice/fenics-adapter`, and inside the container `$ python3 -c "import fenicsprecice; print(fenicsprecice.__version__)"`.
+
+8. Add an empty commit (details https://github.com/precice/python-bindings/issues/109) on master by running the steps:
+
+    ```bash
+    git checkout master
+    git commit --allow-empty -m "post-tag bump"
+    git push
+    ```
+
+    Check that everything is in order via `git log`. Important: The `tag` and `origin/master` should not point to the same commit. For example:
+
+    ```bash
+    commit 9d0d6bf978b2363c7ee041201df4322f930dd456 (HEAD -> master)
+    Author: Benjamin Rodenberg <benjamin.rodenberg@cit.tum.de>
+    Date:   Thu Oct 31 08:52:07 2024 +0100
+
+        post-tag bump
+
+    commit 0d8eecb54b4bc582f33f5f38fca77dfe6161a237 (origin/master)
+    Merge: f3abeb0 8ca28ae
+    Author: Benjamin Rodenberg <benjamin.rodenberg@cit.tum.de>
+    Date:   Thu Oct 31 08:41:36 2024 +0100
+
+        Merge pull request #184 from precice/fenics-adapter-v2.2.0
+
+        Release v2.2.0
+    ```
+
+    For more details refer to https://github.com/precice/python-bindings/issues/109 and https://github.com/python-versioneer/python-versioneer/issues/217.
