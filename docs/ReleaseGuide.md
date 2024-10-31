@@ -19,7 +19,7 @@ Before starting this process make sure to check that all relevant changes are in
 
     a) If a pre-release is made: Directly hit the "Publish release" button in your Release Draft. Now you can check the artifacts (e.g. release on [PyPI](https://pypi.org/project/fenicsprecice/#history)) of the release. *Note:* As soon as a new tag is created github actions will take care of deploying the new version on PyPI using [this workflow](https://github.com/precice/fenics-adapter/actions?query=workflow%3A%22Upload+Python+Package%22).
 
-    b) If this is a "real" release: As soon as one approving review is made, merge the release PR (`fenics-adapter-vX.X.X`) into `master`.
+    b) If this is a "real" release: As soon as one approving review is made, merge the release PR (`fenics-adapter-vX.X.X`) into `master`. Use **Merge pull request**, don't squash the commits.
 
 5. Merge `master` into `develop` for synchronization of `develop`.
 
