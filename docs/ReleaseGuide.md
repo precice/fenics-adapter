@@ -27,7 +27,7 @@ Before starting this process make sure to check that all relevant changes are in
 
 7. Now there should be a tag for the release. Re-run the [docker release workflow `build-docker.yml` via dispatch](https://github.com/precice/fenics-adapter/actions/workflows/build-docker.yml) such that the correct version is picked up by `versioneer`. Check the version in the container via `docker pull precice/fenics-adapter`, then `docker run -ti precice/fenics-adapter`, and inside the container `$ python3 -c "import fenicsprecice; print(fenicsprecice.__version__)"`.
 
-8. Add an empty commit (details https://github.com/precice/python-bindings/issues/109) on master by running the steps:
+8. Add an empty commit (details see [here](https://github.com/precice/python-bindings/issues/109)) on master by running the steps:
 
     ```bash
     git checkout master
@@ -54,4 +54,4 @@ Before starting this process make sure to check that all relevant changes are in
         Release v2.2.0
     ```
 
-    For more details refer to https://github.com/precice/python-bindings/issues/109 and https://github.com/python-versioneer/python-versioneer/issues/217.
+    For more details refer to [this issue](https://github.com/precice/python-bindings/issues/109) and [this issue](https://github.com/python-versioneer/python-versioneer/issues/217).
