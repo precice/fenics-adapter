@@ -459,26 +459,17 @@ class Adapter:
         -------
         u : FEniCS Function
             Current state of the physical variable of interest for this participant.
-        t : double (optional)
-            Current simulation time.
-        n : int (optional)
-            Current time window (iteration) number.
+        t : double 
+            Current simulation time or None if not specified in store_checkpoint
+        n : int 
+            Current time window (iteration) number or None if not specified in store_checkpoint
         """
         assert (not self.is_time_window_complete())
         logger.debug("Restore solver state")
 
         # since t and n are optional, they should not be returned, if not specified
-        payload, t, n = self._checkpoint.get_state()
-        match (t, n):
-            case (None, None):
-                return payload
-            case (_, None):
-                return payload, t
-            case (None, _):
-                return payload, n
-            case _:
-                return payload, t, n
-
+        return self._checkpoint.get_state()
+    
     def advance(self, dt):
         """
         Advances coupling in preCICE.

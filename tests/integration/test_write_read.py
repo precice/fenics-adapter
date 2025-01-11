@@ -221,15 +221,17 @@ class TestWriteandReadData(TestCase):
             adapter.store_checkpoint(u, t) # without n
             res = adapter.retrieve_checkpoint()
             self.assertEqual(len(res), 2) # correct number of return values
-            res_u, res_t = res
+            res_u, res_t, res_n = res
             self.assertEqual(res_t, t)
+            self.assertEqual(res_n, None)
             np.testing.assert_array_equal(res_u.vector(), u.vector())
             
             adapter.store_checkpoint(u, n) # without t
             res = adapter.retrieve_checkpoint()
             self.assertEqual(len(res), 2) # correct number of return values
-            res_u, res_n = res
+            res_u, res_t, res_n = res
             self.assertEqual(res_n, n)
+            self.assertEqual(res_t, None)
             np.testing.assert_array_equal(res_u.vector(), u.vector())
             
         def test_payload_only(adapter):
@@ -241,8 +243,10 @@ class TestWriteandReadData(TestCase):
             u = interpolate(E, V)
             # test adapter
             adapter.store_checkpoint(u) # no optional parameters
-            res = adapter.retrieve_checkpoint()
-            np.testing.assert_array_equal(res.vector(), u.vector())
+            res_u, res_t, res_n = adapter.retrieve_checkpoint()
+            self.assertEqual(res_t, None)
+            self.assertEqual(res_n, None)
+            np.testing.assert_array_equal(res_u.vector(), u.vector())
             
         
         
