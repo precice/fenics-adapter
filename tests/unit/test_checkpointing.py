@@ -1,14 +1,17 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from unittest import TestCase
+from tests import MockedPrecice
 from fenics import FunctionSpace, UnitSquareMesh, Expression, interpolate
-from fenicsprecice.solverstate import SolverState
 
 
+@patch.dict('sys.modules', {'precice': MockedPrecice})
 class TestCheckpointing(TestCase):
     def test_solverstate_basic(self):
         """
         Check if correct values are read from the checkpoint, while the state of the object that is copied is not changed
         """
+        from fenicsprecice.solverstate import SolverState
+
         n = 1
         size = 5
         mesh = UnitSquareMesh(size, size)
@@ -37,6 +40,8 @@ class TestCheckpointing(TestCase):
 
         Motivation for this test: Related to https://github.com/precice/fenics-adapter/pull/172 and https://github.com/precice/tutorials/pull/554
         """
+        from fenicsprecice.solverstate import SolverState
+
         n = 1
         size = 5
         mesh = UnitSquareMesh(size, size)
@@ -67,6 +72,8 @@ class TestCheckpointing(TestCase):
         Check if correct values are read from the checkpoint, if the dof of the dolfin functions are changed with the assign function
         and not directly via the dof vector
         """
+        from fenicsprecice.solverstate import SolverState
+
         n = 1
         size = 5
         mesh = UnitSquareMesh(size, size)
