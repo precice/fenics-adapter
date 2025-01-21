@@ -32,8 +32,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2   
-      - name: Update apt
-      - run:  |
+      - name: Update list of available packages for apt
+        run:  |
           sudo apt update
       - name: Install scipy (see https://github.com/precice/fenics-adapter/issues/189)
         uses: awalsh128/cache-apt-pkgs-action@latest
