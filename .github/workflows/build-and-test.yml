@@ -37,7 +37,7 @@ jobs:
           apt update
       - name: Install scipy (see https://github.com/precice/fenics-adapter/issues/189)
         run:  |
-          apt install python3-scipy
+          apt install -y python3-scipy
       - name: Install fake precice
         run:  |
           mkdir -p precice
