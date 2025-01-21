@@ -33,8 +33,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2      
       - name: Install scipy (see https://github.com/precice/fenics-adapter/issues/189)
-        run:  |
-          apt install -y python3-scipy
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: python3-scipy
+          version: 1.0
       - name: Install fake precice
         run:  |
           mkdir -p precice
