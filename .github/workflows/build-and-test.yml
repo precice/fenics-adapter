@@ -31,7 +31,10 @@ jobs:
     container: benjaminrodenberg/fenics
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2      
+        uses: actions/checkout@v2   
+      - name: Update apt
+      - run:  |
+          sudo apt update
       - name: Install scipy (see https://github.com/precice/fenics-adapter/issues/189)
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
