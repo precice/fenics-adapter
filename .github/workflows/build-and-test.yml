@@ -31,15 +31,11 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2   
-      - name: Add FEniCS PPA and update
+      - name: Install FEniCS and scipy (see https://github.com/precice/fenics-adapter/issues/189)
         run:  |
           sudo add-apt-repository ppa:fenics-packages/fenics
           sudo apt-get update
-      - name: Install FEniCS and scipy (see https://github.com/precice/fenics-adapter/issues/189)
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-            packages: python3-scipy fenics
-            version: 1.0
+          sudo apt-get install -y python3-scipy fenics
       - name: Install fake precice
         run:  |
           mkdir -p precice
