@@ -28,16 +28,18 @@ jobs:
   test:
     name: Run mock unit tests
     runs-on: ubuntu-latest
-    container: benjaminrodenberg/fenics
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2   
-      - name: Update list of available packages for apt
+      - name: Add FEniCS PPA and update
         run:  |
-          apt update
-      - name: Install scipy (see https://github.com/precice/fenics-adapter/issues/189)
-        run:  |
-          apt install -y python3-scipy
+          sudo add-apt-repository ppa:fenics-packages/fenics
+          sudo apt-get update
+      - name: Install FEniCS and scipy (see https://github.com/precice/fenics-adapter/issues/189)
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+            packages: python3-scipy fenics
+            version: 1.0
       - name: Install fake precice
         run:  |
           mkdir -p precice
