@@ -31,7 +31,13 @@ jobs:
     container: benjaminrodenberg/fenics
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2      
+        uses: actions/checkout@v2   
+      - name: Update list of available packages for apt
+        run:  |
+          apt update
+      - name: Install scipy (see https://github.com/precice/fenics-adapter/issues/189)
+        run:  |
+          apt install -y python3-scipy
       - name: Install fake precice
         run:  |
           mkdir -p precice
