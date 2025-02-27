@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 from unittest import TestCase
 from tests import MockedPrecice
-from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, SubDomain, near
+from fenics import Expression, UnitSquareMesh, FunctionSpace, VectorFunctionSpace, interpolate, SubDomain, near, UnitIntervalMesh
 import numpy as np
 
 x_left, x_right = 0, 1
@@ -185,3 +185,82 @@ class TestWriteandReadData(TestCase):
                 self.fail(f"Unexpected combination of arg: {arg}, expected_arg: {expected_arg}")
 
         np.testing.assert_almost_equal(list(read_data.values()), return_dummy_data(self.n_vertices))
+    
+    def test_optional_parameters(self):
+        from precice import Participant
+        import fenicsprecice
+        
+        def test_all_parameters(adapter):
+            #init variables that are tested against
+            nx = 10
+            mesh = UnitIntervalMesh(nx)
+            V = FunctionSpace(mesh, 'P', 2)
+            dummy_value = 1
+            E = Expression("t", t=dummy_value, degree=2)
+            u = interpolate(E, V)
+            t = 0.5
+            n = 42
+            # test adapter
+            adapter.store_checkpoint(u, t, n) # is the old implementation still working?
+            res_u, res_t, res_n = adapter.retrieve_checkpoint()
+            self.assertEqual(res_t, t)
+            self.assertEqual(res_n, n)
+            np.testing.assert_array_equal(res_u.vector(), u.vector())
+            
+        def test_opt_parameters(adapter):
+            #init variables that are tested against
+            nx = 10
+            mesh = UnitIntervalMesh(nx)
+            V = FunctionSpace(mesh, 'P', 2)
+            dummy_value = 1
+            E = Expression("t", t=dummy_value, degree=2)
+            u = interpolate(E, V)
+            t = 0.5
+            n = 42
+            # test adapter
+            adapter.store_checkpoint(u, t) # without n
+            res = adapter.retrieve_checkpoint()
+            self.assertEqual(len(res), 2) # correct number of return values
+            res_u, res_t, res_n = res
+            self.assertEqual(res_t, t)
+            self.assertEqual(res_n, None)
+            np.testing.assert_array_equal(res_u.vector(), u.vector())
+            
+            adapter.store_checkpoint(u, n) # without t
+            res = adapter.retrieve_checkpoint()
+            self.assertEqual(len(res), 2) # correct number of return values
+            res_u, res_t, res_n = res
+            self.assertEqual(res_n, n)
+            self.assertEqual(res_t, None)
+            np.testing.assert_array_equal(res_u.vector(), u.vector())
+            
+        def test_payload_only(adapter):
+            nx = 10
+            mesh = UnitIntervalMesh(nx)
+            V = FunctionSpace(mesh, 'P', 2)
+            dummy_value = 1
+            E = Expression("t", t=dummy_value, degree=2)
+            u = interpolate(E, V)
+            # test adapter
+            adapter.store_checkpoint(u) # no optional parameters
+            res_u, res_t, res_n = adapter.retrieve_checkpoint()
+            self.assertEqual(res_t, None)
+            self.assertEqual(res_n, None)
+            np.testing.assert_array_equal(res_u.vector(), u.vector())
+            
+        
+        
+        Participant.is_time_window_complete = MagicMock(return_value=False)
+        
+        precice = fenicsprecice.Adapter(self.dummy_config)
+        
+        # call the tests
+        test_all_parameters(precice)
+        test_opt_parameters(precice)
+        test_payload_only(precice)
+        
+        
+        
+        
+        
+        
