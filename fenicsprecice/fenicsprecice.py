@@ -432,7 +432,7 @@ class Adapter:
 
         self._participant.initialize()
 
-    def store_checkpoint(self, payload, t = None, n = None):
+    def store_checkpoint(self, payload, t=None, n=None):
         """
         Defines an object of class SolverState which stores the current state of the variable and the time stamp.
 
@@ -459,9 +459,9 @@ class Adapter:
         -------
         u : FEniCS Function
             Current state of the physical variable of interest for this participant.
-        t : double 
+        t : double
             Current simulation time or None if not specified in store_checkpoint
-        n : int 
+        n : int
             Current time window (iteration) number or None if not specified in store_checkpoint
         """
         assert (not self.is_time_window_complete())
@@ -469,7 +469,7 @@ class Adapter:
 
         # since t and n are optional, they should not be returned, if not specified
         return self._checkpoint.get_state()
-    
+
     def advance(self, dt):
         """
         Advances coupling in preCICE.
