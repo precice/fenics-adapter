@@ -4,7 +4,6 @@
   "interface": {
       "coupling_mesh_name": "Dummy-Mesh",
       "write_data_name": "Dummy-Write",
-      "read_data_name": "Dummy-Read",
-      "interpolation_type": "rbf_segregated"
+      "read_data_name": "Dummy-Read"
     }
 }
