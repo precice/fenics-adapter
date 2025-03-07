@@ -4,7 +4,7 @@
 
 * Set required version of `scipy` to `<1.15.0` to prevent failing tests because of a required module that is not found for later versions of scipy. [#195](https://github.com/precice/fenics-adapter/pull/195)
 
-## v2.2.0
+## 2.2.0
 
 * Use `copy(deepcopy=True)` when checkpointing to make checkpointing more user-friendly and secure. IMPORTANT: might increase runtime, please open an issue if you face serious problems. [#172](https://github.com/precice/fenics-adapter/pull/172)
 * Add unit tests for checkpointing. [#173](https://github.com/precice/fenics-adapter/pull/173)
