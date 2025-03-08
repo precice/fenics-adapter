@@ -466,8 +466,6 @@ class Adapter:
         """
         assert (not self.is_time_window_complete())
         logger.debug("Restore solver state")
-
-        # since t and n are optional, they should not be returned, if not specified
         return self._checkpoint.get_state()
 
     def advance(self, dt):
