@@ -218,7 +218,7 @@ class TestWriteandReadData(TestCase):
             t = 0.5
             n = 42
             # test adapter
-            adapter.store_checkpoint(u, t)  # without n
+            adapter.store_checkpoint(u, t=t)  # without n
             res = adapter.retrieve_checkpoint()
             self.assertEqual(len(res), 3)  # correct number of return values
             res_u, res_t, res_n = res
@@ -226,7 +226,7 @@ class TestWriteandReadData(TestCase):
             self.assertEqual(res_n, None)
             np.testing.assert_array_equal(res_u.vector(), u.vector())
 
-            adapter.store_checkpoint(u, n)  # without t
+            adapter.store_checkpoint(u, n=n)  # without t
             res = adapter.retrieve_checkpoint()
             self.assertEqual(len(res), 3)  # correct number of return values
             res_u, res_t, res_n = res
