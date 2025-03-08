@@ -220,7 +220,7 @@ class TestWriteandReadData(TestCase):
             # test adapter
             adapter.store_checkpoint(u, t)  # without n
             res = adapter.retrieve_checkpoint()
-            self.assertEqual(len(res), 2)  # correct number of return values
+            self.assertEqual(len(res), 3)  # correct number of return values
             res_u, res_t, res_n = res
             self.assertEqual(res_t, t)
             self.assertEqual(res_n, None)
@@ -228,7 +228,7 @@ class TestWriteandReadData(TestCase):
 
             adapter.store_checkpoint(u, n)  # without t
             res = adapter.retrieve_checkpoint()
-            self.assertEqual(len(res), 2)  # correct number of return values
+            self.assertEqual(len(res), 3)  # correct number of return values
             res_u, res_t, res_n = res
             self.assertEqual(res_n, n)
             self.assertEqual(res_t, None)
