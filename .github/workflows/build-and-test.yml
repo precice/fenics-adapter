@@ -42,6 +42,6 @@ jobs:
           echo "setup(name='pyprecice', version='3.0.0.0')" >> precice/setup.py
           pip3 install --break-system-packages ./precice/
       - name: Run unit tests
-        run:  python3 setup.py test -s tests.unit
+        run:  tox run -e unit
       - name: Run integration tests
-        run:  python3 setup.py test -s tests.integration
+        run:  tox run -e integration
