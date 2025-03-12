@@ -31,13 +31,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2   
-      - name: Install FEniCS and scipy (see https://github.com/precice/fenics-adapter/issues/189)
+      - name: Install FEniCS
         run:  |
-         apt-get update
-         apt-get install -y software-properties-common
-         add-apt-repository ppa:fenics-packages/fenics -y
-         apt-get update
-         apt-get install -y fenics
+          apt-get update
+          apt-get install -y software-properties-common
+          add-apt-repository ppa:fenics-packages/fenics -y
+          apt-get update
+          apt-get install -y fenics
       - name: Install tox
         run: pip install tox
       - name: Run unit tests
