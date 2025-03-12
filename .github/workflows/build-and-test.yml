@@ -33,11 +33,11 @@ jobs:
         uses: actions/checkout@v2   
       - name: Install FEniCS
         run:  |
-          apt-get update
-          apt-get install -y software-properties-common
+          apt update
+          apt install -y software-properties-common
           add-apt-repository ppa:fenics-packages/fenics -y
-          apt-get update
-          apt-get install -y fenics
+          apt update
+          apt install -y fenics
       - name: Install tox
         run: pip install tox
       - name: Run unit tests
