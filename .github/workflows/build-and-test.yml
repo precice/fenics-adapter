@@ -40,8 +40,7 @@ jobs:
           mkdir -p precice
           echo "from setuptools import setup" >> precice/setup.py
           echo "setup(name='pyprecice', version='3.0.0.0')" >> precice/setup.py
-          pip3 install --break-system-packages ./precice/
-          name: Install tox
+          pip3 install --break-system-packages ./precice
       - name: Install tox
         run: pip install tox
       - name: Run unit tests
