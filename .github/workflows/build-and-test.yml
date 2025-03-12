@@ -33,9 +33,15 @@ jobs:
         uses: actions/checkout@v2   
       - name: Install FEniCS and scipy (see https://github.com/precice/fenics-adapter/issues/189)
         run:  |
-          sudo add-apt-repository ppa:fenics-packages/fenics
+          sudo add-apt-repository ppa:fenics-packages/fenics -y
           sudo apt-get update
-          sudo apt-get install -y python3-scipy fenics
+          sudo apt-get install -y \ 
+            python3-scipy \ 
+            fenics \
+            pkg-config \
+            libprecice-dev \
+            build-essential
+          pkg-config --modversion precice
       - name: Install tox
         run: pip install tox
       - name: Run unit tests
