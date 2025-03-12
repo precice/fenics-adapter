@@ -39,7 +39,7 @@ jobs:
           pip3 install ../../..
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
-          sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction-complex/solver-fenics/requirements.txt
+          sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction/solver-fenics/requirements.txt
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction
