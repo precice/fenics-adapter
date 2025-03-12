@@ -31,16 +31,14 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2   
-      - name: Install FEniCS
+      - name: Install FEniCS and tox
         run:  |
           apt update
           apt install -y software-properties-common
           add-apt-repository ppa:fenics-packages/fenics -y
           apt update
-          apt install -y fenics
-      - name: Install tox
-        run: pip install tox
+          apt install -y fenics tox
       - name: Run unit tests
-        run:  tox run -e unit
+        run:  tox -e unit
       - name: Run integration tests
-        run:  tox run -e integration
+        run:  tox -e integration
