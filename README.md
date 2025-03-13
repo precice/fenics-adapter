@@ -61,12 +61,13 @@ After cloning this repository and switching to the root directory (`fenics-adapt
 
 As a first test, try to import the adapter via `python3 -c "import fenicsprecice"`.
 
-You can run the other tests via `python3 setup.py test`.
+You can run the other tests via `tox`.
+If you want to run them separately, use `tox -e unit` and `tox -e integration` respectively.
 
 Single tests can be also be run. For example the test `test_vector_write` in the file `test_write_read.py` can be run as follows:
 
 ```bash
-python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
+tox -e all -- tests/integration/test_write_read.py::TestWriteandReadData::test_vector_write
 ```
 
 #### Troubleshooting
