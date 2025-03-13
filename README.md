@@ -31,7 +31,7 @@ python3 -m venv --system-site-packages .venv
 
 You can replace `.venv` with `path/of/your/venv/venv_name` if you want to create the virtual environment somewhere else. The command `--system-site-packages` will allow the virtual environment to access the FEniCS installation on your system. Refer to the [Python documentation](https://docs.python.org/3/library/venv.html) for further details on virtual environments.
 
-If you do not want to use a virtual environment, you might encounter the `error: externally-managed-environment` during installation of the adapter; this depends on your pip version and operating system. You can read why this error shows up [here](https://packaging.python.org/en/latest/specifications/externally-managed-environments/). 
+If you do not want to use a virtual environment, you might encounter the `error: externally-managed-environment` during installation of the adapter; this depends on your pip version and operating system. You can read why this error shows up [here](https://packaging.python.org/en/latest/specifications/externally-managed-environments/).
 
 ### Using pip to install from PyPI
 
