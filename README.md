@@ -67,7 +67,7 @@ If you want to run them separately, use `tox -e unit` and `tox -e integration` r
 Single tests can be also be run. For example the test `test_vector_write` in the file `test_write_read.py` can be run as follows:
 
 ```bash
-python3 tox -e unit -- tests/test_write_read.py::TestWriteandReadData::test_vector_write
+tox -e all -- tests/integration/test_write_read.py::TestWriteandReadData::test_vector_write
 ```
 
 #### Troubleshooting
