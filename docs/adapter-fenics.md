@@ -32,9 +32,9 @@ The adapter requires FEniCS and preCICE version 2.0 or greater and the preCICE l
 
 The adapter is [published on PyPI](https://pypi.org/project/fenicsprecice/). After installing preCICE and the python language bindings, run `pip3 install --user fenicsprecice` to install the adapter via your Python package manager.
 
-### Use `conda`
+### Use `conda` (or `mamba`)
 
-You can alternatively use `conda` to install the adapter. Please refer to [`conda-forge/fenicsprecice`](https://anaconda.org/conda-forge/fenicsprecice) for installation instructions. Bonus, if you use `conda`: You don't have to worry about the dependencies, because `conda` takes care of this for you.
+You can alternatively use `conda` (or `mamba`) to install the adapter. We recommend using [Miniforge](https://conda-forge.org/download/) (see https://www.fz-juelich.de/en/rse/the_latest/the-anaconda-is-squeezing-us for reasons why). Please refer to [`conda-forge/fenicsprecice`](https://github.com/conda-forge/fenicsprecice-feedstock) for installation instructions. Added advantage of using `conda`: you do not have to worry about the dependencies, because `conda` takes care of this for you.
 
 ### Something special?
 
