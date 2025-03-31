@@ -7,12 +7,19 @@ on:
   pull_request:
     paths:
       - '**'
+  workflow_dispatch:
+    inputs:
+      docker_image_tag:
+        description: 'Specify tag for docker container precice/precice:tag'
+        required: true
+        default: 'nightly'
+        type: string
 
 jobs:
   run_ht_simple:
     name: Run HT, simple
     runs-on: ubuntu-latest
-    container: precice/precice:nightly
+    container: precice/precice:${{ inputs.docker_image_tag }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
