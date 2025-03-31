@@ -55,7 +55,7 @@ jobs:
   run_ht_complex:
     name: Run HT, complex
     runs-on: ubuntu-latest
-    container: precice/precice:nightly
+    container: precice/precice:${{ inputs.docker_image_tag }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
