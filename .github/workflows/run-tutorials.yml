@@ -38,18 +38,12 @@ jobs:
           /opt/adapter-venv/bin/pip install --upgrade pip
       - name: Install adapter
         run: pip install .
+      - name: Verify adapter import
+        run: python -c "import fenicsprecice"
       - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
         run: pip uninstall -y fenics-ufl
       - name: Get tutorials
         run: git clone -b develop https://github.com/precice/tutorials.git
-      - name: Install adapter for Dirichlet participants
-        run: |
-          cd tutorials/partitioned-heat-conduction/dirichlet-fenics
-          pip install ../../..
-      - name: Install adapter for Neumann participants
-        run: |
-          cd tutorials/partitioned-heat-conduction/neumann-fenics
-          pip install ../../..
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
           sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction/solver-fenics/requirements.txt
@@ -80,18 +74,12 @@ jobs:
           /opt/adapter-venv/bin/pip install --upgrade pip
       - name: Install adapter
         run: pip install .
+      - name: Verify adapter import
+        run: python -c "import fenicsprecice"
       - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
         run: pip uninstall -y fenics-ufl
       - name: Get tutorials
         run: git clone -b develop https://github.com/precice/tutorials.git
-      - name: Install adapter for Dirichlet participants
-        run: |
-          cd tutorials/partitioned-heat-conduction-complex/dirichlet-fenics
-          pip install ../../..
-      - name: Install adapter for Neumann participants
-        run: |
-          cd tutorials/partitioned-heat-conduction-complex/neumann-fenics
-          pip install ../../..
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
           sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction-complex/solver-fenics/requirements.txt
