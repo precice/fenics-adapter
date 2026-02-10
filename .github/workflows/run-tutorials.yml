@@ -31,7 +31,7 @@ jobs:
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
       - name: Install adapter
-        run: MPICC=mpicc PIP_NO_BINARY=mpi4py pip3 install --user .
+        run: MPICC=mpicc PIP_NO_BINARY=mpi4py pip3 install .
       - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
         run: pip3 uninstall -y fenics-ufl
       - name: Get tutorials
@@ -71,7 +71,7 @@ jobs:
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
       - name: Install adapter
-        run: MPICC=mpicc PIP_NO_BINARY=mpi4py pip3 install --user .
+        run: MPICC=mpicc PIP_NO_BINARY=mpi4py pip3 install .
       - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
         run: pip3 uninstall -y fenics-ufl
       - name: Get tutorials
