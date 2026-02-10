@@ -5,7 +5,7 @@ cff-version: 1.2.0
 title: FEniCS-preCICE
 message: >-
   If you use this software, please cite it using the metadata from this file. When using or referring to preCICE in
-  academic publications, please follow the [citation guidelines](https://precice.org/fundamentals-literature-guide.html). 
+  academic publications, please follow the [citation guidelines](https://precice.org/fundamentals-literature-guide.html).
 type: software
 authors:
   - given-names: Benjamin
@@ -36,7 +36,7 @@ version: 2.2.0
 preferred-citation:
   title: "FEniCS-preCICE: Coupling FEniCS to other Simulation Software"
   type: "article"
-  authors: 
+  authors:
     - affiliation: "Technical University of Munich"
       family-names: Rodenberg
       given-names: Benjamin
