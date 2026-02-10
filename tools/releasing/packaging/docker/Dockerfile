@@ -1,4 +1,4 @@
-# Dockerfile to build a ubuntu image containing the installed Debian package of a release 
+# Dockerfile to build a ubuntu image containing the installed Debian package of a release
 ARG PYTHON_BINDINGS_REF=develop
 ARG from=precice/python-bindings:${PYTHON_BINDINGS_REF}
 FROM $from
