@@ -26,12 +26,12 @@ jobs:
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
-          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils openmpi-bin libopenmpi-dev
+          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils openmpi-bin libopenmpi-dev python3-mpi4py
           add-apt-repository -y ppa:fenics-packages/fenics
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
       - name: Install adapter
-        run: MPICC=mpicc PIP_NO_BINARY=mpi4py pip3 install .
+        run: pip3 install .
       - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
         run: pip3 uninstall -y fenics-ufl
       - name: Get tutorials
@@ -66,12 +66,12 @@ jobs:
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
-          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils openmpi-bin libopenmpi-dev
+          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils openmpi-bin libopenmpi-dev python3-mpi4py
           add-apt-repository -y ppa:fenics-packages/fenics
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
       - name: Install adapter
-        run: MPICC=mpicc PIP_NO_BINARY=mpi4py pip3 install .
+        run: pip3 install .
       - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
         run: pip3 uninstall -y fenics-ufl
       - name: Get tutorials
