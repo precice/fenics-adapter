@@ -38,16 +38,14 @@ jobs:
           python3 -m venv .venv
           . .venv/bin/activate
           pip3 install ../../..
-          pip3 uninstall -y mpi4py
-          pip install --force-reinstall --no-cache-dir mpi4py
+          pip3 install --force-reinstall --no-cache-dir mpi4py
       - name: Create venv for Neumann participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction/neumann-fenics
           python3 -m venv .venv
           . .venv/bin/activate
           pip3 install ../../..
-          pip3 uninstall -y mpi4py
-          pip install --force-reinstall --no-cache-dir mpi4py
+          pip3 install --force-reinstall --no-cache-dir mpi4py
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
           sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction/solver-fenics/requirements.txt
