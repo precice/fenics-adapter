@@ -38,6 +38,7 @@ jobs:
           python3 -m venv .venv
           . .venv/bin/activate
           pip3 install ../../..
+          apt-get -qq remove python3-mpi4py
           pip3 uninstall -y mpi4py
           pip3 install --no-cache-dir --force-reinstall --no-binary=mpi4py mpi4py
       - name: Create venv for Neumann participants and install adapter
@@ -46,6 +47,7 @@ jobs:
           python3 -m venv .venv
           . .venv/bin/activate
           pip3 install ../../..
+          apt-get -qq remove python3-mpi4py
           pip3 uninstall -y mpi4py
           pip3 install --no-cache-dir --force-reinstall --no-binary=mpi4py mpi4py
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
