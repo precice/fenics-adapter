@@ -26,7 +26,7 @@ jobs:
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
-          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils libopenmpi-dev
+          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils
           add-apt-repository -y ppa:fenics-packages/fenics
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
@@ -38,18 +38,12 @@ jobs:
           python3 -m venv .venv
           . .venv/bin/activate
           pip3 install ../../..
-          apt-get -qq remove python3-mpi4py
-          pip3 uninstall -y mpi4py
-          pip3 install --no-cache-dir --force-reinstall --no-binary=mpi4py mpi4py
       - name: Create venv for Neumann participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction/neumann-fenics
           python3 -m venv .venv
           . .venv/bin/activate
           pip3 install ../../..
-          apt-get -qq remove python3-mpi4py
-          pip3 uninstall -y mpi4py
-          pip3 install --no-cache-dir --force-reinstall --no-binary=mpi4py mpi4py
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
           sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction/solver-fenics/requirements.txt
