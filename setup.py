@@ -20,7 +20,7 @@ setup(name='fenicsprecice',
           'pyprecice>=3.0.0.0',
           'scipy<1.15.0',
           'numpy>=1.13.3, <2',
-          "mpi4py==4.0.0",
+          "mpi4py",
       ],
       test_suite='tests',
       zip_safe=False)
