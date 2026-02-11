@@ -38,14 +38,12 @@ jobs:
           python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
           pip3 install ../../..
-          python3 -c "import mpi4py; print(mpi4py.__version__)"
       - name: Create venv for Neumann participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction/neumann-fenics
           python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
           pip3 install ../../..
-          python3 -c "import mpi4py; print(mpi4py.__version__)"
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
           sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction/solver-fenics/requirements.txt
