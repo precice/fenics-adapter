@@ -37,14 +37,14 @@ jobs:
           cd tutorials/partitioned-heat-conduction/dirichlet-fenics
           python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
-          pip3 install 'mpi4py<4' ../../..
+          pip3 install ../../..
           python3 -c "import mpi4py; print(mpi4py.__version__)"
       - name: Create venv for Neumann participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction/neumann-fenics
           python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
-          pip3 install 'mpi4py<4' ../../..
+          pip3 install ../../..
           python3 -c "import mpi4py; print(mpi4py.__version__)"
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
@@ -75,13 +75,13 @@ jobs:
           cd tutorials/partitioned-heat-conduction-complex/dirichlet-fenics
           python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
-          pip3 install 'mpi4py<4' ../../..
+          pip3 install ../../..
       - name: Create venv for Neumann participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction-complex/neumann-fenics
           python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
-          pip3 install 'mpi4py<4' ../../..
+          pip3 install ../../..
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
         run: |
           sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction-complex/solver-fenics/requirements.txt
