@@ -26,7 +26,7 @@ jobs:
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
-          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils
+          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils libopenmpi-dev openmpi-bin
           add-apt-repository -y ppa:fenics-packages/fenics
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
@@ -35,13 +35,13 @@ jobs:
       - name: Create venv for Dirichlet participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction/dirichlet-fenics
-          python3 -m venv .venv
+          python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
           pip3 install ../../..
       - name: Create venv for Neumann participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction/neumann-fenics
-          python3 -m venv .venv
+          python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
           pip3 install ../../..
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
@@ -62,7 +62,7 @@ jobs:
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
-          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils
+          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils libopenmpi-dev openmpi-bin
           add-apt-repository -y ppa:fenics-packages/fenics
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
@@ -71,13 +71,13 @@ jobs:
       - name: Create venv for Dirichlet participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction-complex/dirichlet-fenics
-          python3 -m venv .venv
+          python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
           pip3 install ../../..
       - name: Create venv for Neumann participants and install adapter
         run: |
           cd tutorials/partitioned-heat-conduction-complex/neumann-fenics
-          python3 -m venv .venv
+          python3 -m venv --system-site-packages .venv
           . .venv/bin/activate
           pip3 install ../../..
       - name: Remove fenicsadapter from requirements to avoid overwriting develop version
