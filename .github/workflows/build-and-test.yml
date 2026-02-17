@@ -2,13 +2,12 @@ name: Build and Test
 on:
   push:
     branches:
-      - master
-      - develop
+      - '*'
   pull_request:
     paths:
-      - '**'
-      
-jobs:  
+      - '*'
+
+jobs:
   sdist:
     name: Build distribution
     runs-on: ubuntu-latest
@@ -22,23 +21,24 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip3 install --break-system-packages setuptools wheel twine
+          pip3 install --break-system-packages build twine
       - name: Build distribution
-        run:  python3 setup.py sdist
+        run: python3 -m build --sdist
   test:
     name: Run mock unit tests
     runs-on: ubuntu-latest
-    container: benjaminrodenberg/fenics
+    container: precice/precice:nightly
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2      
-      - name: Install fake precice
+        uses: actions/checkout@v2
+      - name: Install FEniCS and tox
         run:  |
-          mkdir -p precice
-          echo "from setuptools import setup" >> precice/setup.py
-          echo "setup(name='pyprecice', version='3.0.0.0')" >> precice/setup.py
-          pip3 install --break-system-packages ./precice/
+          apt update
+          apt install -y software-properties-common
+          add-apt-repository ppa:fenics-packages/fenics -y
+          apt update
+          apt install -y fenics tox
       - name: Run unit tests
-        run:  python3 setup.py test -s tests.unit
+        run:  tox -e unit
       - name: Run integration tests
-        run:  python3 setup.py test -s tests.integration
+        run:  tox -e integration

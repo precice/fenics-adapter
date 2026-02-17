@@ -15,24 +15,35 @@
     <img src="https://github.com/precice/fenics-adapter/actions/workflows/run-tutorials.yml/badge.svg" alt="Run preCICE Tutorials">
 </a>
 <a style="text-decoration: none" href="https://pypi.org/project/fenicsprecice/" target="_blank">
-    <img src="https://github.com/precice/fenics-adapter/actions/workflows/pythonpublish.yml/badge.svg" alt="Upload Python Package">
+    <img src="https://github.com/precice/fenics-adapter/actions/workflows/release.yml/badge.svg" alt="Upload Package">
 </a>
 
 preCICE-adapter for the open source computing platform FEniCS.
 
 ## Installing the package
 
-### Using pip3 to install from PyPI
+Generally, we recommend to create a virtual environment and install the package there. The following commands will create the virtual environment `.venv`:
+
+```bash
+python3 -m venv --system-site-packages .venv
+. .venv/bin/activate
+```
+
+You can replace `.venv` with `path/of/your/venv/venv_name` if you want to create the virtual environment somewhere else. The command `--system-site-packages` will allow the virtual environment to access the FEniCS installation on your system. Refer to the [Python documentation](https://docs.python.org/3/library/venv.html) for further details on virtual environments.
+
+If you do not want to use a virtual environment, you might encounter the `error: externally-managed-environment` during installation of the adapter; this depends on your pip version and operating system. You can read why this error shows up in the [documentation](https://packaging.python.org/en/latest/specifications/externally-managed-environments/).
+
+### Using pip to install from PyPI
 
 It is recommended to install [fenicsprecice from PyPI](https://pypi.org/project/fenicsprecice/) via
 
 ```bash
-pip3 install --user fenicsprecice
+pip install fenicsprecice
 ```
 
 This should work out of the box, if all dependencies are installed correctly. If you face problems during installation or you want to run the tests, see below for a list of dependencies and alternative installation procedures
 
-### Clone this repository and use pip3
+### Clone this repository and use pip
 
 #### Required dependencies
 
@@ -41,23 +52,24 @@ Make sure to install the following dependencies:
 * [preCICE](https://github.com/precice/precice/wiki)
 * python3 (this adapter **only supports python3**)
 * [the python language bindings for preCICE](https://github.com/precice/python-bindings)
-* [FEniCS](https://fenicsproject.org/) (with python interface, installed by default)
-* and scipy (`pip3 install scipy`)
+* [FEniCS](https://fenicsproject.org/) (with Python interface, installed by default)
+* and scipy (`pip install scipy`)
 
 #### Build and install the adapter
 
-After cloning this repository and switching to the root directory (`fenics-adapter`), run ``pip3 install --user .`` from your shell.
+After cloning this repository and switching to the root directory (`fenics-adapter`), run ``pip install .`` from your shell.
 
 #### Test the adapter
 
 As a first test, try to import the adapter via `python3 -c "import fenicsprecice"`.
 
-You can run the other tests via `python3 setup.py test`.
+You can run the other tests via `tox`.
+If you want to run them separately, use `tox -e unit` and `tox -e integration` respectively.
 
 Single tests can be also be run. For example the test `test_vector_write` in the file `test_write_read.py` can be run as follows:
 
 ```bash
-python3 -m unittest tests.test_write_read.TestWriteandReadData.test_vector_write
+tox -e all -- tests/integration/test_write_read.py::TestWriteandReadData::test_vector_write
 ```
 
 #### Troubleshooting
@@ -76,7 +88,7 @@ Please refer to [our website](https://www.precice.org/adapter-fenics.html#how-ca
 
 ## Packaging
 
-To create and install the `fenicsprecice` python package the following instructions were used: [How To Package Your Python Code from python-packaging.readthedocs.io](https://python-packaging.readthedocs.io/en/latest/index.html).
+To create and install the `fenicsprecice` Python package the following instructions were used: ["How To Package Your Python Code" from python-packaging.readthedocs.io](https://python-packaging.readthedocs.io/en/latest/index.html).
 
 ## Citing
 

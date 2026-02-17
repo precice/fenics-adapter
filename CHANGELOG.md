@@ -1,6 +1,14 @@
 # FEniCS-preCICE adapter changelog
 
-## v2.2.0
+## 2.3.0
+
+* Improved building: removed `setup.py`, `setup.cfg`; added `pyproject.toml`. Replaced versioneer with Git tag based versioning. [#204](https://github.com/precice/fenics-adapter/pull/204)
+* Set mpi4py dependency version requirement to `>=3` to ensure compatibility with legacy FEniCS.
+* Introduced tox for testing. [#197](https://github.com/precice/fenics-adapter/pull/197)
+* Made `t` and `n` optional arguments in the function `store_checkpoint`. [#178](https://github.com/precice/fenics-adapter/pull/178)
+* Set required version of `scipy` to `<1.15.0` to prevent failing tests because of a required module that is not found for later versions of scipy. [#195](https://github.com/precice/fenics-adapter/pull/195)
+
+## 2.2.0
 
 * Use `copy(deepcopy=True)` when checkpointing to make checkpointing more user-friendly and secure. IMPORTANT: might increase runtime, please open an issue if you face serious problems. [#172](https://github.com/precice/fenics-adapter/pull/172)
 * Add unit tests for checkpointing. [#173](https://github.com/precice/fenics-adapter/pull/173)

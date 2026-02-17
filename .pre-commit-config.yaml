@@ -1,0 +1,22 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v2.3.0
+  hooks:
+    - id: check-xml
+    - id: check-merge-conflict
+    - id: mixed-line-ending
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+# markdownlint for markdown formatting
+- repo: https://github.com/markdownlint/markdownlint
+  rev: v0.12.0
+  hooks:
+    - id: markdownlint
+      args: ['-c', '.markdown-link-check-config.json', '-r', '~MD002,~MD013,~MD026,~MD029,~MD033,~MD034']
+- repo: https://github.com/precice/precice-pre-commit-hooks
+  rev: 'v3.3'
+  hooks:
+  - id: format-precice-config
+    files: "^.*/precice-config.xml"
+  - id: check-image-prefix
+    args: [ --prefix=docs-tooling-micro-manager- ]

@@ -7,28 +7,46 @@ on:
   pull_request:
     paths:
       - '**'
+  workflow_dispatch:
+    inputs:
+      docker_image_tag:
+        description: 'Specify tag for docker container precice/precice:tag'
+        required: true
+        default: 'nightly'
+        type: string
 
 jobs:
   run_ht_simple:
     name: Run HT, simple
     runs-on: ubuntu-latest
-    container: precice/precice:develop
+    container: precice/precice:${{ inputs.docker_image_tag || 'nightly' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
-          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils
+          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils libopenmpi-dev openmpi-bin
           add-apt-repository -y ppa:fenics-packages/fenics
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
-      - name: Install adapter
-        run:  pip3 install --user .
-      - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
-        run: pip3 uninstall -y fenics-ufl
       - name: Get tutorials
         run: git clone -b develop https://github.com/precice/tutorials.git
+      - name: Create venv for Dirichlet participants and install adapter
+        run: |
+          cd tutorials/partitioned-heat-conduction/dirichlet-fenics
+          python3 -m venv --system-site-packages .venv
+          . .venv/bin/activate
+          pip3 install ../../..
+      - name: Create venv for Neumann participants and install adapter
+        run: |
+          cd tutorials/partitioned-heat-conduction/neumann-fenics
+          python3 -m venv --system-site-packages .venv
+          . .venv/bin/activate
+          pip3 install ../../..
+      - name: Remove fenicsadapter from requirements to avoid overwriting develop version
+        run: |
+          sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction/solver-fenics/requirements.txt
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction
@@ -37,23 +55,34 @@ jobs:
   run_ht_complex:
     name: Run HT, complex
     runs-on: ubuntu-latest
-    container: precice/precice:develop
+    container: precice/precice:${{ inputs.docker_image_tag || 'nightly' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
       - name: Install Dependencies & FEniCS
         run: |
           apt-get -qq update
-          apt-get -qq install software-properties-common python3-dev python3-pip git apt-utils
+          apt-get -qq install software-properties-common python3-dev python3-pip python3-venv git apt-utils libopenmpi-dev openmpi-bin
           add-apt-repository -y ppa:fenics-packages/fenics
           apt-get -qq install --no-install-recommends fenics
           rm -rf /var/lib/apt/lists/*
-      - name: Install adapter
-        run:  pip3 install --user .
-      - name: Fix broken FEniCS installation (see https://fenicsproject.discourse.group/t/installing-python-package-with-fenics-dependency-breaks-fenics-installation/4476)
-        run: pip3 uninstall -y fenics-ufl
       - name: Get tutorials
         run: git clone -b develop https://github.com/precice/tutorials.git
+      - name: Create venv for Dirichlet participants and install adapter
+        run: |
+          cd tutorials/partitioned-heat-conduction-complex/dirichlet-fenics
+          python3 -m venv --system-site-packages .venv
+          . .venv/bin/activate
+          pip3 install ../../..
+      - name: Create venv for Neumann participants and install adapter
+        run: |
+          cd tutorials/partitioned-heat-conduction-complex/neumann-fenics
+          python3 -m venv --system-site-packages .venv
+          . .venv/bin/activate
+          pip3 install ../../..
+      - name: Remove fenicsadapter from requirements to avoid overwriting develop version
+        run: |
+          sed -i '/fenicsprecice/d' tutorials/partitioned-heat-conduction-complex/solver-fenics/requirements.txt
       - name: Run tutorial
         run: |
           cd tutorials/partitioned-heat-conduction-complex
