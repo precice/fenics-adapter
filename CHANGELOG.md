@@ -2,6 +2,7 @@
 
 ## develop
 
+* Improved building: removed `setup.py`, `setup.cfg`; added `pyproject.toml`. Replaced versioneer with Git tag based versioning. [#204](https://github.com/precice/fenics-adapter/pull/204)
 * Set mpi4py dependency version requirement to `>=3` to ensure compatibility with legacy FEniCS.
 * Set required version of `scipy` to `<1.15.0` to prevent failing tests because of a required module that is not found for later versions of scipy. [#195](https://github.com/precice/fenics-adapter/pull/195)
 * `store_checkpoint` no longer requires the time `t` and the current time window number `n` as parameters as they are now optional. If they are not specified in `store_checkpoint`, `retrieve_checkpoint` still returns a tuple of three elements but for unspecified parameters, it returns `None`.
