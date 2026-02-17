@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel", "setuptools-git-versioning>=1.8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fenicsprecice"
+description = "FEniCS-preCICE adapter is a preCICE adapter for the open source computing platform FEniCS."
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "LGPL-3.0"}
+authors = [
+    {name = "the preCICE developers", email = "info@precice.org"},
+]
+dependencies = [
+    "pyprecice>=3.0.0.0",
+    "scipy<1.15.0",
+    "numpy>=1.13.3,<2",
+    "mpi4py>=3",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/precice/fenics-adapter"
+Documentation = "https://precice.org/tutorials-fenics-adapter.html"
+Repository = "https://github.com/precice/fenics-adapter"
+Issues = "https://github.com/precice/fenics-adapter/issues"
+
+[tool.setuptools]
+packages = ["fenicsprecice"]
+zip-safe = false
+include-package-data = true
+
+[tool.wheel]
+license-files = ["LICENSE"]
+
+[tool.setuptools-git-versioning]
+enabled = true
