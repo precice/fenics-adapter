@@ -15,7 +15,7 @@
     <img src="https://github.com/precice/fenics-adapter/actions/workflows/run-tutorials.yml/badge.svg" alt="Run preCICE Tutorials">
 </a>
 <a style="text-decoration: none" href="https://pypi.org/project/fenicsprecice/" target="_blank">
-    <img src="https://github.com/precice/fenics-adapter/actions/workflows/pythonpublish.yml/badge.svg" alt="Upload Python Package">
+    <img src="https://github.com/precice/fenics-adapter/actions/workflows/release.yml/badge.svg" alt="Upload Package">
 </a>
 
 preCICE-adapter for the open source computing platform FEniCS.
