@@ -1,0 +1,41 @@
+name: Upload Python Package
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build:
+    name: Build package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - run: pip install --upgrade build
+      - name: Build package
+        run: pyproject-build
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Upload release to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

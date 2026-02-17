@@ -60,3 +60,6 @@ universal = false
 
 [tool.wheel]
 license-files = ["LICENSE"]
+
+[tool.setuptools-git-versioning]
+enabled = true
