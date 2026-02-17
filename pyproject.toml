@@ -1,12 +1,11 @@
 [build-system]
-requires = ["setuptools>=65.0", "wheel", "versioneer[toml]==0.29"]
+requires = ["setuptools>=65.0", "wheel", "setuptools-git-versioning>=1.8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "fenicsprecice"
 description = "FEniCS-preCICE adapter is a preCICE adapter for the open source computing platform FEniCS."
 readme = "README.md"
-readme-content-type = "text/markdown"
 requires-python = ">=3.7"
 license = {text = "LGPL-3.0"}
 authors = [
@@ -46,14 +45,6 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 fenicsprecice = ["py.typed"]
-
-[tool.versioneer]
-VCS = "git"
-style = "pep440"
-versionfile_source = "fenicsprecice/_version.py"
-versionfile_build = "fenicsprecice/_version.py"
-tag_prefix = "v"
-parentdir_prefix = "fenicsprecice-"
 
 [tool.bdist-wheel]
 universal = false
