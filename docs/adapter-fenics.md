@@ -1,6 +1,8 @@
 ---
 title: The FEniCS adapter
 permalink: adapter-fenics.html
+aliases:
+  - /adapter-fenics.html
 keywords: adapter, fenics
 summary: "A general adapter for the open source computing platform FEniCS"
 ---
