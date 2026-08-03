@@ -1,5 +1,5 @@
 name: Lint scripts and docs
-on: [push, pull_request]
+on: workflow_dispatch
 jobs:
   check_markdown_files:
     name: Lint scripts and docs
