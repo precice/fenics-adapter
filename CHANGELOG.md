@@ -1,6 +1,6 @@
 # FEniCS-preCICE adapter changelog
 
-## develop
+## 2.3.1
 
 * Removed the version restrictions of `scipy`, since the required modules are again compatible with the latest version. [#211](https://github.com/precice/fenics-adapter/pull/211)
 * Migrated the documentation from the [website repository](https://github.com/precice/precice.github.io). [#206](https://github.com/precice/fenics-adapter/pull/206)
